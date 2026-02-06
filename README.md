@@ -125,7 +125,21 @@ The API will be available at `http://localhost:3000`
 
 API documentation: `http://localhost:3000/api-docs`
 
-## 📁 Project Structure
+## �️ Database Schema
+
+The system uses PostgreSQL with the following entity relationships:
+
+![Database ERD](docs/ERD.svg)
+
+**Key Design Decisions:**
+
+- **UUID primary keys** for better distribution and security
+- **Composite indexes** on `(propertyId, checkIn, checkOut)` for fast availability checks
+- **Soft delete** via `isActive` flag on properties
+- **Cascade delete** on refresh tokens when user is deleted
+- **Decimal type** for money to avoid floating-point precision issues
+
+## �📁 Project Structure
 
 ```
 booking-service/

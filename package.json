@@ -4,25 +4,29 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prisma:generate": "prisma generate",
+    "generate:erd": "powershell -ExecutionPolicy Bypass -File ./scripts/generate-erd.ps1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.28.2",
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.12.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.1",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "prisma": "^7.3.0",
+    "prisma": "5.22.0",
+    "prisma-erd-generator": "^2.4.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@prisma/client": "^7.3.0",
+    "@prisma/client": "5.22.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.67.3",
     "cors": "^2.8.6",

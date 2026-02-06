@@ -1,0 +1,126 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "../docs/ERD.svg"
+}
+
+// ============================================
+// User Management
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings      Booking[]
+  properties    Property[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+  OWNER
+}
+
+// ============================================
+// Property Management
+// ============================================
+
+model Property {
+  id            String       @id @default(uuid())
+  title         String
+  description   String       @db.Text
+  type          PropertyType
+  city          String
+  address       String
+  pricePerNight Decimal      @db.Decimal(10, 2)
+  maxGuests     Int
+  amenities     String[]
+  images        String[]
+  ownerId       String
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  owner         User         @relation(fields: [ownerId], references: [id])
+  bookings      Booking[]
+
+  @@index([city, pricePerNight])
+  @@index([isActive])
+  @@index([ownerId])
+  @@map("properties")
+}
+
+enum PropertyType {
+  HOTEL_ROOM
+  APARTMENT
+  HOUSE
+  MEETING_ROOM
+}
+
+// ============================================
+// Booking Management
+// ============================================
+
+model Booking {
+  id          String        @id @default(uuid())
+  propertyId  String
+  userId      String
+  checkIn     DateTime
+  checkOut    DateTime
+  totalPrice  Decimal       @db.Decimal(10, 2)
+  guests      Int
+  status      BookingStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  property    Property      @relation(fields: [propertyId], references: [id])
+  user        User          @relation(fields: [userId], references: [id])
+
+  @@index([propertyId, checkIn, checkOut])
+  @@index([userId])
+  @@index([status])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// ============================================
+// Authentication
+// ============================================
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
