@@ -129,7 +129,7 @@ API documentation: `http://localhost:3000/api-docs`
 
 The system uses PostgreSQL with the following entity relationships:
 
-![Database ERD](docs/ERD.svg)
+<!-- ERD diagram will be added here -->
 
 **Key Design Decisions:**
 
@@ -138,6 +138,19 @@ The system uses PostgreSQL with the following entity relationships:
 - **Soft delete** via `isActive` flag on properties
 - **Cascade delete** on refresh tokens when user is deleted
 - **Decimal type** for money to avoid floating-point precision issues
+- **Average rating calculation** through aggregation or cached fields
+- **Payment idempotency** for safe transaction processing
+- **Blocked dates** for owner-controlled availability
+
+**Main Tables:**
+
+- **Users** - Authentication and user management (USER, ADMIN, OWNER roles)
+- **Properties** - Hotels, apartments, houses with average rating & review count
+- **Bookings** - Reservation management with race condition protection
+- **Reviews** - Rating (1-5) and feedback system with user comments
+- **Payments** - Transaction tracking (STRIPE, PAYPAL, CASH providers)
+- **BlockedDates** - Owner-managed unavailability periods (maintenance, personal use)
+- **RefreshTokens** - JWT token rotation for secure authentication
 
 ## �📁 Project Structure
 

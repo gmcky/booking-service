@@ -7,11 +7,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator erd {
-  provider = "prisma-erd-generator"
-  output   = "../docs/ERD.svg"
-}
-
 // ============================================
 // User Management
 // ============================================
@@ -29,6 +24,7 @@ model User {
   bookings      Booking[]
   properties    Property[]
   refreshTokens RefreshToken[]
+  reviews       Review[]
 
   @@map("users")
 }
@@ -56,11 +52,15 @@ model Property {
   images        String[]
   ownerId       String
   isActive      Boolean      @default(true)
+  averageRating Decimal?     @db.Decimal(2, 1) // Средний рейтинг (автоматически обновляется)
+  reviewCount   Int          @default(0)        // Количество отзывов
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
   owner         User         @relation(fields: [ownerId], references: [id])
   bookings      Booking[]
+  reviews       Review[]
+  blockedDates  BlockedDate[]
 
   @@index([city, pricePerNight])
   @@index([isActive])
@@ -89,6 +89,7 @@ model Booking {
   guests      Int
   status      BookingStatus @default(PENDING)
   createdAt   DateTime      @default(now())
+  payment     Payment?      // Один платеж на бронь
   updatedAt   DateTime      @updatedAt
 
   property    Property      @relation(fields: [propertyId], references: [id])
@@ -123,4 +124,76 @@ model RefreshToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+// ============================================
+// Reviews & Ratings
+// ============================================
+
+model Review {
+  id         String   @id @default(uuid())
+  rating     Int      // 1-5 (валидация через Zod)
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([userId])
+  @@index([rating]) // Для быстрой фильтрации по рейтингу
+  @@map("reviews")
+}
+
+// ============================================
+// Payment Management
+// ============================================
+
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  provider      String        // "STRIPE", "PAYPAL", "CASH"
+  transactionId String?       // ID от платежной системы
+  metadata      Json?         // Дополнительные данные от провайдера
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  bookingId     String        @unique // 1 платеж = 1 бронь
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([transactionId])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+// ============================================
+// Availability Management
+// ============================================
+
+model BlockedDate {
+  id         String   @id @default(uuid())
+  startDate  DateTime
+  endDate    DateTime
+  reason     String?  @db.Text // "Ремонт", "Личное использование"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, startDate, endDate]) // Критично для проверки доступности
+  @@map("blocked_dates")
 }
