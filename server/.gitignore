@@ -1,0 +1,67 @@
+# ====================
+# SERVER (Node.js/TypeScript)
+# ====================
+
+# Dependencies
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+.rollup.cache/
+
+# Logs
+logs/
+*.log
+pino-*.log
+combined.log
+error.log
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+prisma/dev.db*
+migrations/.DS_Store
+
+# Uploads (если будет загрузка файлов)
+uploads/
+public/uploads/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Lock files (если нужно игнорировать)
+# package-lock.json
+# yarn.lock
+
+# Templates
+package.json.template
