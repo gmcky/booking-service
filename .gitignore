@@ -30,7 +30,7 @@ docker-compose.override.yml
 notes.md
 todo.md
 roadmap.md
-stack.mdS
+stack.md
 
 # Temporary files
 tmp/
