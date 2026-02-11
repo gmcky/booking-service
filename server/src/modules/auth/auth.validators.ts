@@ -1,45 +1,51 @@
 import { z } from "zod";
-
-// TODO: Strengthen password validation for better security
-// Current: min 8 characters (weak!)
-// Recommended requirements:
-// - Min 8 characters (or 12 for better security)
-// - At least 1 uppercase letter
-// - At least 1 lowercase letter
-// - At least 1 number
-// - At least 1 special character
-// - No common passwords (use zxcvbn library for password strength)
-//
-// Example strong password schema:
-// password: z.string()
-//   .min(12, 'Password must be at least 12 characters')
-//   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-//   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-//   .regex(/[0-9]/, 'Password must contain at least one number')
-//   .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
-//   .refine((val) => !commonPasswords.includes(val), {
-//     message: 'Password is too common'
-//   })
+import zxcvbn from "zxcvbn";
+import { parsePhoneNumberWithError, PhoneNumber } from "libphonenumber-js";
 
 export const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z
+    .string()
+    .min(8)
+    .max(128)
+    .refine(
+      (password) => {
+        const result = zxcvbn(password);
+        return result.score >= 3;
+      },
+      {
+        message:
+          "Password is too weak or common. Please use a stronger password.",
+      },
+    ),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  // TODO: Add optional fields
-  // phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/).optional(),
-  // dateOfBirth: z.string().datetime().transform(s => new Date(s)).optional(),
-  // agreedToTerms: z.boolean().refine(val => val === true, {
-  //   message: 'You must accept the terms and conditions'
-  // })
+
+  phoneNumber: z
+    .string()
+    .min(10)
+    .max(20)
+    .optional()
+    .refine(
+      (val) => {
+        if (!val) return true;
+        try {
+          const phoneNumber = parsePhoneNumberWithError(val, "UA");
+          return phoneNumber.isValid();
+        } catch {
+          return false;
+        }
+      },
+      {
+        message: "Invalid phone number format",
+      },
+    ),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
-  // TODO: Add optional remember-me flag
-  // rememberMe: z.boolean().optional().default(false)
-  // If true, issue longer-lived refresh token (30 days vs 7 days)
+  email: z.email().trim().toLowerCase(),
+  password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export const refreshTokenSchema = z.object({
