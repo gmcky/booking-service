@@ -1,0 +1,42 @@
+import dotenv from "dotenv";
+import { cleanEnv, str, port, url, num, bool } from "envalid";
+
+dotenv.config();
+
+export const env = cleanEnv(process.env, {
+  NODE_ENV: str({
+    choices: ["development", "production", "test"],
+    default: "development",
+  }),
+  PORT: port({ default: 3000 }),
+  DATABASE_URL: url(),
+
+  // Redis
+  REDIS_HOST: str({ default: "localhost" }),
+  REDIS_PORT: port({ default: 6379 }),
+  REDIS_PASSWORD: str({ default: "" }),
+
+  // JWT
+  JWT_ACCESS_SECRET: str(),
+  JWT_REFRESH_SECRET: str(),
+  JWT_ACCESS_EXPIRES_IN: str({ default: "15m" }),
+  JWT_REFRESH_EXPIRES_IN: str({ default: "7d" }),
+
+  // Logging
+  LOG_LEVEL: str({
+    default: "info",
+    choices: ["debug", "info", "warn", "error"],
+  }),
+  LOG_PRETTY_PRINT: bool({ default: true }),
+
+  // CORS
+  CORS_ORIGIN: str({ default: "http://localhost:3000" }),
+
+  // Rate Limiting
+  RATE_LIMIT_WINDOW_MS: num({ default: 900000 }), // 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: num({ default: 100 }),
+
+  // API Documentation
+  SWAGGER_ENABLED: bool({ default: true }),
+  API_VERSION: str({ default: "v1" }),
+});
