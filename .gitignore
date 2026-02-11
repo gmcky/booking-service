@@ -26,9 +26,18 @@ Thumbs.db
 # Docker overrides
 docker-compose.override.yml
 
+# Docker volumes (if stored locally)
+.docker/
+volumes/
+
+# Logs
+*.log
+logs/
+
 # Personal notes (not project documentation)
 notes.md
 todo.md
+scratch.md
 roadmap.md
 stack.md
 

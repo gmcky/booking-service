@@ -83,47 +83,110 @@ winget install -e --id pnpm.pnpm
 
 ## 🚀 Quick Start
 
-### 1. Clone the repository
+### Option 1: Hybrid Mode (RECOMMENDED) ⚡
+
+**Fastest way to develop - Infrastructure in Docker, app runs locally**
 
 ```bash
-git clone https://github.com/yourusername/booking-service.git
-cd booking-service
-```
+# Navigate to server directory
+cd server
 
-### 2. Install dependencies
-
-```bash
+# Install dependencies
 pnpm install
-```
 
-### 3. Set up environment variables
+# Start infrastructure (Postgres + Redis)
+pnpm infra:up
 
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+# Run database migrations
+pnpm prisma:migrate
 
-### 4. Start with Docker Compose
+# (Optional) Seed with test data
+pnpm db:seed
 
-```bash
-docker-compose up -d
-```
-
-### 5. Run database migrations
-
-```bash
-pnpm migrate
-```
-
-### 6. Start the development server
-
-```bash
+# Start app with hot-reload
 pnpm dev
 ```
 
-The API will be available at `http://localhost:3000`
+API available at: `http://localhost:3000`  
+Swagger docs: `http://localhost:3000/api-docs`
 
-API documentation: `http://localhost:3000/api-docs`
+---
+
+### Option 2: Full Docker (For Testing)
+
+```bash
+cd server
+
+# Start everything in Docker
+pnpm docker:dev
+
+# Run migrations inside container
+docker exec booking-api pnpm prisma:migrate
+```
+
+---
+
+### Option 3: Manual Setup (Without Docker)
+
+```bash
+# 1. Install PostgreSQL and Redis locally
+# 2. Create database
+createdb booking_db
+
+# 3. Install dependencies
+cd server
+pnpm install
+
+# 4. Configure .env
+cp .env.example .env
+# Edit DATABASE_URL and REDIS_HOST
+
+# 5. Run migrations
+pnpm prisma:migrate
+
+# 6. Start app
+pnpm dev
+```
+
+---
+
+📖 **Detailed guide**: See [server/docs/QUICK-START.md](./server/docs/QUICK-START.md)
+
+## 📋 Available Commands
+
+### Development
+
+```bash
+pnpm dev              # Start with hot-reload
+pnpm dev:full         # Start infra + app
+pnpm build            # Build for production
+pnpm start            # Run production build
+```
+
+### Infrastructure
+
+```bash
+pnpm infra:up         # Start Postgres + Redis
+pnpm infra:down       # Stop infrastructure
+pnpm infra:logs       # View logs
+pnpm infra:clean      # Remove everything
+```
+
+### Database
+
+```bash
+pnpm prisma:migrate   # Apply migrations
+pnpm prisma:studio    # Open Prisma Studio GUI
+pnpm prisma:generate  # Generate Prisma Client
+pnpm db:seed          # Seed test data
+```
+
+### Docker
+
+```bash
+pnpm docker:dev       # Full Docker dev
+pnpm docker:prod      # Production Docker
+```
 
 ## �️ Database Schema
 
