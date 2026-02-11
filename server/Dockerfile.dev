@@ -1,0 +1,31 @@
+# Development Dockerfile with hot-reload
+FROM node:20-alpine
+
+# Install pnpm
+RUN npm install -g pnpm@latest
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Install all dependencies (including dev)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Generate Prisma Client
+RUN pnpm prisma generate
+
+# Expose port
+EXPOSE 3000
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Run in development mode with hot-reload
+CMD ["pnpm", "dev"]

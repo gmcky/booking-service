@@ -1,19 +1,23 @@
-# Production docker-compose
+# Development docker-compose with hot-reload
 services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: booking-api
+      dockerfile: Dockerfile.dev
+    container_name: booking-api-dev
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DATABASE_URL: postgresql://booking_user:booking_password@postgres:5432/booking_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
     env_file:
       - .env
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - /app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -22,19 +26,6 @@ services:
     networks:
       - booking-network
     restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:3000/health",
-        ]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
   postgres:
     image: postgres:16-alpine
