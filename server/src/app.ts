@@ -15,14 +15,7 @@ const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http");
 import { env } from "./config/env.js";
 import { errorHandler } from "./shared/middlewares/error.handler.js";
-
-// Import routes
-import { authRouter } from "./modules/auth/auth.routes.js";
-import { userRouter } from "./modules/users/user.routes.js";
-import { propertyRouter } from "./modules/properties/property.routes.js";
-import { bookingRouter } from "./modules/bookings/booking.routes.js";
-import { paymentRouter } from "./modules/payments/payment.routes.js";
-import { reviewRouter } from "./modules/reviews/review.routes.js";
+import { createApiRouter } from "./api.routes.js";
 
 export function createApp(): Application {
   const app = express();
@@ -64,24 +57,8 @@ export function createApp(): Application {
     );
   }
 
-  // Health check
-  app.get("/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
-
-  // API routes
-  const apiPrefix = `/api/${env.API_VERSION}`;
-  app.use(`${apiPrefix}/auth`, authRouter);
-  app.use(`${apiPrefix}/users`, userRouter);
-  app.use(`${apiPrefix}/properties`, propertyRouter);
-  app.use(`${apiPrefix}/bookings`, bookingRouter);
-  app.use(`${apiPrefix}/payments`, paymentRouter);
-  app.use(`${apiPrefix}/reviews`, reviewRouter);
-
-  // 404 handler
-  app.use((req, res) => {
-    res.status(404).json({ error: "Route not found" });
-  });
+  // Mount all API routes
+  app.use(createApiRouter());
 
   // Global error handler (must be last)
   app.use(errorHandler);
