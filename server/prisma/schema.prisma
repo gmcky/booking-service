@@ -1,0 +1,170 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  bookings      Booking[]
+  properties    Property[]
+  refreshTokens RefreshToken[]
+  reviews       Review[]
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+  OWNER
+}
+
+model Property {
+  id            String       @id @default(uuid())
+  title         String
+  description   String       @db.Text
+  type          PropertyType
+  city          String
+  address       String
+  pricePerNight Decimal      @db.Decimal(10, 2)
+  maxGuests     Int
+  amenities     String[]
+  images        String[]
+  ownerId       String
+  isActive      Boolean      @default(true)
+  averageRating Decimal?     @db.Decimal(2, 1)
+  reviewCount   Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  owner         User         @relation(fields: [ownerId], references: [id])
+  bookings      Booking[]
+  reviews       Review[]
+  blockedDates  BlockedDate[]
+
+  @@index([city, pricePerNight])
+  @@index([isActive])
+  @@index([ownerId])
+  @@map("properties")
+}
+
+enum PropertyType {
+  HOTEL_ROOM
+  APARTMENT
+  HOUSE
+  MEETING_ROOM
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  propertyId  String
+  userId      String
+  checkIn     DateTime
+  checkOut    DateTime
+  totalPrice  Decimal       @db.Decimal(10, 2)
+  guests      Int
+  status      BookingStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  payment     Payment?
+  updatedAt   DateTime      @updatedAt
+
+  property    Property      @relation(fields: [propertyId], references: [id])
+  user        User          @relation(fields: [userId], references: [id])
+
+  @@index([propertyId, checkIn, checkOut])
+  @@index([userId])
+  @@index([status])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  rating     Int      // 1-5 scale
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([userId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  provider      String
+  transactionId String?       // External payment provider transaction ID
+  metadata      Json?         // Additional provider-specific data
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  bookingId     String        @unique // One payment per booking
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([transactionId])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model BlockedDate {
+  id         String   @id @default(uuid())
+  startDate  DateTime
+  endDate    DateTime
+  reason     String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, startDate, endDate])
+  @@map("blocked_dates")
+}
