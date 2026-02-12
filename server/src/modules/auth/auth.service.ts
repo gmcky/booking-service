@@ -1,7 +1,13 @@
 import { prisma } from "../../shared/lib/prisma.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
-import type { RegisterInput, LoginInput } from "./auth.types.js";
+import type { RegisterInput, LoginInput, AuthResponse } from "./auth.types.js";
+import bcrypt from "bcrypt";
+import { SignJWT } from "jose";
+import { env } from "../../config/env.js";
+import type { User } from "@prisma/client";
+import crypto from "crypto";
+import { Prisma } from "@prisma/client";
 
 /**
  * AuthService handles all authentication and authorization logic
@@ -12,39 +18,104 @@ export class AuthService {
    * Register a new user
    * @security Implement rate limiting on controller level to prevent spam
    */
-  static async register(data: RegisterInput) {
-    // TODO: Check if user already exists (email unique constraint)
-    // const existingUser = await prisma.user.findUnique({ where: { email } });
-    // if (existingUser) throw new AppError(409, "User already exists");
+  static async register(data: RegisterInput): Promise<AuthResponse> {
+    // Check if user already exists (email unique constraint)
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: data.email.toLowerCase() },
+          ...(data.phoneNumber ? [{ phoneNumber: data.phoneNumber }] : []),
+        ],
+      },
+    });
 
-    // TODO: Hash password using bcrypt with salt rounds = 12
-    // import bcrypt from 'bcrypt';
-    // const passwordHash = await bcrypt.hash(data.password, 12);
-    // CRITICAL: Never store plain text passwords!
+    if (existingUser) {
+      if (existingUser.email === data.email.toLowerCase()) {
+        throw new AppError(409, "User with this email already exists");
+      }
+      if (existingUser.phoneNumber === data.phoneNumber) {
+        throw new AppError(409, "User with this phone number already exists");
+      }
+    }
 
-    // TODO: Create user in database
-    // const user = await prisma.user.create({
-    //   data: { email, passwordHash, firstName, lastName, role: 'USER' }
-    // });
+    // Hash password using bcrypt with salt rounds = 12
+    const passwordHash = await bcrypt.hash(data.password, 12);
 
-    // TODO: Generate JWT tokens (Access + Refresh)
-    // - Access Token: Short-lived (15m), contains user.id, role
-    // - Refresh Token: Long-lived (7d), stored in DB for invalidation
-    // Use 'jose' library for JWT (already installed)
+    try {
+      // Generate token metadata before transaction
+      const jti = crypto.randomUUID();
+      const refreshExpiresIn = this.parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
+      const expiresAt = new Date(Date.now() + refreshExpiresIn);
 
-    // TODO: Store Refresh Token in database with expiry
-    // await prisma.refreshToken.create({
-    //   data: { token: refreshToken, userId: user.id, expiresAt }
-    // });
+      // Wrap user + refresh token creation in transaction for atomicity
+      const result = await prisma.$transaction(async (tx) => {
+        // Create user in database
+        const user = await tx.user.create({
+          data: {
+            email: data.email.toLowerCase(),
+            passwordHash,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phoneNumber: data.phoneNumber || null,
+            role: "USER",
+          },
+        });
 
-    // TODO: Log successful registration (structured logging)
-    // logger.info({ userId: user.id, email: user.email }, 'User registered');
+        // Generate JWT tokens (Access + Refresh)
+        const accessToken = await this.generateAccessToken(user);
+        const refreshToken = await this.generateRefreshToken(user, jti);
 
-    // TODO: Return { user: {...}, accessToken, refreshToken }
-    // IMPORTANT: Controller should set refreshToken as HttpOnly cookie
+        // Hash refresh token before storing (prevent token leakage)
+        const tokenHash = await bcrypt.hash(refreshToken, 10);
 
-    // TODO: Write unit test for duplicate email registration
-    throw new AppError(501, "Not implemented");
+        // Store hashed refresh token with jti in database
+        await tx.refreshToken.create({
+          data: {
+            tokenHash,
+            jti,
+            userId: user.id,
+            expiresAt,
+          },
+        });
+
+        return { user, accessToken, refreshToken };
+      });
+
+      // Log successful registration (structured logging)
+      logger.info(
+        { userId: result.user.id, email: result.user.email },
+        "User registered successfully",
+      );
+
+      // Return user data and tokens
+      return {
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          firstName: result.user.firstName,
+          lastName: result.user.lastName,
+          role: result.user.role,
+        },
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      };
+    } catch (error) {
+      // Catch unique constraint violations (race condition)
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          const target = error.meta?.target as string[] | undefined;
+          if (target?.includes("email")) {
+            throw new AppError(409, "User with this email already exists");
+          }
+          if (target?.includes("phoneNumber")) {
+            throw new AppError(409, "User with this phone number already exists");
+          }
+          throw new AppError(409, "User already exists");
+        }
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   /**
@@ -176,10 +247,76 @@ export class AuthService {
     throw new AppError(501, "Not implemented");
   }
 
-  // TODO: Add helper methods for token generation
-  // private static async generateAccessToken(user: User): Promise<string>
-  // private static async generateRefreshToken(user: User): Promise<string>
-  // Use env.JWT_ACCESS_EXPIRES_IN and env.JWT_REFRESH_EXPIRES_IN
+  /**
+   * Generate Access Token (short-lived)
+   */
+  private static async generateAccessToken(user: User): Promise<string> {
+    const secret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
+
+    const token = await new SignJWT({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setIssuer("booking-service")
+      .setAudience("booking-api")
+      .setNotBefore("0s")
+      .setExpirationTime(env.JWT_ACCESS_EXPIRES_IN)
+      .sign(secret);
+
+    return token;
+  }
+
+  /**
+   * Generate Refresh Token (long-lived)
+   */
+  private static async generateRefreshToken(user: User, jti: string): Promise<string> {
+    const secret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
+
+    const token = await new SignJWT({
+      userId: user.id,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setJti(jti)
+      .setIssuedAt()
+      .setIssuer("booking-service")
+      .setAudience("booking-api")
+      .setNotBefore("0s")
+      .setExpirationTime(env.JWT_REFRESH_EXPIRES_IN)
+      .sign(secret);
+
+    return token;
+  }
+
+  /**
+   * Parse expiry string to milliseconds
+   * Supports: 15m, 7d, 1h, etc.
+   */
+  private static parseExpiry(expiry: string): number {
+    const units: Record<string, number> = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000,
+    };
+
+    const match = expiry.match(/^(\d+)([smhd])$/);
+    if (!match || !match[1] || !match[2]) {
+      throw new Error(`Invalid expiry format: ${expiry}`);
+    }
+
+    const value = match[1];
+    const unit = match[2];
+    const multiplier = units[unit];
+
+    if (!multiplier) {
+      throw new Error(`Invalid time unit: ${unit}`);
+    }
+
+    return parseInt(value, 10) * multiplier;
+  }
 
   // TODO: Add method for password reset flow
   // static async requestPasswordReset(email: string)
