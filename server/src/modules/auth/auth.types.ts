@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { registerSchema, loginSchema } from "./auth.validators.js";
+import { registerSchema, loginSchema } from "./auth.validators.js";
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
