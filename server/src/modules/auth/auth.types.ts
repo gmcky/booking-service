@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { registerSchema, loginSchema } from "./auth.validators.js";
+import { Role } from "@prisma/client";
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -15,6 +16,6 @@ export interface AuthResponse extends AuthTokens {
     email: string;
     firstName: string;
     lastName: string;
-    role: string;
+    role: Role;
   };
 }
