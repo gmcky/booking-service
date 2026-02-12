@@ -49,10 +49,13 @@ export const loginSchema = z.object({
 });
 
 export const refreshTokenSchema = z.object({
-  refreshToken: z.string(),
-  // TODO: Change to extract from HttpOnly cookie instead of body
-  // This schema becomes unnecessary once cookies are used
-  // Validation happens in middleware: const token = req.cookies.refreshToken
+  refreshToken: z
+    .string()
+    .trim()
+    .min(20, "Refresh token is required")
+    .max(2048, "Refresh token is too long")
+    .regex(/^[^\s]+$/, "Refresh token must not contain whitespace"),
+  // TODO: Move refresh token to HttpOnly cookie + middleware validation/rotation
 });
 
 // TODO: Add validation schemas for other auth endpoints
