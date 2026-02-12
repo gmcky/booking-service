@@ -3,7 +3,7 @@ import zxcvbn from "zxcvbn";
 import { parsePhoneNumberWithError, PhoneNumber } from "libphonenumber-js";
 
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z
     .string()
     .min(8)
