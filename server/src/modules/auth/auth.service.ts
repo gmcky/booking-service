@@ -1,9 +1,14 @@
 import { prisma } from "../../shared/lib/prisma.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
-import type { RegisterInput, LoginInput, AuthResponse } from "./auth.types.js";
+import type {
+  RegisterInput,
+  LoginInput,
+  AuthResponse,
+  AuthTokens,
+} from "./auth.types.js";
 import bcrypt from "bcrypt";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 import { env } from "../../config/env.js";
 import type { User } from "@prisma/client";
 import crypto from "crypto";
@@ -18,7 +23,10 @@ export class AuthService {
    * Register a new user
    * @security Implement rate limiting on controller level to prevent spam
    */
-  static async register(data: RegisterInput): Promise<AuthResponse> {
+  static async register(
+    data: RegisterInput,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<AuthResponse> {
     // Check if user already exists (email unique constraint)
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -30,12 +38,16 @@ export class AuthService {
     });
 
     if (existingUser) {
-      if (existingUser.email === data.email.toLowerCase()) {
-        throw new AppError(409, "User with this email already exists");
-      }
-      if (existingUser.phoneNumber === data.phoneNumber) {
-        throw new AppError(409, "User with this phone number already exists");
-      }
+      logger.warn(
+        {
+          email: data.email.toLowerCase(),
+          phoneNumber: data.phoneNumber,
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+        },
+        "Registration rejected: duplicate account",
+      );
+      throw new AppError(409, "Registration failed");
     }
 
     // Hash password using bcrypt with salt rounds = 12
@@ -75,6 +87,8 @@ export class AuthService {
             jti,
             userId: user.id,
             expiresAt,
+            ip: meta?.ip || null,
+            userAgent: meta?.userAgent || null,
           },
         });
 
@@ -83,7 +97,12 @@ export class AuthService {
 
       // Log successful registration (structured logging)
       logger.info(
-        { userId: result.user.id, email: result.user.email },
+        {
+          userId: result.user.id,
+          email: result.user.email,
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+        },
         "User registered successfully",
       );
 
@@ -100,17 +119,20 @@ export class AuthService {
         refreshToken: result.refreshToken,
       };
     } catch (error) {
-      // Catch unique constraint violations (race condition)
+      // Catch unique constraint violations (race condition) with generic message
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
-          const target = error.meta?.target as string[] | undefined;
-          if (target?.includes("email")) {
-            throw new AppError(409, "User with this email already exists");
-          }
-          if (target?.includes("phoneNumber")) {
-            throw new AppError(409, "User with this phone number already exists");
-          }
-          throw new AppError(409, "User already exists");
+          logger.warn(
+            {
+              email: data.email.toLowerCase(),
+              phoneNumber: data.phoneNumber,
+              ip: meta?.ip,
+              userAgent: meta?.userAgent,
+              code: error.code,
+            },
+            "Registration failed due to unique constraint",
+          );
+          throw new AppError(409, "Registration failed");
         }
       }
       // Re-throw other errors
@@ -122,67 +144,207 @@ export class AuthService {
    * Authenticate user and issue tokens
    * @security Implement account lockout after N failed attempts (store in Redis or DB)
    */
-  static async login(data: LoginInput) {
-    // TODO: Find user by email (case-insensitive)
-    // const user = await prisma.user.findUnique({
-    //   where: { email: data.email.toLowerCase() }
-    // });
-    // if (!user) throw new AppError(401, 'Invalid credentials');
-    // SECURITY: Use generic message to prevent email enumeration
+  static async login(
+    data: LoginInput,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<AuthResponse> {
+    const email = data.email.toLowerCase();
 
-    // TODO: Verify password using bcrypt.compare()
-    // const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
-    // if (!isValidPassword) {
-    //   // TODO: Increment failed login counter (prevent brute force)
-    //   throw new AppError(401, 'Invalid credentials');
-    // }
+    // Find user by email (case-insensitive)
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
 
-    // TODO: Generate new Access + Refresh tokens
-    // Access Token payload: { userId, email, role, iat, exp }
-    // Refresh Token payload: { userId, tokenId (UUID), iat, exp }
+    // Generic response to prevent enumeration
+    if (!user) {
+      logger.warn(
+        { email, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Login failed: user not found",
+      );
+      throw new AppError(401, "Invalid credentials");
+    }
 
-    // TODO: Store Refresh Token in database
-    // Implement token rotation: delete old tokens for this user (optional)
-    // or keep max N tokens per user to support multiple devices
+    // Verify password
+    const isValidPassword = await bcrypt.compare(
+      data.password,
+      user.passwordHash,
+    );
+    if (!isValidPassword) {
+      logger.warn(
+        { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Login failed: invalid password",
+      );
+      throw new AppError(401, "Invalid credentials");
+    }
 
-    // TODO: Log successful login with IP and User-Agent
-    // logger.info({ userId: user.id, ip: req.ip }, 'User logged in');
+    // Prepare tokens and metadata
+    const jti = crypto.randomUUID();
+    const refreshExpiresIn = this.parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
+    const expiresAt = new Date(Date.now() + refreshExpiresIn);
 
-    // TODO: Return tokens and safe user data (exclude passwordHash!)
-    // return { user: omit(user, 'passwordHash'), accessToken, refreshToken };
+    const { accessToken, refreshToken } = await prisma.$transaction(
+      async (tx) => {
+        const accessToken = await this.generateAccessToken(user);
+        const refreshToken = await this.generateRefreshToken(user, jti);
+        const tokenHash = await bcrypt.hash(refreshToken, 10);
 
-    // TODO: Write test for invalid credentials, account lockout
-    throw new AppError(501, "Not implemented");
+        // Persist refresh token
+        await tx.refreshToken.create({
+          data: {
+            tokenHash,
+            jti,
+            userId: user.id,
+            expiresAt,
+            ip: meta?.ip || null,
+            userAgent: meta?.userAgent || null,
+          },
+        });
+
+        // Cleanup expired tokens for this user
+        await tx.refreshToken.deleteMany({
+          where: {
+            userId: user.id,
+            expiresAt: { lt: new Date() },
+          },
+        });
+
+        // Keep only latest 5 tokens (multi-device support) and prune older
+        const tokensToPrune = await tx.refreshToken.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          skip: 5,
+          select: { id: true },
+        });
+
+        if (tokensToPrune.length) {
+          await tx.refreshToken.deleteMany({
+            where: { id: { in: tokensToPrune.map((t) => t.id) } },
+          });
+        }
+
+        return { accessToken, refreshToken };
+      },
+    );
+
+    logger.info(
+      { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+      "User logged in",
+    );
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
+      accessToken,
+      refreshToken,
+    };
   }
 
   /**
    * Logout user by invalidating refresh token
    */
-  static async logout(refreshToken: string) {
-    // TODO: Verify the refresh token signature first
-    // const payload = await verifyJWT(refreshToken, env.JWT_REFRESH_SECRET);
+  static async logout(
+    refreshToken: string,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<void> {
+    if (!refreshToken) {
+      throw new AppError(401, "No refresh token provided");
+    }
 
-    // TODO: Delete refresh token from database
-    // await prisma.refreshToken.delete({
-    //   where: { token: refreshToken }
-    // });
-    // Handle error gracefully if token doesn't exist (already logged out)
+    let payload;
+    try {
+      const secret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
+      const verification = await jwtVerify(refreshToken, secret, {
+        issuer: "booking-service",
+        audience: "booking-api",
+      });
+      payload = verification.payload;
+    } catch (error) {
+      logger.warn(
+        {
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+          error: (error as Error).message,
+        },
+        "Logout failed: invalid refresh token (signature)",
+      );
+      throw new AppError(401, "Invalid refresh token");
+    }
 
-    // TODO: Optional: Add token to Redis blacklist until expiry
-    // This prevents using the token even if stolen before deletion
-    // await redis.setex(`blacklist:${tokenId}`, ttl, '1');
+    const jti = payload.jti as string | undefined;
+    const userId = payload.userId as string | undefined;
 
-    // TODO: Log logout event
-    // logger.info({ userId: payload.userId }, 'User logged out');
+    if (!jti || !userId) {
+      logger.warn(
+        { ip: meta?.ip, userAgent: meta?.userAgent },
+        "Logout failed: refresh token missing jti or userId",
+      );
+      throw new AppError(401, "Invalid refresh token");
+    }
 
-    throw new AppError(501, "Not implemented");
+    // Fetch stored token by jti (unique)
+    const storedToken = await prisma.refreshToken.findUnique({
+      where: { jti },
+    });
+
+    if (!storedToken) {
+      // Possible reuse: revoke all tokens for user as precaution
+      await prisma.refreshToken.deleteMany({ where: { userId } });
+      logger.warn(
+        { userId, jti, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Logout failed: refresh token reuse detected (missing stored token)",
+      );
+      throw new AppError(401, "Invalid refresh token");
+    }
+
+    const isMatch = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+    if (!isMatch) {
+      await prisma.refreshToken.deleteMany({
+        where: { userId: storedToken.userId },
+      });
+      logger.warn(
+        {
+          userId: storedToken.userId,
+          jti,
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+        },
+        "Logout failed: refresh token hash mismatch (reuse)",
+      );
+      throw new AppError(401, "Invalid refresh token");
+    }
+
+    // Invalidate this token and clean expired ones for the user
+    await prisma.$transaction([
+      prisma.refreshToken.delete({ where: { id: storedToken.id } }),
+      prisma.refreshToken.deleteMany({
+        where: {
+          userId: storedToken.userId,
+          expiresAt: { lt: new Date() },
+        },
+      }),
+    ]);
+
+    logger.info(
+      {
+        userId: storedToken.userId,
+        jti,
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+      },
+      "User logged out",
+    );
   }
 
   /**
    * Issue new access token using valid refresh token
    * @security Implement Refresh Token Rotation to prevent reuse attacks
    */
-  static async refreshToken(refreshToken: string) {
+  static async refreshToken(refreshToken: string): Promise<AuthTokens> {
     // TODO: Verify refresh token signature and expiry
     // const payload = await verifyJWT(refreshToken, env.JWT_REFRESH_SECRET);
     // catch (error) { throw new AppError(401, 'Invalid refresh token') }
@@ -272,7 +434,10 @@ export class AuthService {
   /**
    * Generate Refresh Token (long-lived)
    */
-  private static async generateRefreshToken(user: User, jti: string): Promise<string> {
+  private static async generateRefreshToken(
+    user: User,
+    jti: string,
+  ): Promise<string> {
     const secret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 
     const token = await new SignJWT({
