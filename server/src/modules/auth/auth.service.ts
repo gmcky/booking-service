@@ -14,6 +14,10 @@ import type { User } from "@prisma/client";
 import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 
+// Encoded once at module load time — avoids repeated allocations on every request
+const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
+const REFRESH_SECRET = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
+
 /**
  * AuthService handles all authentication and authorization logic
  * Implements JWT-based auth with Access + Refresh Token strategy
@@ -257,8 +261,7 @@ export class AuthService {
 
     let payload;
     try {
-      const secret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
-      const verification = await jwtVerify(refreshToken, secret, {
+      const verification = await jwtVerify(refreshToken, REFRESH_SECRET, {
         issuer: "booking-service",
         audience: "booking-api",
       });
@@ -390,31 +393,51 @@ export class AuthService {
    * Verify and decode access token
    * This is used by the auth middleware
    */
-  static async verifyAccessToken(token: string) {
-    // TODO: Verify JWT signature using jose library
-    // import { jwtVerify } from 'jose';
-    // const secret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
-    // const { payload } = await jwtVerify(token, secret);
-    // if (!payload.userId) throw new AppError(401, 'Invalid token');
+  static async verifyAccessToken(
+    token: string,
+  ): Promise<{ id: string; email: string; role: string }> {
+    let payload;
+    try {
+      const verification = await jwtVerify(token, ACCESS_SECRET, {
+        algorithms: ["HS256"],
+        issuer: "booking-service",
+        audience: "booking-api",
+      });
+      payload = verification.payload;
+    } catch (error) {
+      const err = error as Error & { code?: string };
+      if (err.code === "ERR_JWT_EXPIRED") {
+        throw new AppError(401, "Token expired");
+      }
+      throw new AppError(401, "Invalid token");
+    }
 
-    // TODO: Optional - Check if user still exists and is active
-    // const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-    // if (!user) throw new AppError(401, 'User not found');
+    // Validate required claims
+    const userId = payload.userId as string | undefined;
+    const email = payload.email as string | undefined;
+    const role = payload.role as string | undefined;
 
-    // TODO: Optional - Check token blacklist in Redis (for immediate logout)
+    if (!userId || !email || !role) {
+      throw new AppError(401, "Invalid token structure");
+    }
 
-    // TODO: Return decoded payload { userId, email, role }
-    // This will be attached to req.user by the middleware
+    // No DB lookup here — access tokens are stateless by design.
+    // A revoked/banned user retains access until the token expires (max 15m).
+    // Actual invalidation happens in refreshToken() which does hit the DB.
+    // For immediate revocation, add a Redis blacklist check here instead.
 
-    throw new AppError(501, "Not implemented");
+    logger.debug(
+      { userId, endpoint: "verifyAccessToken" },
+      "Access token verified",
+    );
+
+    return { id: userId, email, role };
   }
 
   /**
    * Generate Access Token (short-lived)
    */
   private static async generateAccessToken(user: User): Promise<string> {
-    const secret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
-
     const token = await new SignJWT({
       userId: user.id,
       email: user.email,
@@ -426,7 +449,7 @@ export class AuthService {
       .setAudience("booking-api")
       .setNotBefore("0s")
       .setExpirationTime(env.JWT_ACCESS_EXPIRES_IN)
-      .sign(secret);
+      .sign(ACCESS_SECRET);
 
     return token;
   }
@@ -438,8 +461,6 @@ export class AuthService {
     user: User,
     jti: string,
   ): Promise<string> {
-    const secret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
-
     const token = await new SignJWT({
       userId: user.id,
     })
@@ -450,7 +471,7 @@ export class AuthService {
       .setAudience("booking-api")
       .setNotBefore("0s")
       .setExpirationTime(env.JWT_REFRESH_EXPIRES_IN)
-      .sign(secret);
+      .sign(REFRESH_SECRET);
 
     return token;
   }
