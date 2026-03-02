@@ -109,7 +109,6 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
-  @@index([jti])
   @@map("refresh_tokens")
 }
 
