@@ -45,17 +45,6 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.email().trim().toLowerCase(),
   password: z.string().min(1, "Password is required"),
-  rememberMe: z.boolean().optional().default(false),
-});
-
-export const refreshTokenSchema = z.object({
-  refreshToken: z
-    .string()
-    .trim()
-    .min(20, "Refresh token is required")
-    .max(2048, "Refresh token is too long")
-    .regex(/^[^\s]+$/, "Refresh token must not contain whitespace"),
-  // TODO: Move refresh token to HttpOnly cookie + middleware validation/rotation
 });
 
 // TODO: Add validation schemas for other auth endpoints
