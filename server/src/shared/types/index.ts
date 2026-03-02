@@ -1,12 +1,21 @@
 import type { Request } from "express";
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
+// Extend Express Request globally so req.user is typed everywhere without casts
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: string;
+      };
+    }
+  }
 }
+
+// AuthenticatedRequest is now identical to Request (user is globally augmented above).
+// Kept as a named export so existing controller imports continue to work.
+export type AuthenticatedRequest = Request;
 
 export interface PaginationParams {
   page: number;

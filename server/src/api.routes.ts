@@ -11,13 +11,12 @@ import { reviewRouter } from "./modules/reviews/review.routes.js";
 
 /**
  * Main API router
- * Combines all module routes under /api/v1 prefix
+ * Mounted under /api/v1 in app.ts — all paths here are relative to that prefix.
  */
 export function createApiRouter(): Router {
   const router = Router();
-  const apiPrefix = `/api/${env.API_VERSION}`;
 
-  // Health check (outside versioned API)
+  // Health check
   router.get("/health", (req, res) => {
     res.json({
       status: "ok",
@@ -26,27 +25,27 @@ export function createApiRouter(): Router {
     });
   });
 
-  // Module routes (versioned)
-  router.use(`${apiPrefix}/auth`, authRouter);
-  router.use(`${apiPrefix}/users`, userRouter);
-  router.use(`${apiPrefix}/properties`, propertyRouter);
-  router.use(`${apiPrefix}/bookings`, bookingRouter);
-  router.use(`${apiPrefix}/payments`, paymentRouter);
-  router.use(`${apiPrefix}/reviews`, reviewRouter);
+  // Module routes
+  router.use("/auth", authRouter);
+  router.use("/users", userRouter);
+  router.use("/properties", propertyRouter);
+  router.use("/bookings", bookingRouter);
+  router.use("/payments", paymentRouter);
+  router.use("/reviews", reviewRouter);
 
-  // 404 handler for API routes
+  // 404 handler for unmatched API routes
   router.use((req, res) => {
     res.status(404).json({
       error: "Route not found",
       path: req.path,
       availableRoutes: [
-        `${apiPrefix}/auth`,
-        `${apiPrefix}/users`,
-        `${apiPrefix}/properties`,
-        `${apiPrefix}/bookings`,
-        `${apiPrefix}/payments`,
-        `${apiPrefix}/reviews`,
-      ],
+        "/auth",
+        "/users",
+        "/properties",
+        "/bookings",
+        "/payments",
+        "/reviews",
+      ].map((r) => `/api/${env.API_VERSION}${r}`),
     });
   });
 
