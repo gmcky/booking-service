@@ -15,7 +15,7 @@
     "prisma:migrate": "prisma migrate dev --config prisma.config.ts",
     "prisma:studio": "prisma studio --config prisma.config.ts",
     "db:push": "prisma db push --config prisma.config.ts",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "infra:up": "docker-compose -f docker-compose.infra.yml up -d",
     "infra:down": "docker-compose -f docker-compose.infra.yml down",
     "infra:logs": "docker-compose -f docker-compose.infra.yml logs -f",
