@@ -438,7 +438,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + refreshExpiresIn);
 
     // Heavy CPU work is done BEFORE opening the transaction so the DB connection
-    // is not held idle while bcrypt churns through its key-derivation rounds.
+    // is not held idle during bcrypt / JWT signing.
     const accessToken = await this.generateAccessToken(user);
     const newRefreshToken = await this.generateRefreshToken(user, newJti);
     const tokenHash = await bcrypt.hash(newRefreshToken, 10);
