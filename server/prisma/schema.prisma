@@ -39,7 +39,7 @@ model Property {
   address       String
   pricePerNight Decimal      @db.Decimal(10, 2)
   maxGuests     Int
-  amenities     String[]
+  amenities     Amenity[]
   images        String[]
   ownerId       String
   isActive      Boolean      @default(true)
@@ -64,6 +64,50 @@ enum PropertyType {
   APARTMENT
   HOUSE
   MEETING_ROOM
+}
+// consider many to many relationship for amenities if we want to allow custom amenities in the future
+// for now, we can use an enum to keep it simple and ensure data consistency
+enum Amenity {
+  WIFI
+  AIR_CONDITIONING
+  HEATING
+  KITCHEN
+  WASHER
+  DRYER
+  DISHWASHER
+  PARKING
+  POOL
+  GYM
+  BALCONY
+  TERRACE
+  ROOFTOP_TERRACE
+  GARDEN
+  BBQ
+  FIREPLACE
+  BATHTUB
+  PRIVATE_BATHROOM
+  TV
+  SMART_TV
+  COFFEE_MACHINE
+  PROJECTOR
+  STANDING_DESK
+  ELEVATOR
+  PET_FRIENDLY
+  WHEELCHAIR_ACCESSIBLE
+  SEA_VIEW
+  CITY_CENTRE
+  BEACHFRONT
+  KIDS_PLAY_AREA
+  BIKE_INCLUDED
+  BIKE_RENTAL_NEARBY
+  COURTYARD
+  CANAL_VIEW
+  RIVER_VIEW
+  SUN_DECK
+  KAYAK
+  HISTORIC_BUILDING
+  VINYL_RECORD_PLAYER
+  BOOKS
 }
 
 model Booking {
