@@ -1,4 +1,4 @@
-import { Role, PropertyType } from "@prisma/client";
+import { Role, PropertyType, Amenity } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { prisma } from "../src/shared/lib/prisma.js";
 
@@ -52,7 +52,7 @@ const propertyTemplates: Array<{
   address: string;
   pricePerNight: number;
   maxGuests: number;
-  amenities: string[];
+  amenities: Amenity[];
   images: string[];
 }> = [
   // ── Kyiv ──────────────────────────────────────────────────────────────────
@@ -65,7 +65,12 @@ const propertyTemplates: Array<{
     address: "Kontraktova Square 4, Podil",
     pricePerNight: 55,
     maxGuests: 2,
-    amenities: ["Wi-Fi", "Air Conditioning", "Kitchen", "Washing Machine"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.AIR_CONDITIONING,
+      Amenity.KITCHEN,
+      Amenity.WASHER,
+    ],
     images: [
       "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1560185007-5f0a3b7a6ac7?auto=format&fit=crop&w=800",
@@ -81,12 +86,12 @@ const propertyTemplates: Array<{
     pricePerNight: 85,
     maxGuests: 4,
     amenities: [
-      "Wi-Fi",
-      "Kitchen",
-      "Washer",
-      "Projector",
-      "Bathtub",
-      "Gym Access",
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.WASHER,
+      Amenity.PROJECTOR,
+      Amenity.BATHTUB,
+      Amenity.GYM,
     ],
     images: [
       "https://images.unsplash.com/photo-1556912173-46c336c7fd55?auto=format&fit=crop&w=800",
@@ -102,7 +107,11 @@ const propertyTemplates: Array<{
     address: "Lypska St 3, Pechersk",
     pricePerNight: 30,
     maxGuests: 1,
-    amenities: ["Wi-Fi", "Air Conditioning", "Private Bathroom"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.AIR_CONDITIONING,
+      Amenity.PRIVATE_BATHROOM,
+    ],
     images: [
       "https://images.unsplash.com/photo-1568605117036-5f326c888be4?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1631679706909-1844bbd07221?auto=format&fit=crop&w=800",
@@ -118,11 +127,11 @@ const propertyTemplates: Array<{
     pricePerNight: 120,
     maxGuests: 3,
     amenities: [
-      "Wi-Fi",
-      "Kitchen",
-      "Rooftop Terrace",
-      "Vinyl Record Player",
-      "Coffee Machine",
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.ROOFTOP_TERRACE,
+      Amenity.VINYL_RECORD_PLAYER,
+      Amenity.COFFEE_MACHINE,
     ],
     images: [
       "https://images.unsplash.com/photo-1586023492125-27b2c045efd3?auto=format&fit=crop&w=800",
@@ -139,13 +148,13 @@ const propertyTemplates: Array<{
     pricePerNight: 150,
     maxGuests: 8,
     amenities: [
-      "Wi-Fi",
-      "Parking",
-      "Garden",
-      "BBQ",
-      "Washer",
-      "Dishwasher",
-      "Kids Play Area",
+      Amenity.WIFI,
+      Amenity.PARKING,
+      Amenity.GARDEN,
+      Amenity.BBQ,
+      Amenity.WASHER,
+      Amenity.DISHWASHER,
+      Amenity.KIDS_PLAY_AREA,
     ],
     images: [
       "https://images.unsplash.com/photo-1449247613801-f6d4b7a43176?auto=format&fit=crop&w=800",
@@ -163,7 +172,12 @@ const propertyTemplates: Array<{
     address: "Shevska St 5, Old Town",
     pricePerNight: 65,
     maxGuests: 2,
-    amenities: ["Wi-Fi", "Kitchen", "Historic Building", "City Centre"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.HISTORIC_BUILDING,
+      Amenity.CITY_CENTRE,
+    ],
     images: [
       "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1555854877-bab93439e74d?auto=format&fit=crop&w=800",
@@ -178,7 +192,13 @@ const propertyTemplates: Array<{
     address: "Mechnikova St 18",
     pricePerNight: 90,
     maxGuests: 4,
-    amenities: ["Wi-Fi", "Fireplace", "Courtyard", "Parking", "Kitchen"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.FIREPLACE,
+      Amenity.COURTYARD,
+      Amenity.PARKING,
+      Amenity.KITCHEN,
+    ],
     images: [
       "https://images.unsplash.com/photo-1464082354059-d9b74de0e530?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1615873968403-89583c888e04?auto=format&fit=crop&w=800",
@@ -194,11 +214,11 @@ const propertyTemplates: Array<{
     pricePerNight: 75,
     maxGuests: 3,
     amenities: [
-      "Wi-Fi",
-      "Kitchen",
-      "Coffee Machine",
-      "City Centre",
-      "Air Conditioning",
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.COFFEE_MACHINE,
+      Amenity.CITY_CENTRE,
+      Amenity.AIR_CONDITIONING,
     ],
     images: [
       "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=800",
@@ -217,12 +237,12 @@ const propertyTemplates: Array<{
     pricePerNight: 95,
     maxGuests: 3,
     amenities: [
-      "Wi-Fi",
-      "Air Conditioning",
-      "Sea View",
-      "Balcony",
-      "Beachfront",
-      "Kitchen",
+      Amenity.WIFI,
+      Amenity.AIR_CONDITIONING,
+      Amenity.SEA_VIEW,
+      Amenity.BALCONY,
+      Amenity.BEACHFRONT,
+      Amenity.KITCHEN,
     ],
     images: [
       "https://images.unsplash.com/photo-1560184897-52acbc2bcbbf?auto=format&fit=crop&w=800",
@@ -239,10 +259,10 @@ const propertyTemplates: Array<{
     pricePerNight: 80,
     maxGuests: 2,
     amenities: [
-      "Wi-Fi",
-      "Air Conditioning",
-      "Historic Building",
-      "City Centre",
+      Amenity.WIFI,
+      Amenity.AIR_CONDITIONING,
+      Amenity.HISTORIC_BUILDING,
+      Amenity.CITY_CENTRE,
     ],
     images: [
       "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800",
@@ -259,13 +279,13 @@ const propertyTemplates: Array<{
     pricePerNight: 280,
     maxGuests: 10,
     amenities: [
-      "Wi-Fi",
-      "Pool",
-      "BBQ",
-      "Parking",
-      "Beachfront",
-      "Air Conditioning",
-      "Smart TV",
+      Amenity.WIFI,
+      Amenity.POOL,
+      Amenity.BBQ,
+      Amenity.PARKING,
+      Amenity.BEACHFRONT,
+      Amenity.AIR_CONDITIONING,
+      Amenity.SMART_TV,
     ],
     images: [
       "https://images.unsplash.com/photo-1612722432474-b971cdcea546?auto=format&fit=crop&w=800",
@@ -283,7 +303,12 @@ const propertyTemplates: Array<{
     address: "Rosenthaler Str 25, Mitte",
     pricePerNight: 110,
     maxGuests: 2,
-    amenities: ["Wi-Fi", "Standing Desk", "Air Conditioning", "City Centre"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.STANDING_DESK,
+      Amenity.AIR_CONDITIONING,
+      Amenity.CITY_CENTRE,
+    ],
     images: [
       "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1586023492125-27b2c045efd3?auto=format&fit=crop&w=800",
@@ -298,7 +323,13 @@ const propertyTemplates: Array<{
     address: "Oranienstr 58, Kreuzberg",
     pricePerNight: 135,
     maxGuests: 4,
-    amenities: ["Wi-Fi", "Kitchen", "Courtyard", "Washing Machine", "Books"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.COURTYARD,
+      Amenity.WASHER,
+      Amenity.BOOKS,
+    ],
     images: [
       "https://images.unsplash.com/photo-1556912173-46c336c7fd55?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800",
@@ -314,11 +345,11 @@ const propertyTemplates: Array<{
     pricePerNight: 100,
     maxGuests: 5,
     amenities: [
-      "Wi-Fi",
-      "Kitchen",
-      "Balcony",
-      "Washing Machine",
-      "Bike Rental Nearby",
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.BALCONY,
+      Amenity.WASHER,
+      Amenity.BIKE_RENTAL_NEARBY,
     ],
     images: [
       "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800",
@@ -337,11 +368,11 @@ const propertyTemplates: Array<{
     pricePerNight: 160,
     maxGuests: 2,
     amenities: [
-      "Wi-Fi",
-      "Coffee Machine",
-      "Balcony",
-      "Air Conditioning",
-      "City Centre",
+      Amenity.WIFI,
+      Amenity.COFFEE_MACHINE,
+      Amenity.BALCONY,
+      Amenity.AIR_CONDITIONING,
+      Amenity.CITY_CENTRE,
     ],
     images: [
       "https://images.unsplash.com/photo-1560185007-5f0a3b7a6ac7?auto=format&fit=crop&w=800",
@@ -358,11 +389,11 @@ const propertyTemplates: Array<{
     pricePerNight: 210,
     maxGuests: 4,
     amenities: [
-      "Wi-Fi",
-      "Kitchen",
-      "Air Conditioning",
-      "Dishwasher",
-      "Historic Building",
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.AIR_CONDITIONING,
+      Amenity.DISHWASHER,
+      Amenity.HISTORIC_BUILDING,
     ],
     images: [
       "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&w=800",
@@ -381,11 +412,11 @@ const propertyTemplates: Array<{
     pricePerNight: 130,
     maxGuests: 3,
     amenities: [
-      "Wi-Fi",
-      "Rooftop Terrace",
-      "Kitchen",
-      "Air Conditioning",
-      "City Centre",
+      Amenity.WIFI,
+      Amenity.ROOFTOP_TERRACE,
+      Amenity.KITCHEN,
+      Amenity.AIR_CONDITIONING,
+      Amenity.CITY_CENTRE,
     ],
     images: [
       "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=800",
@@ -402,11 +433,11 @@ const propertyTemplates: Array<{
     pricePerNight: 175,
     maxGuests: 4,
     amenities: [
-      "Wi-Fi",
-      "Terrace",
-      "Kitchen",
-      "Historic Building",
-      "Air Conditioning",
+      Amenity.WIFI,
+      Amenity.TERRACE,
+      Amenity.KITCHEN,
+      Amenity.HISTORIC_BUILDING,
+      Amenity.AIR_CONDITIONING,
     ],
     images: [
       "https://images.unsplash.com/photo-1612722432474-b971cdcea546?auto=format&fit=crop&w=800",
@@ -424,7 +455,13 @@ const propertyTemplates: Array<{
     address: "Prinsengracht 204, Jordaan",
     pricePerNight: 195,
     maxGuests: 2,
-    amenities: ["Wi-Fi", "Terrace", "Canal View", "Kitchen", "Bike Included"],
+    amenities: [
+      Amenity.WIFI,
+      Amenity.TERRACE,
+      Amenity.CANAL_VIEW,
+      Amenity.KITCHEN,
+      Amenity.BIKE_INCLUDED,
+    ],
     images: [
       "https://images.unsplash.com/photo-1560184897-52acbc2bcbbf?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800",
@@ -440,12 +477,12 @@ const propertyTemplates: Array<{
     pricePerNight: 220,
     maxGuests: 4,
     amenities: [
-      "Wi-Fi",
-      "Sun Deck",
-      "Kayak",
-      "Kitchen",
-      "River View",
-      "Parking",
+      Amenity.WIFI,
+      Amenity.SUN_DECK,
+      Amenity.KAYAK,
+      Amenity.KITCHEN,
+      Amenity.RIVER_VIEW,
+      Amenity.PARKING,
     ],
     images: [
       "https://images.unsplash.com/photo-1464082354059-d9b74de0e530?auto=format&fit=crop&w=800",
