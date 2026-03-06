@@ -1,22 +1,23 @@
+import { Amenity, PropertyType } from "@prisma/client";
 import { z } from "zod";
 
 export const createPropertySchema = z.object({
   title: z.string().min(5).max(200),
   description: z.string().min(20),
-  type: z.enum(["HOTEL_ROOM", "APARTMENT", "HOUSE", "MEETING_ROOM"]),
+  type: z.nativeEnum(PropertyType),
   city: z.string().min(2),
   address: z.string().min(5),
   pricePerNight: z.number().positive(),
   maxGuests: z.number().int().positive(),
-  amenities: z.array(z.string()).default([]),
-  images: z.array(z.string().url()).default([]),
+  amenities: z.array(z.nativeEnum(Amenity)).max(20).default([]),
+  images: z.array(z.string().url()).max(10).default([]),
 });
 
 export const updatePropertySchema = createPropertySchema.partial();
 
 export const propertyQuerySchema = z.object({
   city: z.string().optional(),
-  type: z.enum(["HOTEL_ROOM", "APARTMENT", "HOUSE", "MEETING_ROOM"]).optional(),
+  type: z.nativeEnum(PropertyType).optional(),
   minPrice: z.coerce.number().positive().optional(),
   maxPrice: z.coerce.number().positive().optional(),
   maxGuests: z.coerce.number().int().positive().optional(),
