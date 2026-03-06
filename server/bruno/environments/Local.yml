@@ -2,3 +2,7 @@ name: Local
 variables:
   - name: baseUrl
     value: http://localhost:3000/api/v1
+  - name: propertyId
+    value: 258ecc52-b944-493d-a305-34e149bad8cc
+  - name: propertyId2
+    value: bd6bc164-4a09-4cb2-8394-853e5247a186

@@ -1,11 +1,11 @@
 info:
-  name: Logout
+  name: Property by ID
   type: http
-  seq: 4
+  seq: 2
 
 http:
-  method: POST
-  url: "{{baseUrl}}/auth/logout"
+  method: GET
+  url: "{{baseUrl}}/properties/{{propertyId2}}"
   auth: inherit
 
 settings:

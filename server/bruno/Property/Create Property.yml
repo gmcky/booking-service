@@ -1,0 +1,39 @@
+info:
+  name: Create Property
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/properties"
+  body:
+    type: json
+    data: |-
+      {
+        "title": "BullMQ Test Villa",
+        "description": "Это тестовое описание, которое специально сделано длиннее двадцати символов, чтобы Zod валидатор пропустил запрос.",
+        "type": "HOUSE",
+        "city": "Kyiv",
+        "address": "123 Async Worker Street",
+        "pricePerNight": 150,
+        "maxGuests": 4,
+        "amenities": [
+          "WIFI",
+          "AIR_CONDITIONING",
+          "PARKING"
+        ],
+        "rawImagePaths": [
+          "/tmp/fake_upload_1.jpg",
+          "/tmp/fake_upload_2.jpg",
+          "/tmp/fake_upload_3.png"
+        ]
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjYTEyN2IxMS0zNGQxLTQ2YWItYThkNS1jM2JhYTQxNzE1NzYiLCJlbWFpbCI6Im93bmVyQGRlbW8uY29tIiwicm9sZSI6Ik9XTkVSIiwiaWF0IjoxNzcyNzk2MDMzLCJpc3MiOiJib29raW5nLXNlcnZpY2UiLCJhdWQiOiJib29raW5nLWFwaSIsIm5iZiI6MTc3Mjc5NjAzMywiZXhwIjoxNzcyNzk2OTMzfQ.GlJ2Of_TEMxzUPB_XYr3mGXv52nBztILoIrYWHAOs7Y
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
