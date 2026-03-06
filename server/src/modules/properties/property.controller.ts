@@ -3,54 +3,34 @@ import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PropertyService } from "./property.service.js";
 import { logger } from "../../shared/lib/logger.js";
-
-// TODO: Add validation middleware with Zod schemas
-// Create schemas in property.validators.ts:
-// - createPropertySchema: Validate all required fields
-// - updatePropertySchema: Partial validation (only changed fields)
-// - propertyFiltersSchema: Validate query parameters
+import type { PropertyQueryInput } from "./property.types.js";
 
 /**
  * Get all properties with filters and pagination
- * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4
+ * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4&amenities=WIFI,PARKING&sort=price_asc
  * @access Public
  */
 
 export async function getProperties(req: Request, res: Response) {
-  // TODO: Validate and sanitize query parameters with Zod
-  // Prevent SQL injection, validate data types
-  // Example: price must be positive number, page must be integer
+  // req.query is already validated and parsed by validate(propertyQuerySchema, "query") in routes.
+  const {
+    page,
+    limit,
+    city,
+    type,
+    amenities,
+    minPrice,
+    maxPrice,
+    maxGuests,
+    sort,
+  } = req.query as unknown as PropertyQueryInput;
 
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  // TODO [Cache]: Implement Redis Cache-Aside here before calling the service.
 
-  // TODO: Add validation for limit (max 100 to prevent abuse)
-  // if (limit > 100) throw new AppError(400, 'Max limit is 100');
-
-  const filters = {
-    city: req.query.city as string | undefined,
-    type: req.query.type as string | undefined,
-    minPrice: req.query.minPrice
-      ? parseFloat(req.query.minPrice as string)
-      : undefined,
-    maxPrice: req.query.maxPrice
-      ? parseFloat(req.query.maxPrice as string)
-      : undefined,
-    maxGuests: req.query.maxGuests
-      ? parseInt(req.query.maxGuests as string)
-      : undefined,
-    // TODO: Add more filters
-    // checkIn: req.query.checkIn ? new Date(req.query.checkIn as string) : undefined,
-    // checkOut: req.query.checkOut ? new Date(req.query.checkOut as string) : undefined,
-    // amenities: req.query.amenities ? (req.query.amenities as string).split(',') : undefined,
-    // sortBy: req.query.sortBy as 'price_asc' | 'price_desc' | 'rating' | 'recent',
-  };
-
-  const result = await PropertyService.getAll({ page, limit }, filters);
-
-  // TODO: Cache this response (Redis) for 5 minutes
-  // Property list doesn't change frequently
-  // Cache key: `properties:${page}:${limit}:${JSON.stringify(filters)}`
+  const result = await PropertyService.getAll(
+    { page, limit },
+    { city, type, amenities, minPrice, maxPrice, maxGuests, sort },
+  );
 
   res.json(result);
 }
@@ -71,20 +51,6 @@ export async function createProperty(req: AuthenticatedRequest, res: Response) {
 
   // TODO: Implement rate limiting - max 10 properties per day
   // Prevents spam listings
-
-  // TODO: Handle multipart/form-data for im uploads
-  // Use multer middleware:
-  // import multer from 'multer';
-  // const upload = multer({ storage: multer.memoryStorage() });
-  // Route: router.post('/', authenticate, upload.array('images', 10), createProperty);
-  // Access files: req.files
-
-  // TODO: Validate request body with Zod (already in middleware)
-  // Body validation should include:
-  // - title, description, address, city, country
-  // - type (APARTMENT, HOUSE, etc.)
-  // - pricePerNight, maxGuests
-  // - amenities array (optional)
 
   const property = await PropertyService.create({ ...req.body, ownerId });
 
