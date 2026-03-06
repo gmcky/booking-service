@@ -8,6 +8,7 @@
     "setup": "node scripts/setup.mjs",
     "dev": "tsx watch src/server.ts",
     "dev:full": "pnpm infra:up && pnpm dev",
+    "worker:image": "tsx src/workers/image.worker.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -74,5 +75,10 @@
     "swagger-ui-express": "^5.0.1",
     "zod": "^4.3.6",
     "zxcvbn": "^4.4.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "ioredis": "5.10.0"
+    }
   }
 }
