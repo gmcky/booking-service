@@ -8,7 +8,7 @@
     "setup": "node scripts/setup.mjs",
     "dev": "tsx watch src/server.ts",
     "dev:full": "pnpm infra:up && pnpm dev",
-    "worker:image": "tsx src/workers/image.worker.ts",
+    "worker:image": "tsx --env-file=.env src/workers/image.worker.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
