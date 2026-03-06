@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type {
   createPropertySchema,
   updatePropertySchema,
+  propertyQuerySchema,
 } from "./property.validators.js";
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema> & {
@@ -9,6 +10,8 @@ export type CreatePropertyInput = z.infer<typeof createPropertySchema> & {
 };
 
 export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
+
+export type PropertyQueryInput = z.infer<typeof propertyQuerySchema>;
 
 export interface PropertyFilters {
   city?: string;

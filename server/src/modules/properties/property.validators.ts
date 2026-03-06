@@ -17,9 +17,9 @@ export const updatePropertySchema = createPropertySchema.partial();
 export const propertyQuerySchema = z.object({
   city: z.string().optional(),
   type: z.enum(["HOTEL_ROOM", "APARTMENT", "HOUSE", "MEETING_ROOM"]).optional(),
-  minPrice: z.string().transform(Number).optional(),
-  maxPrice: z.string().transform(Number).optional(),
-  maxGuests: z.string().transform(Number).optional(),
-  page: z.string().transform(Number).optional(),
-  limit: z.string().transform(Number).optional(),
+  minPrice: z.coerce.number().positive().optional(),
+  maxPrice: z.coerce.number().positive().optional(),
+  maxGuests: z.coerce.number().int().positive().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
 });
