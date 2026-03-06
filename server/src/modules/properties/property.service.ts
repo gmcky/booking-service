@@ -7,6 +7,13 @@ import {
 } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import { imageQueue } from "../../shared/queues/image.queue.js";
+import {
+  cacheGet,
+  cacheSet,
+  cacheDel,
+  cacheInvalidatePattern,
+  hashKey,
+} from "../../shared/lib/cache.js";
 import type {
   CreatePropertyInput,
   UpdatePropertyInput,
@@ -25,10 +32,9 @@ export class PropertyService {
   static async getAll(params: PaginationParams, filters: PropertyFilters) {
     const { skip, take } = calculatePagination(params.page, params.limit);
 
-    // TODO [Cache]: Implement Redis caching for frequent search queries (Cache-Aside pattern).
-    // 1. Generate a unique cache key from filters + pagination (e.g., `properties:search:${hash}`).
-    // 2. Check Redis first. On hit -> return cached data immediately.
-    // 3. On miss -> fetch from DB, store in Redis with a short TTL (5-10 min), then return.
+    const cacheKey = `properties:search:${hashKey({ params, filters })}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
 
     const where = {
       isActive: true,
@@ -73,11 +79,15 @@ export class PropertyService {
       prisma.property.count({ where }),
     ]);
 
-    return createPaginatedResponse(properties, total, params);
+    const result = createPaginatedResponse(properties, total, params);
+    await cacheSet(cacheKey, result, 5 * 60); // 5 minutes
+    return result;
   }
 
   static async getById(id: string) {
-    // TODO [Cache]: Check Redis for `property:${id}` before hitting the DB.
+    const cacheKey = `property:${id}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
 
     const property = await prisma.property.findUnique({
       where: { id },
@@ -99,8 +109,7 @@ export class PropertyService {
       throw new AppError(404, "Property not found");
     }
 
-    // TODO [Cache]: Populate Redis cache for `property:${id}` with a long TTL (e.g., 1 hour).
-
+    await cacheSet(cacheKey, property, 60 * 60); // 1 hour
     return property;
   }
 
@@ -134,7 +143,7 @@ export class PropertyService {
     // Offload SMTP to a worker to keep HTTP response fast. Worker handles retries automatically.
     // await emailQueue.add('send-welcome-host', { email: property.owner.email, propertyName: property.title });
 
-    // TODO [Cache]: Invalidate `properties:search:*` keys so the new listing appears in fresh queries.
+    await cacheInvalidatePattern("properties:search:*");
 
     return property;
   }
@@ -147,8 +156,10 @@ export class PropertyService {
       data: omitUndefined(data),
     });
 
-    // TODO [Cache]: Invalidate `property:${id}` and `properties:search:*` to prevent stale data.
-    // await redisClient.del(`property:${id}`);
+    await Promise.all([
+      cacheDel(`property:${id}`),
+      cacheInvalidatePattern("properties:search:*"),
+    ]);
 
     return updated;
   }
@@ -163,7 +174,10 @@ export class PropertyService {
 
     await prisma.property.delete({ where: { id } });
 
-    // TODO [Cache]: Invalidate `property:${id}` and `properties:search:*`.
+    await Promise.all([
+      cacheDel(`property:${id}`),
+      cacheInvalidatePattern("properties:search:*"),
+    ]);
   }
 
   static async setActive(id: string, ownerId: string, isActive: boolean) {
@@ -174,7 +188,10 @@ export class PropertyService {
       data: { isActive },
     });
 
-    // TODO [Cache]: Invalidate `property:${id}` and `properties:search:*`.
+    await Promise.all([
+      cacheDel(`property:${id}`),
+      cacheInvalidatePattern("properties:search:*"),
+    ]);
 
     return updated;
   }
