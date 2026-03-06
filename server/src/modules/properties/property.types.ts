@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { Amenity } from "@prisma/client";
 import type {
   createPropertySchema,
   updatePropertySchema,
@@ -16,7 +17,9 @@ export type PropertyQueryInput = z.infer<typeof propertyQuerySchema>;
 export interface PropertyFilters {
   city?: string;
   type?: string;
+  amenities?: Amenity[];
   minPrice?: number;
   maxPrice?: number;
   maxGuests?: number;
+  sort?: "price_asc" | "price_desc" | "newest";
 }
