@@ -10,6 +10,8 @@ import cookieParser from "cookie-parser";
 import { createRequire } from "module";
 import { logger } from "./shared/lib/logger.js";
 import rateLimit from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
+import { cacheClient } from "./shared/lib/cache.js";
 
 // pino-http v10+ work with ESM, but keeping require is safe for compatibility
 const require = createRequire(import.meta.url);
@@ -19,18 +21,35 @@ import { env } from "./config/env.js";
 import { errorHandler } from "./shared/middlewares/error.handler.js";
 import { createApiRouter } from "./api.routes.js";
 
+/**
+ * Shared Redis store for all rate limiters.
+ * Uses the same ioredis client as the app cache — no extra connection needed.
+ * Limiter state is shared across all Node.js instances (production-safe).
+ */
+const redisStore = (prefix: string) =>
+  new RedisStore({
+    prefix: `rl:${prefix}:`,
+    // ioredis exposes arbitrary commands via .call(command, ...args)
+    sendCommand: (...args: string[]) =>
+      (cacheClient as any).call(...args) as Promise<any>,
+  });
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisStore("api"),
   message: { error: "Too many requests, please try again later." },
 });
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15m
-  max: 5,
+  max: 10,
   skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: redisStore("login"),
   message: {
     error: "Too many login attempts. Please try again in 15 minutes.",
   },
@@ -39,6 +58,9 @@ const loginLimiter = rateLimit({
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1h
   max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: redisStore("register"),
   message: { error: "Too many accounts created from this IP." },
 });
 

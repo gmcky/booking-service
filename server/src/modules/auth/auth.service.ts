@@ -1,6 +1,7 @@
 import { prisma } from "../../shared/lib/prisma.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
+import { cacheClient } from "../../shared/lib/cache.js";
 import { parseExpiry } from "../../shared/utils/time.js";
 import type {
   RegisterInput,
@@ -149,8 +150,10 @@ export class AuthService {
   }
 
   /**
-   * Authenticate user and issue tokens
-   * @security Implement account lockout after N failed attempts (store in Redis or DB)
+   * Authenticate user and issue tokens.
+   * Protected by:
+   *   1. IP-based rate limiting in app.ts (express-rate-limit + Redis)
+   *   2. Per-email account lockout after LOGIN_MAX_ATTEMPTS failures (Redis)
    */
   static async login(
     data: LoginInput,
@@ -158,17 +161,26 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const email = data.email.toLowerCase();
 
+    // Fail fast if the account is already locked — avoids bcrypt cost on locked accounts.
+    // Check is placed before DB lookup intentionally: both "wrong email" and
+    // "wrong password" failures increment the same counter, so a locked response
+    // does not reveal whether the email is registered.
+    await this.checkLockout(email, meta);
+
     // Find user by email (case-insensitive)
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
-    // Generic response to prevent enumeration
+    // Generic response to prevent user enumeration.
+    // Increment lockout counter for unknown emails too — prevents distinguishing
+    // "no account" from "wrong password" through lockout timing differences.
     if (!user) {
       logger.warn(
         { email, ip: meta?.ip, userAgent: meta?.userAgent },
         "Login failed: user not found",
       );
+      await this.recordFailedAttempt(email, meta);
       throw new AppError(401, "Invalid credentials");
     }
 
@@ -182,8 +194,12 @@ export class AuthService {
         { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
         "Login failed: invalid password",
       );
+      await this.recordFailedAttempt(email, meta);
       throw new AppError(401, "Invalid credentials");
     }
+
+    // Successful authentication — clear any accumulated failure counter.
+    await this.clearLockout(email);
 
     // Pre-generate all IDs and do heavy CPU work BEFORE opening the transaction
     // so the DB connection is not held idle during bcrypt / JWT signing.
@@ -579,4 +595,92 @@ export class AuthService {
   // TODO: Add method for email verification (optional)
   // static async sendVerificationEmail(userId: string)
   // static async verifyEmail(token: string)
+
+  // ---------------------------------------------------------------------------
+  // Account lockout helpers (brute-force protection)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Key schema: auth:lockout:<email>
+   * Value: number of consecutive failed login attempts.
+   * TTL is set on the FIRST failure and is NOT reset on subsequent ones — so
+   * the window always expires relative to the first bad attempt, not the last.
+   */
+  private static lockoutKey(email: string): string {
+    return `auth:lockout:${email}`;
+  }
+
+  /**
+   * Throws 429 if the account is currently locked.
+   * Fails open when Redis is unavailable to avoid blocking legitimate logins.
+   */
+  private static async checkLockout(
+    email: string,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<void> {
+    try {
+      const raw = await cacheClient.get(this.lockoutKey(email));
+      if (!raw) return;
+
+      const attempts = parseInt(raw, 10);
+      if (attempts >= env.LOGIN_MAX_ATTEMPTS) {
+        const ttl = await cacheClient.ttl(this.lockoutKey(email));
+        const minutesLeft = ttl > 0 ? Math.ceil(ttl / 60) : env.LOGIN_LOCKOUT_MINUTES;
+        logger.warn(
+          { email, attempts, ttl, ip: meta?.ip, userAgent: meta?.userAgent },
+          "Login blocked: account is locked",
+        );
+        throw new AppError(
+          429,
+          `Account temporarily locked due to too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}.`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      // Redis unavailable — fail open so legitimate users are not locked out
+      logger.warn(
+        { email, error: (error as Error).message },
+        "Lockout check skipped — Redis unavailable",
+      );
+    }
+  }
+
+  /**
+   * Increments the failed-attempt counter for the given email.
+   * Sets the TTL only on the first failure (so the window doesn't slide).
+   * Logs a warning when the lockout threshold is reached.
+   */
+  private static async recordFailedAttempt(
+    email: string,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<void> {
+    try {
+      const key = this.lockoutKey(email);
+      const attempts = await cacheClient.incr(key);
+      if (attempts === 1) {
+        // Set expiry only on first failure so the window is fixed, not sliding
+        await cacheClient.expire(key, env.LOGIN_LOCKOUT_MINUTES * 60);
+      }
+      if (attempts >= env.LOGIN_MAX_ATTEMPTS) {
+        logger.warn(
+          { email, attempts, ip: meta?.ip, userAgent: meta?.userAgent },
+          `Account locked after ${attempts} failed login attempts`,
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        { email, error: (error as Error).message },
+        "Failed to record login attempt — Redis unavailable",
+      );
+    }
+  }
+
+  /** Clears the lockout counter on successful authentication. */
+  private static async clearLockout(email: string): Promise<void> {
+    try {
+      await cacheClient.del(this.lockoutKey(email));
+    } catch {
+      // Best-effort — a stale counter will expire on its own
+    }
+  }
 }
