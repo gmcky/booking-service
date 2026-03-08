@@ -20,6 +20,13 @@ import { Prisma } from "@prisma/client";
 const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const REFRESH_SECRET = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 
+// TODO: Implement Magic Link unlock flow for locked accounts
+// Generates a one-time token and sends it via email with a link to unlock the account.
+// The token is stored in Redis with a short TTL (15 minutes) and is single-use.
+// static async sendUnlockLink(email: string) {
+//   const user = await prisma.user.findUnique({ where: { email } });
+//   if (!user) return;  Don't reveal whether the email is registered
+
 /**
  * AuthService handles all authentication and authorization logic
  * Implements JWT-based auth with Access + Refresh Token strategy
@@ -625,7 +632,8 @@ export class AuthService {
       const attempts = parseInt(raw, 10);
       if (attempts >= env.LOGIN_MAX_ATTEMPTS) {
         const ttl = await cacheClient.ttl(this.lockoutKey(email));
-        const minutesLeft = ttl > 0 ? Math.ceil(ttl / 60) : env.LOGIN_LOCKOUT_MINUTES;
+        const minutesLeft =
+          ttl > 0 ? Math.ceil(ttl / 60) : env.LOGIN_LOCKOUT_MINUTES;
         logger.warn(
           { email, attempts, ttl, ip: meta?.ip, userAgent: meta?.userAgent },
           "Login blocked: account is locked",
