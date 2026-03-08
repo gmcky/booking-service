@@ -36,6 +36,10 @@ export const env = cleanEnv(process.env, {
   RATE_LIMIT_WINDOW_MS: num({ default: 900000 }), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: num({ default: 100 }),
 
+  // Account Lockout (login brute-force protection)
+  LOGIN_MAX_ATTEMPTS: num({ default: 5 }),
+  LOGIN_LOCKOUT_MINUTES: num({ default: 15 }),
+
   // API Documentation
   SWAGGER_ENABLED: bool({ default: true }),
   API_VERSION: str({ default: "v1" }),
