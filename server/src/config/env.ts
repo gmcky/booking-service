@@ -40,6 +40,14 @@ export const env = cleanEnv(process.env, {
   LOGIN_MAX_ATTEMPTS: num({ default: 5 }),
   LOGIN_LOCKOUT_MINUTES: num({ default: 15 }),
 
+  // SMTP (email worker)
+  SMTP_HOST: str({ default: "localhost" }),
+  SMTP_PORT: port({ default: 1025 }),
+  SMTP_SECURE: bool({ default: false }), // true = TLS (port 465), false = STARTTLS / plain
+  SMTP_USER: str({ default: "" }),
+  SMTP_PASSWORD: str({ default: "" }),
+  EMAIL_FROM: str({ default: "noreply@booking-service.local" }),
+
   // API Documentation
   SWAGGER_ENABLED: bool({ default: true }),
   API_VERSION: str({ default: "v1" }),

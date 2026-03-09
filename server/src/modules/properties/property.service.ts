@@ -7,6 +7,7 @@ import {
 } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import { imageQueue } from "../../shared/queues/image.queue.js";
+import { emailQueue } from "../../shared/queues/email.queue.js";
 import {
   cacheGet,
   cacheSet,
@@ -125,7 +126,7 @@ export class PropertyService {
       },
       include: {
         owner: {
-          select: { id: true, firstName: true, lastName: true },
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
     });
@@ -139,9 +140,13 @@ export class PropertyService {
       });
     }
 
-    // TODO [Queue]: BullMQ - Host Email Notification
-    // Offload SMTP to a worker to keep HTTP response fast. Worker handles retries automatically.
-    // await emailQueue.add('send-welcome-host', { email: property.owner.email, propertyName: property.title });
+    // Notify the host asynchronously — SMTP is handled by the email worker.
+    await emailQueue.add("property-created-host", {
+      ownerEmail: property.owner.email!,
+      ownerFirstName: property.owner.firstName,
+      propertyId: property.id,
+      propertyTitle: property.title,
+    });
 
     await cacheInvalidatePattern("properties:search:*");
 
