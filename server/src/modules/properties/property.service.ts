@@ -9,6 +9,10 @@ import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import { imageQueue } from "../../shared/queues/image.queue.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import {
+  cleanupQueue,
+  type CleanupJobName,
+} from "../../shared/queues/cleanup.queue.js";
+import {
   cacheGet,
   cacheSet,
   cacheDel,
@@ -154,12 +158,24 @@ export class PropertyService {
   }
 
   static async update(id: string, ownerId: string, data: UpdatePropertyInput) {
-    await this.verifyOwnership(id, ownerId);
+    const current = await this.verifyOwnership(id, ownerId);
 
     const updated = await prisma.property.update({
       where: { id },
       data: omitUndefined(data),
     });
+
+    // Enqueue orphaned images for deletion only when the caller explicitly
+    // passes a new images array (even an empty one counts — all old files are orphaned).
+    if (data.images !== undefined) {
+      const incoming = new Set(data.images);
+      const orphaned = current.images.filter((p) => !incoming.has(p));
+
+      if (orphaned.length > 0) {
+        const jobName: CleanupJobName = "unlink-property-images";
+        await cleanupQueue.add(jobName, { paths: orphaned });
+      }
+    }
 
     await Promise.all([
       cacheDel(`property:${id}`),
@@ -170,14 +186,14 @@ export class PropertyService {
   }
 
   static async delete(id: string, ownerId: string) {
-    await this.verifyOwnership(id, ownerId);
-
-    // TODO [Queue]: BullMQ - S3 Cleanup
-    // Enqueue a job to delete property images from S3 before removing the DB record.
-    // Prevents orphaned files accumulating storage costs.
-    // await cleanupQueue.add('delete-s3-images', { propertyId: id });
+    const property = await this.verifyOwnership(id, ownerId);
 
     await prisma.property.delete({ where: { id } });
+
+    if (property.images.length > 0) {
+      const jobName: CleanupJobName = "unlink-property-images";
+      await cleanupQueue.add(jobName, { paths: property.images });
+    }
 
     await Promise.all([
       cacheDel(`property:${id}`),
@@ -204,7 +220,7 @@ export class PropertyService {
   private static async verifyOwnership(propertyId: string, ownerId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
-      select: { ownerId: true },
+      select: { ownerId: true, images: true },
     });
 
     if (!property) {
@@ -214,5 +230,7 @@ export class PropertyService {
     if (property.ownerId !== ownerId) {
       throw new AppError(403, "Not authorized to modify this property");
     }
+
+    return property;
   }
 }
