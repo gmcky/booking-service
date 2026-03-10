@@ -3,18 +3,57 @@
  *
  * Runs as a separate process: `pnpm worker:image`
  * Picks up jobs from the "image-processing" BullMQ queue and:
- *   1. Resizes and compresses each image to WebP  (stub — requires `sharp`)
- *   2. Uploads to S3/Cloudinary                   (stub — requires AWS SDK or cloudinary)
- *   3. Updates the property record in DB with final CDN URLs.
+ *   1. Validates each raw path against UPLOADS_ROOT (path-traversal guard).
+ *   2. Resizes and converts each image to WebP via sharp.
+ *   3. Persists the processed file paths to the property record in DB.
+ *   4. Enqueues the original raw files for deletion via the cleanup worker.
  *
- * TODO [Storage]: pnpm add sharp @types/sharp
- * TODO [Storage]: Configure S3 client (pnpm add @aws-sdk/client-s3) or Cloudinary SDK.
+ * Output layout: uploads/properties/{propertyId}/{index}.webp
  */
+import sharp from "sharp";
+import { mkdir } from "node:fs/promises";
+import { resolve, sep } from "node:path";
+import { randomUUID } from "node:crypto";
 import { Worker, type Job } from "bullmq";
 import { prisma } from "../shared/lib/prisma.js";
 import { redisConnection } from "../shared/lib/redis.js";
 import { logger } from "../shared/lib/logger.js";
 import type { ImageProcessingJob } from "../shared/queues/image.queue.js";
+import {
+  cleanupQueue,
+  type CleanupJobName,
+} from "../shared/queues/cleanup.queue.js";
+
+// ---------------------------------------------------------------------------
+// Security: Path Traversal guard (mirrors cleanup.worker.ts)
+// ---------------------------------------------------------------------------
+
+/** Absolute path to the only directory image inputs may reside in. */
+const UPLOADS_ROOT = resolve(process.cwd(), "uploads");
+
+/**
+ * Resolves `inputPath` and verifies it sits strictly inside UPLOADS_ROOT.
+ * Throws on null-byte injection or path escapes.
+ */
+function safeResolve(inputPath: string): string {
+  if (inputPath.includes("\0")) {
+    throw new Error(`Null byte in path: ${inputPath}`);
+  }
+
+  const absolute = resolve(process.cwd(), inputPath);
+
+  if (!absolute.startsWith(UPLOADS_ROOT + sep) && absolute !== UPLOADS_ROOT) {
+    throw new Error(
+      `Path traversal attempt blocked: "${inputPath}" resolves to "${absolute}" which is outside "${UPLOADS_ROOT}"`,
+    );
+  }
+
+  return absolute;
+}
+
+// ---------------------------------------------------------------------------
+// Job handler
+// ---------------------------------------------------------------------------
 
 async function processImages(job: Job<ImageProcessingJob>): Promise<void> {
   const { propertyId, rawImagePaths } = job.data;
@@ -24,40 +63,52 @@ async function processImages(job: Job<ImageProcessingJob>): Promise<void> {
     "Starting image processing job",
   );
 
-  // Step 1: Resize + compress each image to WebP.
-  // TODO [Storage]: Replace stub with real sharp pipeline.
-  // const processedBuffers = await Promise.all(
-  //   rawImagePaths.map((tempPath) =>
-  //     sharp(tempPath)
-  //       .resize({ width: 1200, height: 800, fit: "cover" })
-  //       .webp({ quality: 80 })
-  //       .toBuffer(),
-  //   ),
-  // );
+  // Ensure the output directory exists before writing any files.
+  const outputDir = resolve(UPLOADS_ROOT, "properties", propertyId);
+  await mkdir(outputDir, { recursive: true });
 
-  // Step 2: Upload processed buffers to S3/Cloudinary.
-  // TODO [Storage]: Replace stub URLs with real upload results.
-  // const uploadedUrls = await Promise.all(
-  //   processedBuffers.map((buffer, i) =>
-  //     s3.send(new PutObjectCommand({
-  //       Bucket: env.S3_BUCKET,
-  //       Key: `properties/${propertyId}/${i}.webp`,
-  //       Body: buffer,
-  //       ContentType: "image/webp",
-  //     })).then(() => `${env.CDN_BASE_URL}/properties/${propertyId}/${i}.webp`),
-  //   ),
-  // );
-  const uploadedUrls: string[] = rawImagePaths.map(
-    (_, i) => `https://cdn.example.com/properties/${propertyId}/${i}.webp`,
-  );
+  const processedPaths: string[] = [];
 
-  // Step 3: Persist final CDN URLs to DB.
+  for (const [, rawPath] of rawImagePaths.entries()) {
+    const absoluteInput = safeResolve(rawPath);
+    const id = randomUUID();
+    const relativePath = `uploads/properties/${propertyId}/${id}.webp`;
+    const absoluteOutput = resolve(
+      UPLOADS_ROOT,
+      "properties",
+      propertyId,
+      `${id}.webp`,
+    );
+
+    await sharp(absoluteInput)
+      .resize({ width: 1200, height: 800, fit: "cover" })
+      .webp({ quality: 80 })
+      .toFile(absoluteOutput);
+
+    processedPaths.push(relativePath);
+
+    logger.debug({ propertyId, id, output: relativePath }, "Image converted");
+  }
+
+  // Persist optimised WebP paths to the property record.
   await prisma.property.update({
     where: { id: propertyId },
-    data: { images: uploadedUrls },
+    data: { images: processedPaths },
   });
 
-  logger.info({ propertyId, uploadedUrls }, "Image processing complete");
+  logger.info(
+    { propertyId, processedPaths },
+    "DB updated with processed image paths",
+  );
+
+  // Remove raw source files via the dedicated cleanup worker.
+  const jobName: CleanupJobName = "unlink-property-images";
+  await cleanupQueue.add(jobName, { paths: rawImagePaths });
+
+  logger.info(
+    { propertyId, count: rawImagePaths.length },
+    "Image processing complete",
+  );
 }
 
 const worker = new Worker<ImageProcessingJob>(
