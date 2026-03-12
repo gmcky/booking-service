@@ -6,3 +6,7 @@ variables:
     value: 258ecc52-b944-493d-a305-34e149bad8cc
   - name: propertyId2
     value: bd6bc164-4a09-4cb2-8394-853e5247a186
+  - name: testProperty
+    value: 9ca0b557-d22b-41c7-b3af-cca2936acafe
+  - secret: true
+    name: jwt_token

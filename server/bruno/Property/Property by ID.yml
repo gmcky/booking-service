@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/properties/{{propertyId2}}"
+  url: "{{baseUrl}}/properties/{{testProperty}}"
   auth: inherit
 
 settings:

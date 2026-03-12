@@ -28,9 +28,7 @@ http:
           "/tmp/fake_upload_3.png"
         ]
       }
-  auth:
-    type: bearer
-    token: "{{jwt_token}}"
+  auth: inherit
 
 settings:
   encodeUrl: true
