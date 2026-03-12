@@ -20,7 +20,16 @@ export function errorHandler(
   res: Response,
   next: NextFunction,
 ) {
-  logger.error(err);
+  // Operational errors (AppError) are expected — log at warn level.
+  // Only truly unexpected errors get ERROR level to avoid alert fatigue.
+  if (err instanceof AppError) {
+    logger.warn(
+      { statusCode: err.statusCode, message: err.message },
+      "Operational error",
+    );
+  } else {
+    logger.error(err);
+  }
 
   // Validation errors
   if (err instanceof ZodError) {

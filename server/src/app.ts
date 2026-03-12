@@ -93,6 +93,12 @@ export function createApp(): Application {
     app.use(
       pinoHttp({
         logger,
+        // Redact sensitive values so they never appear in log output.
+        // Authorization header carries the access token; set-cookie carries the refresh token.
+        redact: {
+          paths: ["req.headers.authorization", 'res.headers["set-cookie"]'],
+          censor: "[REDACTED]",
+        },
         autoLogging: {
           ignore: (req: Request) => req.url === "/health",
         },

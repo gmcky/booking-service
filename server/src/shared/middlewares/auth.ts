@@ -30,15 +30,8 @@ export async function authenticate(
 
     next();
   } catch (error) {
-    logger.warn(
-      {
-        method: req.method,
-        path: req.path,
-        ip: req.ip,
-        error: (error as Error).message,
-      },
-      "Authentication failed",
-    );
+    // Don't log here — errorHandler is the single, centralised log point.
+    // Logging here too would cause every auth failure to appear twice in the logs.
     next(error);
   }
 }
@@ -57,15 +50,7 @@ export function authorize(...roles: string[]) {
     }
 
     if (!roles.includes(req.user.role)) {
-      logger.warn(
-        {
-          userId: req.user.id,
-          userRole: req.user.role,
-          requiredRoles: roles,
-          path: req.path,
-        },
-        "Authorization failed — insufficient permissions",
-      );
+      // Don't log here — errorHandler handles the single authoritative log.
       return next(new AppError(403, "Insufficient permissions"));
     }
 
