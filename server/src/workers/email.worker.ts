@@ -2,14 +2,7 @@
  * Email Worker
  *
  * Runs as a separate process: `pnpm worker:email`
- * Picks up jobs from the "email" BullMQ queue and sends transactional emails
- * via SMTP using nodemailer.
- *
- * Configuration (via .env):
- *   SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM
- *
- * For local development, point at Mailpit (included in docker-compose.infra.yml):
- *   SMTP_HOST=localhost  SMTP_PORT=1025
+ * Picks up jobs from the "email" BullMQ queue and sends transactional emails.
  */
 import { Worker, type Job } from "bullmq";
 import nodemailer from "nodemailer";
@@ -20,10 +13,13 @@ import type {
   EmailJobData,
   EmailJobName,
   PropertyCreatedHostJob,
+  BookingCreatedGuestJob,
+  BookingCancelledGuestJob,
+  BookingCancelledHostJob,
 } from "../shared/queues/email.queue.js";
 
 // ---------------------------------------------------------------------------
-// Transporter (shared across all jobs in this process)
+// Transporter
 // ---------------------------------------------------------------------------
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
@@ -35,7 +31,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // ---------------------------------------------------------------------------
-// Handlers per job name
+// Handlers
 // ---------------------------------------------------------------------------
 async function sendPropertyCreatedHost(
   data: PropertyCreatedHostJob,
@@ -65,6 +61,106 @@ async function sendPropertyCreatedHost(
   });
 }
 
+async function sendBookingCreatedGuest(
+  data: BookingCreatedGuestJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Booking confirmed — ${data.propertyTitle} ✅`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `Your booking for "${data.propertyTitle}" in ${data.propertyCity} has been received.`,
+      "",
+      `Check-in:  ${data.checkIn}`,
+      `Check-out: ${data.checkOut}`,
+      `Nights:    ${data.nights}`,
+      `Guests:    ${data.guests}`,
+      `Total:     $${data.totalPrice.toFixed(2)}`,
+      "",
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>Your booking for <strong>${data.propertyTitle}</strong> in ${data.propertyCity} has been received.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-in</td><td>${data.checkIn}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-out</td><td>${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Nights</td><td>${data.nights}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guests</td><td>${data.guests}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Total</td><td><strong>$${data.totalPrice.toFixed(2)}</strong></td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendBookingCancelledGuest(
+  data: BookingCancelledGuestJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Booking cancelled — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `Your booking for "${data.propertyTitle}" has been cancelled.`,
+      "",
+      `Original dates: ${data.checkIn} — ${data.checkOut}`,
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "If this was unintentional, please create a new booking.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>Your booking for <strong>${data.propertyTitle}</strong> has been cancelled.</p>
+      <p>Original dates: ${data.checkIn} — ${data.checkOut}</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>If this was unintentional, please create a new booking.</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendBookingCancelledHost(
+  data: BookingCancelledHostJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.hostEmail,
+    subject: `Booking cancelled — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.hostFirstName},`,
+      "",
+      `A booking for "${data.propertyTitle}" has been cancelled by the guest.`,
+      "",
+      `Guest: ${data.guestFirstName} ${data.guestLastName}`,
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "The dates are now available for new bookings.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.hostFirstName},</p>
+      <p>A booking for <strong>${data.propertyTitle}</strong> has been cancelled by the guest.</p>
+      <p>Guest: ${data.guestFirstName} ${data.guestLastName}</p>
+      <p>Dates: ${data.checkIn} — ${data.checkOut}</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>The dates are now available for new bookings.</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------------
@@ -77,6 +173,15 @@ async function processEmail(
     case "property-created-host":
       await sendPropertyCreatedHost(job.data as PropertyCreatedHostJob);
       break;
+    case "booking-created-guest":
+      await sendBookingCreatedGuest(job.data as BookingCreatedGuestJob);
+      break;
+    case "booking-cancelled-guest":
+      await sendBookingCancelledGuest(job.data as BookingCancelledGuestJob);
+      break;
+    case "booking-cancelled-host":
+      await sendBookingCancelledHost(job.data as BookingCancelledHostJob);
+      break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");
   }
@@ -85,7 +190,7 @@ async function processEmail(
 const worker = new Worker<EmailJobData["data"], void, EmailJobName>(
   "email",
   processEmail,
-  { connection: redisConnection },
+  { connection: redisConnection, concurrency: 10 },
 );
 
 worker.on("completed", (job) => {

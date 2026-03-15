@@ -6,11 +6,25 @@ import * as bookingController from "./booking.controller.js";
 import {
   createBookingSchema,
   updateBookingStatusSchema,
+  availabilitySchema,
+  updateBookingDatesSchema,
 } from "./booking.validators.js";
 
 export const bookingRouter: IRouter = Router();
 
-// All routes require authentication
+// ---- Public routes ----
+bookingRouter.post(
+  "/check-availability",
+  validate(availabilitySchema),
+  asyncHandler(bookingController.checkAvailability),
+);
+
+bookingRouter.get(
+  "/:propertyId/blocked-dates",
+  asyncHandler(bookingController.getBlockedDates),
+);
+
+// ---- Authenticated routes ----
 bookingRouter.use(authenticate);
 
 bookingRouter.get("/", asyncHandler(bookingController.getUserBookings));
@@ -29,10 +43,10 @@ bookingRouter.patch(
   asyncHandler(bookingController.updateBookingStatus),
 );
 
-bookingRouter.delete("/:id", asyncHandler(bookingController.cancelBooking));
-
-// Check property availability
-bookingRouter.post(
-  "/check-availability",
-  asyncHandler(bookingController.checkAvailability),
+bookingRouter.patch(
+  "/:id/dates",
+  validate(updateBookingDatesSchema),
+  asyncHandler(bookingController.updateBookingDates),
 );
+
+bookingRouter.delete("/:id", asyncHandler(bookingController.cancelBooking));
