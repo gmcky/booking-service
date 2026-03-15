@@ -1,0 +1,27 @@
+info:
+  name: Update Dates
+  type: http
+  seq: 6
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/bookings/{{bookingId}}/dates"
+  body:
+    type: json
+    data: |-
+      {
+        "checkIn": "2026-04-12T14:00:00.000Z",
+        "checkOut": "2026-04-17T12:00:00.000Z"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: bookingId
+      value: cc1ee44e-098e-42f3-8627-a8cff8f30ca3
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

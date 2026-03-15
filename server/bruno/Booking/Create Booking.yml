@@ -1,0 +1,26 @@
+info:
+  name: Create Booking
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/bookings"
+  body:
+    type: json
+    data: |-
+      {
+        "propertyId": "{{propertyId}}",
+        "checkIn": "2026-04-10T14:00:00.000Z",
+        "checkOut": "2026-04-15T12:00:00.000Z",
+        "guests": 2,
+        "specialRequests": "Late check-in if possible, arriving on evening flight.",
+        "arrivalTime": "21:30"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

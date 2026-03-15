@@ -1,0 +1,24 @@
+info:
+  name: Create Booking (90 Days Error)
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{baseUrl}}/bookings"
+  body:
+    type: json
+    data: |-
+      {
+        "propertyId": "{{propertyId}}",
+        "checkIn": "2026-05-01T14:00:00.000Z",
+        "checkOut": "2026-10-01T12:00:00.000Z",
+        "guests": 1
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

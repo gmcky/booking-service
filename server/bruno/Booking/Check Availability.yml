@@ -1,0 +1,23 @@
+info:
+  name: Check Availability
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/bookings/check-availability"
+  body:
+    type: json
+    data: |-
+      {
+        "propertyId": "{{propertyId}}",
+        "checkIn": "2026-04-10T14:00:00.000Z",
+        "checkOut": "2026-04-15T12:00:00.000Z"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

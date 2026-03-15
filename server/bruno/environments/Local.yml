@@ -7,6 +7,8 @@ variables:
   - name: propertyId2
     value: bd6bc164-4a09-4cb2-8394-853e5247a186
   - name: testProperty
-    value: 9ca0b557-d22b-41c7-b3af-cca2936acafe
+    value: d2e183ec-27b3-43ce-b9e8-63b74bc3f53c
   - secret: true
     name: jwt_token
+  - name: bookingId
+    value: cc1ee44e-098e-42f3-8627-a8cff8f30ca3
