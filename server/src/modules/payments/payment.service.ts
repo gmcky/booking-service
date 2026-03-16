@@ -1,15 +1,8 @@
 import { prisma } from "../../shared/lib/prisma.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
+import { stripe } from "../../shared/lib/stripe.js";
 import type { CreatePaymentInput } from "./payment.types.js";
-// import Stripe from 'stripe';
-// import { env } from '../../config/env.js';
-
-// TODO: Initialize Stripe client
-// const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-//   apiVersion: '2024-12-18.acacia', // Use latest API version
-//   typescript: true
-// });
 
 /**
  * PaymentService - Handles payment processing and refunds

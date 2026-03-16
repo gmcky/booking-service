@@ -1,40 +1,33 @@
-import type { Request, Response } from "express";
+import express, { type Response } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PaymentService } from "./payment.service.js";
+import { stripe } from "../../shared/lib/stripe.js";
+import { env } from "../../config/env.js";
 import { logger } from "../../shared/lib/logger.js";
+import { AppError } from "../../shared/middlewares/error.handler.js";
 
-// TODO: Import Stripe for webhook signature verification
-// import Stripe from 'stripe';
-// import { env } from '../../config/env.js';
-// const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+// ─── Existing endpoints ───────────────────────────────────────────────────────
 
 /**
- * Create payment intent (Step 1 of payment flow)
+ * Create payment record (legacy / simple flow)
  * @route POST /api/v1/payments
  * @access Private
  * @body { bookingId, currency? }
  */
-
-export async function createPayment(req: AuthenticatedRequest, res: Response) {
-  // TODO: Validate request body with Zod
-  // Schema: { bookingId: string (UUID), currency?: string }
-
+export async function createPayment(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
   const userId = req.user!.id;
-
-  // TODO: Return client_secret for frontend
-  // Frontend will use Stripe.js to complete payment
-  // const { clientSecret, paymentIntentId } = await PaymentService.create(req.body, userId);
-  // res.status(201).json({ clientSecret, paymentIntentId });
-
   const payment = await PaymentService.create(req.body, userId);
   res.status(201).json(payment);
-
-  // TODO: Add rate limiting - prevent payment spam
-  // Max 5 payment attempts per booking
 }
 
-export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
+export async function getPaymentById(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const payment = await PaymentService.getById(id, userId);
@@ -42,21 +35,15 @@ export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * Process payment (Manual trigger - for testing only)
+ * Process payment (Manual trigger — for testing only)
  * @route POST /api/v1/payments/:id/process
  * @access Private
  * @deprecated Use webhook for production
  */
-export async function processPayment(req: AuthenticatedRequest, res: Response) {
-  // ⚠️ WARNING: This should NOT be used in production!
-  // Payments should be confirmed via Stripe webhook, not user request
-  // Reason: Users could fake payment success
-
-  // TODO: Remove this endpoint in production or restrict to admins only
-  // if (env.NODE_ENV === 'production') {
-  //   throw new AppError(403, 'Use Stripe webhook for payment confirmation');
-  // }
-
+export async function processPayment(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const payment = await PaymentService.process(id, userId);
@@ -70,68 +57,67 @@ export async function refundPayment(req: AuthenticatedRequest, res: Response) {
   res.json(payment);
 }
 
+// ─── New Stripe endpoints (stubs) ─────────────────────────────────────────────
+
 /**
- * Handle Stripe webhook events
- * @route POST /api/v1/payments/webhook
- * @access Public (but verified via signature)
+ * Create a Stripe PaymentIntent and return the client_secret to the frontend.
+ * The frontend uses Stripe.js / Elements to securely collect card details
+ * and confirm the payment without card data ever touching our server (PCI-DSS).
  *
- * CRITICAL SETUP REQUIREMENTS:
- * 1. Register endpoint in Stripe Dashboard
- * 2. Get webhook secret (starts with whsec_)
- * 3. Use RAW body (not JSON parsed)
- * 4. Verify signature before processing
+ * @route  POST /api/v1/payments/intent
+ * @access Private (authenticated user)
+ * @body   { bookingId: string (UUID), currency?: string (ISO-4217, default "usd") }
+ *
+ * TODO (implementation checklist):
+ *   1. Validate body with Zod: createPaymentIntentSchema
+ *   2. Fetch booking from DB; verify it belongs to req.user.id
+ *   3. Verify booking.status === 'PENDING' (only pending bookings need payment)
+ *   4. Check there is no existing SUCCESS payment for this booking (idempotency)
+ *   5. Call stripe.paymentIntents.create({
+ *        amount: Math.round(booking.totalPrice * 100),  // cents
+ *        currency: body.currency ?? 'usd',
+ *        metadata: { bookingId, userId },
+ *        idempotencyKey: `intent_${bookingId}`,
+ *      })
+ *   6. Persist { bookingId, stripePaymentIntentId, status: 'PENDING' } to DB
+ *   7. Return { clientSecret: paymentIntent.client_secret }
  */
-export async function handleWebhook(req: Request, res: Response) {
-  // TODO: CRITICAL - Get RAW body, not JSON
-  // Express json() middleware parses body automatically,
-  // but Stripe signature verification needs raw buffer
-  //
-  // Solution: Apply express.raw() middleware to this route ONLY
-  // In routes file:
-  // router.post('/webhook',
-  //   express.raw({ type: 'application/json' }), // Get raw body
-  //   handleWebhook
-  // );
+export async function createPaymentIntent(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  // TODO: implement (see checklist above)
+  res.status(501).json({ message: "Not implemented yet" });
+}
 
-  // TODO: Get Stripe signature from headers
-  // const signature = req.headers['stripe-signature'];
-  // if (!signature) {
-  //   logger.error('Missing Stripe signature header');
-  //   return res.status(400).json({ error: 'Missing signature' });
-  // }
-
-  // TODO: Verify and process webhook
-  // try {
-  //   await PaymentService.handleStripeWebhook(
-  //     req.body, // Raw body (Buffer or string)
-  //     signature
-  //   );
-  //
-  //   // Return 200 ASAP (Stripe retries on non-200 responses)
-  //   res.status(200).json({ received: true });
-  //
-  // } catch (error) {
-  //   logger.error({
-  //     error: error.message,
-  //     body: req.body?.toString?.('utf-8')
-  //   }, 'Webhook processing failed');
-  //
-  //   // Return 400 for invalid signature (don't retry)
-  //   // Return 500 for processing errors (Stripe will retry)
-  //   const statusCode = error instanceof AppError ? error.statusCode : 500;
-  //   res.status(statusCode).json({ error: error.message });
-  // }
-
-  // TEMPORARY placeholder
-  res.status(200).send();
-
-  // TODO: Add monitoring/alerting for webhook failures
-  // High webhook failure rate indicates system issues
-
-  // TODO: Test webhook locally using Stripe CLI
-  // stripe listen --forward-to localhost:3000/api/v1/payments/webhook
-
-  // TODO: Handle webhook events idempotently
-  // Stripe may send same event multiple times (network retries)
-  // Store processed event IDs in database to prevent duplicate processing
+/**
+ * Stripe webhook handler — the ONLY place payment status should be set to SUCCESS.
+ *
+ * @route  POST /api/v1/payments/webhook
+ * @access Public (no JWT), protected by Stripe signature verification
+ *
+ * ⚠️  IMPORTANT: this route MUST receive the RAW body (Buffer), NOT parsed JSON.
+ *    Add `express.raw({ type: 'application/json' })` middleware on this route only.
+ *    See payment.routes.ts — the middleware is already applied there.
+ *
+ * TODO (implementation checklist):
+ *   1. Read raw body from req.body (Buffer)
+ *   2. Read stripe-signature header
+ *   3. stripe.webhooks.constructEvent(rawBody, sig, env.STRIPE_WEBHOOK_SECRET)
+ *      → throws on invalid signature → return 400
+ *   4. Switch on event.type:
+ *        'payment_intent.succeeded'      → call PaymentService.handlePaymentSuccess
+ *        'payment_intent.payment_failed' → call PaymentService.handlePaymentFailed
+ *        'charge.refunded'               → call PaymentService.handleRefundCompleted
+ *        default                         → log & ignore
+ *   5. Always return 200 quickly (Stripe retries on non-2xx)
+ *   6. Implement idempotency: store processed stripeEvent.id in DB,
+ *      skip events already recorded (Stripe may re-deliver on network errors)
+ *
+ * Test locally:
+ *   stripe listen --forward-to localhost:3000/api/v1/payments/webhook
+ */
+export async function handleWebhook(req: express.Request, res: Response) {
+  // TODO: implement (see checklist above)
+  res.status(200).json({ received: true });
 }
