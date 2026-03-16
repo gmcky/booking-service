@@ -48,6 +48,10 @@ export const env = cleanEnv(process.env, {
   SMTP_PASSWORD: str({ default: "" }),
   EMAIL_FROM: str({ default: "noreply@booking-service.local" }),
 
+  // Stripe
+  STRIPE_SECRET_KEY: str({ default: "" }),
+  STRIPE_WEBHOOK_SECRET: str({ default: "" }),
+
   // API Documentation
   SWAGGER_ENABLED: bool({ default: true }),
   API_VERSION: str({ default: "v1" }),
