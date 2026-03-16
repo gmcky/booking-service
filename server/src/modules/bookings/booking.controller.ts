@@ -47,15 +47,17 @@ export async function updateBookingStatus(
 ) {
   const id = getIdParam(req);
   const userId = req.user!.id;
+  const userRole = req.user!.role;
   const { status } = req.body;
-  const booking = await BookingService.updateStatus(id, userId, status);
+  const booking = await BookingService.updateStatus(id, userId, userRole, status);
   res.json(booking);
 }
 
 export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
-  await BookingService.cancel(id, userId);
+  const userRole = req.user!.role;
+  await BookingService.cancel(id, userId, userRole);
   res.status(204).send();
 }
 
