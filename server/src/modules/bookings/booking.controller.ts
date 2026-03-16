@@ -19,7 +19,8 @@ export async function getUserBookings(
 export async function getBookingById(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
-  const booking = await BookingService.getById(id, userId);
+  const userRole = req.user!.role;
+  const booking = await BookingService.getById(id, userId, userRole);
   res.json(booking);
 }
 
@@ -67,7 +68,8 @@ export async function updateBookingDates(
 ) {
   const id = getIdParam(req);
   const userId = req.user!.id;
-  const booking = await BookingService.updateDates(id, userId, req.body);
+  const userRole = req.user!.role;
+  const booking = await BookingService.updateDates(id, userId, userRole, req.body);
   res.json(booking);
 }
 

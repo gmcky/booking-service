@@ -55,7 +55,7 @@ export class BookingService {
     return createPaginatedResponse(bookings, total, params);
   }
 
-  static async getById(id: string, userId: string) {
+  static async getById(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: {
@@ -68,7 +68,8 @@ export class BookingService {
       throw new AppError(404, "Booking not found");
     }
 
-    if (booking.userId !== userId) {
+    const role = getBookingRole(booking, userId, userRole);
+    if (role === "NONE") {
       throw new AppError(403, "Not authorized to view this booking");
     }
 
@@ -276,9 +277,17 @@ export class BookingService {
   static async updateDates(
     id: string,
     userId: string,
+    userRole: string,
     data: UpdateBookingDatesInput,
   ) {
-    const booking = await this.getById(id, userId);
+    // Only guests (the booking owner) and admins may reschedule.
+    // Hosts must not silently shift a guest's confirmed dates.
+    const booking = await this.getById(id, userId, userRole);
+
+    const role = getBookingRole(booking, userId, userRole);
+    if (role === "HOST") {
+      throw new AppError(403, "Hosts cannot reschedule guest bookings");
+    }
 
     if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") {
       throw new AppError(400, "Can only reschedule active bookings");
