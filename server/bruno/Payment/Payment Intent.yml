@@ -1,0 +1,21 @@
+info:
+  name: Payment Intent
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/payments/intent"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{bookingId2}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

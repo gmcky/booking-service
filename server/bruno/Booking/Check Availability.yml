@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-        "propertyId": "{{propertyId}}",
+        "propertyId": "{{propertyId2}}",
         "checkIn": "2026-04-10T14:00:00.000Z",
         "checkOut": "2026-04-15T12:00:00.000Z"
       }
