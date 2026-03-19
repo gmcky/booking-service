@@ -66,11 +66,18 @@ const registerLimiter = rateLimit({
 
 export function createApp(): Application {
   const app = express();
+  const apiPrefix = `/api/${env.API_VERSION}`;
+  const jsonParser = express.json({ limit: "10kb" });
 
   // Trust the first proxy (needed for accurate client IP when behind load balancers)
   app.set("trust proxy", 1);
 
   app.use(helmet());
+
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
   const allowedOrigins = env.CORS_ORIGIN.split(",")
     .map((o) => o.trim())
     .filter(Boolean);
@@ -110,20 +117,19 @@ export function createApp(): Application {
     );
   }
 
-  app.use(express.json({ limit: "10kb" }));
+  app.use((req, res, next) => {
+    if (req.path === `${apiPrefix}/payments/webhook`) {
+      return next();
+    }
+    return jsonParser(req, res, next);
+  });
   app.use(express.urlencoded({ extended: true, limit: "25kb" }));
-
-  const apiPrefix = `/api/${env.API_VERSION}`;
 
   app.use(apiPrefix, apiLimiter);
   app.use(`${apiPrefix}/auth/register`, registerLimiter);
   app.use(`${apiPrefix}/auth/login`, loginLimiter);
 
   app.use(apiPrefix, createApiRouter());
-
-  app.get("/health", (req, res) => {
-    res.status(200).json({ status: "ok" });
-  });
 
   app.use(errorHandler);
 
