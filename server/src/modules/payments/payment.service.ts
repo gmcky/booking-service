@@ -10,17 +10,17 @@ import type {
 } from "./payment.types.js";
 
 /**
- * PaymentService - Handles payment processing and refunds
+ * Handles payment processing and refund lifecycle operations.
  *
- * CRITICAL REQUIREMENTS:
- * 1. Use Stripe (or PayPal) for payment processing
- * 2. Handle webhook events for async payment confirmation
- * 3. Implement idempotency to prevent duplicate charges
- * 4. Update Booking status to CONFIRMED only after successful payment
- * 5. Handle refunds with proper validation
- * 6. Store transaction IDs for reconciliation
- * 7. Handle payment failures gracefully
- * 8. Implement PCI compliance (never store card details)
+ * Critical requirements:
+ * 1. Use Stripe (or PayPal) for payment processing.
+ * 2. Handle webhook events for asynchronous payment confirmation.
+ * 3. Enforce idempotency to prevent duplicate processing.
+ * 4. Update booking status to CONFIRMED only after successful payment.
+ * 5. Validate refund requests before processing.
+ * 6. Store transaction identifiers for reconciliation.
+ * 7. Handle payment failures predictably.
+ * 8. Maintain PCI compliance by never storing card details.
  */
 export class PaymentService {
   static async createIntent(data: CreatePaymentIntentInput, userId: string) {
@@ -112,7 +112,7 @@ export class PaymentService {
   }
 
   static async create(data: CreatePaymentInput, userId: string) {
-    // TODO: SECURITY - Verify booking belongs to user
+    // TODO: Enforce PENDING booking status before payment creation.
     const booking = await prisma.booking.findUnique({
       where: { id: data.bookingId },
       include: { payment: true },
@@ -126,41 +126,12 @@ export class PaymentService {
       throw new AppError(403, "Not authorized");
     }
 
-    // TODO: Check booking status - only PENDING bookings need payment
-    // if (booking.status !== 'PENDING') {
-    //   throw new AppError(400, 'Booking not in pending status');
-    // }
-
     if (booking.payment) {
       throw new AppError(409, "Payment already exists for this booking");
     }
 
-    // TODO: Create Stripe Payment Intent (server-side)
-    // Payment Intent is Stripe's recommended way to handle payments
-    // It supports 3D Secure, retries, and various payment methods
-    //
-    // const paymentIntent = await stripe.paymentIntents.create({
-    //   amount: Math.round(booking.totalPrice * 100), // Convert to cents
-    //   currency: data.currency || 'usd',
-    //   customer: await getOrCreateStripeCustomer(userId), // Reuse customer
-    //   metadata: {
-    //     bookingId: data.bookingId,
-    //     userId,
-    //     propertyId: booking.propertyId
-    //   },
-    //   description: `Booking for property ${booking.propertyId}`,
-    //   // CRITICAL: Store idempotency key to prevent duplicate charges
-    //   idempotencyKey: `booking_${data.bookingId}_${Date.now()}`
-    // });
-    //
-    // // Return client_secret to frontend for payment confirmation
-    // // Frontend uses Stripe.js to securely collect card details
-    // return {
-    //   clientSecret: paymentIntent.client_secret,
-    //   paymentIntentId: paymentIntent.id
-    // };
-
-    // TEMPORARY: Create payment record (replace with Stripe integration)
+    // TODO: Replace temporary record creation with Stripe PaymentIntent flow.
+    // TODO: Persist provider intent identifier for webhook reconciliation.
     return prisma.payment.create({
       data: {
         bookingId: data.bookingId,
@@ -170,9 +141,6 @@ export class PaymentService {
         status: "PENDING",
       },
     });
-
-    // TODO: Store payment intent ID for webhook processing
-    // When webhook arrives, we'll match it using this ID
   }
 
   static async getById(id: string, userId: string) {
@@ -205,63 +173,18 @@ export class PaymentService {
       throw new AppError(400, "Payment already processed");
     }
 
-    // ⚠️ WARNING: This should NOT be called directly by users!
-    // Payment processing should happen via Stripe webhook
-    // This method exists only for testing or manual intervention
-
-    // TODO: Verify payment with Stripe before updating status
-    // const paymentIntent = await stripe.paymentIntents.retrieve(payment.transactionId);
-    // if (paymentIntent.status !== 'succeeded') {
-    //   throw new AppError(400, 'Payment not confirmed by Stripe');
-    // }
-
-    // TODO: Use transaction to update payment + booking status atomically
-    // This ensures consistency - either both succeed or both fail
-    //
-    // return await prisma.$transaction(async (tx) => {
-    //   // Step 1: Update payment status
-    //   const updatedPayment = await tx.payment.update({
-    //     where: { id },
-    //     data: {
-    //       status: 'SUCCESS',
-    //       processedAt: new Date(),
-    //       // Store Stripe transaction details
-    //       transactionId: paymentIntent.id,
-    //       metadata: JSON.stringify(paymentIntent)
-    //     }
-    //   });
-    //
-    //   // Step 2: Update booking status to CONFIRMED
-    //   await tx.booking.update({
-    //     where: { id: payment.bookingId },
-    //     data: { status: 'CONFIRMED' }
-    //   });
-    //
-    //   return updatedPayment;
-    // });
+    // WARNING: This endpoint is intended for testing/manual intervention.
+    // Production payment finalization must be handled by verified webhooks.
+    // TODO: Verify provider payment state before marking payment as SUCCESS.
+    // TODO: Update payment and booking state atomically in one transaction.
+    // TODO: Enqueue booking confirmation notification after successful processing.
 
     return prisma.payment.update({
       where: { id },
       data: {
         status: "SUCCESS",
-        // transactionId: result.transactionId,
-        // metadata: result.metadata,
       },
     });
-
-    // TODO: Trigger background job for confirmation email
-    // await emailQueue.add('payment-success', {
-    //   bookingId: payment.bookingId,
-    //   amount: payment.amount
-    // });
-
-    // TODO: Log successful payment
-    // logger.info({
-    //   event: 'payment_success',
-    //   paymentId: id,
-    //   bookingId: payment.bookingId,
-    //   amount: payment.amount
-    // }, 'Payment processed successfully');
   }
 
   static async refund(id: string, userId: string) {
@@ -271,63 +194,16 @@ export class PaymentService {
       throw new AppError(400, "Can only refund successful payments");
     }
 
-    // TODO: Check if already refunded (idempotency)
-    // if (payment.status === 'REFUNDED') {
-    //   return payment; // Already refunded, return success (idempotent)
-    // }
-
-    // TODO: Validate refund eligibility based on booking status
-    // const booking = await prisma.booking.findUnique({
-    //   where: { id: payment.bookingId }
-    // });
-    // if (booking.status === 'COMPLETED') {
-    //   throw new AppError(400, 'Cannot refund completed bookings');
-    // }
-
-    // TODO: Process refund with Stripe
-    // const refund = await stripe.refunds.create({
-    //   payment_intent: payment.transactionId,
-    //   amount: Math.round(payment.amount * 100), // Full refund
-    //   reason: 'requested_by_customer',
-    //   metadata: {
-    //     bookingId: payment.bookingId,
-    //     userId
-    //   }
-    // });
-    //
-    // if (refund.status !== 'succeeded') {
-    //   throw new AppError(500, 'Refund failed');
-    // }
-
-    // TODO: Use transaction to update payment + booking atomically
-    // return await prisma.$transaction([
-    //   prisma.payment.update({
-    //     where: { id },
-    //     data: {
-    //       status: 'REFUNDED',
-    //       refundedAt: new Date(),
-    //       refundTransactionId: refund.id
-    //     }
-    //   }),
-    //   prisma.booking.update({
-    //     where: { id: payment.bookingId },
-    //     data: { status: 'CANCELLED' }
-    //   })
-    // ]);
+    // TODO: Make refunds idempotent for repeated requests.
+    // TODO: Validate refund eligibility against booking lifecycle state.
+    // TODO: Execute provider refund before local status transition.
+    // TODO: Update payment and booking state atomically.
+    // TODO: Enqueue refund confirmation notification after completion.
 
     return prisma.payment.update({
       where: { id },
       data: { status: "REFUNDED" },
     });
-
-    // TODO: Trigger background job for refund confirmation email
-    // await emailQueue.add('refund-processed', {
-    //   bookingId: payment.bookingId,
-    //   amount: payment.amount
-    // });
-
-    // TODO: Log refund
-    // logger.info({ paymentId: id, bookingId: payment.bookingId }, 'Refund processed');
   }
 
   /**

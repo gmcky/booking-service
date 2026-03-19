@@ -3,10 +3,8 @@ import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PaymentService } from "./payment.service.js";
 
-// ─── Existing endpoints ───────────────────────────────────────────────────────
-
 /**
- * Create payment record (legacy / simple flow)
+ * Create payment record using the legacy payment flow.
  * @route POST /api/v1/payments
  * @access Private
  * @body { bookingId, currency? }
@@ -25,7 +23,7 @@ export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * Process payment (Manual trigger — for testing only)
+ * Process payment manually for testing or operational intervention.
  * @route POST /api/v1/payments/:id/process
  * @access Private
  * @deprecated Use webhook for production
@@ -44,16 +42,13 @@ export async function refundPayment(req: AuthenticatedRequest, res: Response) {
   res.json(payment);
 }
 
-// ─── New Stripe endpoints (stubs) ─────────────────────────────────────────────
-
 /**
  * Create a Stripe PaymentIntent and return the client_secret to the frontend.
- * The frontend uses Stripe.js / Elements to securely collect card details
- * and confirm the payment without card data ever touching our server (PCI-DSS).
+ * Card data collection and confirmation are handled by Stripe.js/Elements.
  *
- * @route  POST /api/v1/payments/intent
+ * @route POST /api/v1/payments/intent
  * @access Private (authenticated user)
- * @body   { bookingId: string (UUID) }
+ * @body { bookingId: string (UUID) }
  * @returns { clientSecret: string }
  */
 export async function createPaymentIntent(
@@ -66,31 +61,12 @@ export async function createPaymentIntent(
 }
 
 /**
- * Stripe webhook handler — the ONLY place payment status should be set to SUCCESS.
+ * Stripe webhook handler.
+ * Payment status transitions to SUCCESS must be performed via verified webhooks.
  *
- * @route  POST /api/v1/payments/webhook
+ * @route POST /api/v1/payments/webhook
  * @access Public (no JWT), protected by Stripe signature verification
- *
- * ⚠️  IMPORTANT: this route MUST receive the RAW body (Buffer), NOT parsed JSON.
- *    Add `express.raw({ type: 'application/json' })` middleware on this route only.
- *    See payment.routes.ts — the middleware is already applied there.
- *
- * TODO (implementation checklist):
- *   1. Read raw body from req.body (Buffer)
- *   2. Read stripe-signature header
- *   3. stripe.webhooks.constructEvent(rawBody, sig, env.STRIPE_WEBHOOK_SECRET)
- *      → throws on invalid signature → return 400
- *   4. Switch on event.type:
- *        'payment_intent.succeeded'      → call PaymentService.handlePaymentSuccess
- *        'payment_intent.payment_failed' → call PaymentService.handlePaymentFailed
- *        'charge.refunded'               → call PaymentService.handleRefundCompleted
- *        default                         → log & ignore
- *   5. Always return 200 quickly (Stripe retries on non-2xx)
- *   6. Implement idempotency: store processed stripeEvent.id in DB,
- *      skip events already recorded (Stripe may re-deliver on network errors)
- *
- * Test locally:
- *   stripe listen --forward-to localhost:3000/api/v1/payments/webhook
+ * This route requires the raw request body (Buffer), not parsed JSON.
  */
 export async function handleWebhook(req: express.Request, res: Response) {
   const signature = req.headers["stripe-signature"] as string;

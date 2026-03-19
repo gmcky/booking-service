@@ -10,26 +10,23 @@ import {
 
 export const paymentRouter: IRouter = Router();
 
-// ─── Webhook (raw body, no JWT auth) ─────────────────────────────────────────
-// IMPORTANT: must be defined BEFORE the json-body authenticate middleware,
-// because Stripe signature verification requires the raw Buffer, not parsed JSON.
+// Webhook route must run before authenticated JSON routes because Stripe
+// signature verification requires the raw request body.
 paymentRouter.post(
   "/webhook",
-  express.raw({ type: "application/json" }), // keeps body as Buffer
+  express.raw({ type: "application/json" }),
   asyncHandler(paymentController.handleWebhook),
 );
 
-// ─── All routes below require authentication ──────────────────────────────────
+// Routes below require authentication.
 paymentRouter.use(authenticate);
 
-// Create payment record (legacy simple flow)
 paymentRouter.post(
   "/",
   validate(createPaymentSchema),
   asyncHandler(paymentController.createPayment),
 );
 
-// Create Stripe PaymentIntent → returns client_secret to frontend
 paymentRouter.post(
   "/intent",
   validate(createPaymentIntentSchema),
