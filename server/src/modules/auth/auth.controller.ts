@@ -14,10 +14,10 @@ const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
 };
 
 /**
- * Register a new user
+ * Register a new user.
  * @route POST /api/v1/auth/register
  * @access Public
- * @security TODO: Add rate limiting (max 5 registrations per IP per hour)
+ * @security TODO: Add registration rate limiting per IP.
  */
 export async function register(req: Request, res: Response) {
   const result = await AuthService.register(req.body, {
@@ -26,17 +26,17 @@ export async function register(req: Request, res: Response) {
   });
   const { refreshToken, ...responsePayload } = result;
 
-  // Refresh token is stored in an HttpOnly cookie — never exposed in the JSON body
+  // Store refresh token in an HttpOnly cookie and exclude it from JSON responses.
   setRefreshTokenCookie(res, refreshToken);
 
   res.status(201).json(responsePayload);
 }
 
 /**
- * Login user
+ * Authenticate a user.
  * @route POST /api/v1/auth/login
  * @access Public
- * @security TODO: Add rate limiting (max 10 login attempts per IP per hour)
+ * @security TODO: Add login attempt rate limiting per IP.
  */
 export async function login(req: Request, res: Response) {
   const result = await AuthService.login(req.body, {
@@ -51,7 +51,7 @@ export async function login(req: Request, res: Response) {
 }
 
 /**
- * Logout user
+ * Log out a user.
  * @route POST /api/v1/auth/logout
  * @access Private (requires valid refresh token in cookie)
  */
@@ -70,7 +70,7 @@ export async function logout(req: Request, res: Response) {
 
 /**
  * Refresh access token using Refresh Token Rotation.
- * The old refresh token is consumed and a new one is issued on every call.
+ * The current refresh token is consumed and rotated on each call.
  * @route POST /api/v1/auth/refresh
  * @access Public (requires valid refresh token in cookie)
  */
@@ -83,18 +83,14 @@ export async function refreshToken(req: Request, res: Response) {
   });
   const { refreshToken: rotatedRefreshToken, ...responsePayload } = result;
 
-  // Replace the old refresh token cookie with the newly rotated one
+  // Replace the previous refresh token cookie with the rotated token.
   setRefreshTokenCookie(res, rotatedRefreshToken);
 
   res.json(responsePayload);
 }
 
-// TODO: Add controller for password reset
-// export async function requestPasswordReset(req: Request, res: Response)
-// export async function resetPassword(req: Request, res: Response)
-
-// TODO: Add controller for email verification (optional)
-// export async function verifyEmail(req: Request, res: Response)
+// TODO: Add password reset endpoints.
+// TODO: Add email verification endpoint.
 
 function setRefreshTokenCookie(res: Response, token: string) {
   res.cookie(REFRESH_TOKEN_COOKIE_NAME, token, REFRESH_TOKEN_COOKIE_OPTIONS);

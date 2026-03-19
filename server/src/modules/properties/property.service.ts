@@ -26,12 +26,12 @@ import type {
 } from "./property.types.js";
 
 /**
- * PropertyService - Core business logic for property listings.
+ * Core business logic for property listings.
  *
- * ARCHITECTURE ROADMAP:
- * - [Cache] Redis: Cache heavy search queries and single property lookups (Cache-Aside pattern).
- * - [Queue] BullMQ: Offload heavy tasks (image processing, notification emails) to background workers.
- * - [DB]    PostGIS: Future transition for complex geospatial queries (radius search).
+ * Architecture roadmap:
+ * - Cache: Redis cache-aside for search and property lookups.
+ * - Queue: BullMQ for background image processing and notifications.
+ * - Database: optional PostGIS migration for geospatial queries.
  */
 export class PropertyService {
   static async getAll(params: PaginationParams, filters: PropertyFilters) {
@@ -85,7 +85,7 @@ export class PropertyService {
     ]);
 
     const result = createPaginatedResponse(properties, total, params);
-    await cacheSet(cacheKey, result, 5 * 60); // 5 minutes
+    await cacheSet(cacheKey, result, 5 * 60);
     return result;
   }
 
@@ -114,19 +114,19 @@ export class PropertyService {
       throw new AppError(404, "Property not found");
     }
 
-    await cacheSet(cacheKey, property, 60 * 60); // 1 hour
+    await cacheSet(cacheKey, property, 60 * 60);
     return property;
   }
 
   static async create(data: CreatePropertyInput) {
     const { rawImagePaths, ...propertyData } = data;
 
-    // Persist core listing data immediately — HTTP response is not blocked by image processing.
+    // Persist listing data immediately; image processing is asynchronous.
+    // TODO: Add configurable moderation workflow for new listings.
     const property = await prisma.property.create({
       data: {
         ...propertyData,
-        images: [], // Populated asynchronously by the image processing worker.
-        // isActive: false, // TODO: Uncomment to require admin approval before listing goes live.
+        images: [],
       },
       include: {
         owner: {
@@ -135,8 +135,7 @@ export class PropertyService {
       },
     });
 
-    // Offload image work to BullMQ: resize → WebP → S3 upload → DB update.
-    // The client gets a 201 response immediately and images appear once the worker finishes.
+    // Offload image processing to background workers to keep API latency low.
     if (rawImagePaths.length > 0) {
       await imageQueue.add("process-images", {
         propertyId: property.id,
@@ -144,7 +143,7 @@ export class PropertyService {
       });
     }
 
-    // Notify the host asynchronously — SMTP is handled by the email worker.
+    // Send host notification asynchronously via email worker.
     await emailQueue.add("property-created-host", {
       ownerEmail: property.owner.email!,
       ownerFirstName: property.owner.firstName,
@@ -165,8 +164,8 @@ export class PropertyService {
       data: omitUndefined(data),
     });
 
-    // Enqueue orphaned images for deletion only when the caller explicitly
-    // passes a new images array (even an empty one counts — all old files are orphaned).
+    // Cleanup is triggered only when images are explicitly provided by caller.
+    // An empty array intentionally marks all previous images as orphaned.
     if (data.images !== undefined) {
       const incoming = new Set(data.images);
       const orphaned = current.images.filter((p) => !incoming.has(p));

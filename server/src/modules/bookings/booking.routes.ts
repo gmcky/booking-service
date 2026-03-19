@@ -12,7 +12,7 @@ import {
 
 export const bookingRouter: IRouter = Router();
 
-// ---- Public routes ----
+// Public routes.
 bookingRouter.post(
   "/check-availability",
   validate(availabilitySchema),
@@ -24,7 +24,7 @@ bookingRouter.get(
   asyncHandler(bookingController.getBlockedDates),
 );
 
-// ---- Authenticated routes ----
+// Authenticated routes.
 bookingRouter.use(authenticate);
 
 bookingRouter.get("/", asyncHandler(bookingController.getUserBookings));

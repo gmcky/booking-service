@@ -2,17 +2,14 @@ import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PropertyService } from "./property.service.js";
-import { logger } from "../../shared/lib/logger.js";
 import type { PropertyQueryInput } from "./property.types.js";
 
 /**
- * Get all properties with filters and pagination
+ * Get properties with filters and pagination.
  * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4&amenities=WIFI,PARKING&sort=price_asc
  * @access Public
  */
-
 export async function getProperties(req: Request, res: Response) {
-  // req.query is already validated and parsed by validate(propertyQuerySchema, "query") in routes.
   const {
     page,
     limit,
@@ -25,7 +22,7 @@ export async function getProperties(req: Request, res: Response) {
     sort,
   } = req.query as unknown as PropertyQueryInput;
 
-  // TODO [Cache]: Implement Redis Cache-Aside here before calling the service.
+  // TODO: Add controller-level cache-aside if service-level caching is moved.
 
   const result = await PropertyService.getAll(
     { page, limit },
@@ -42,25 +39,13 @@ export async function getPropertyById(req: Request, res: Response) {
 }
 
 export async function createProperty(req: AuthenticatedRequest, res: Response) {
-  // TODO: Validate user role - only HOSTS can create properties
-  // if (req.user!.role !== 'HOST') {
-  //   throw new AppError(403, 'Only hosts can create properties');
-  // }
+  // TODO: Enforce host role authorization for property creation.
 
   const ownerId = req.user!.id;
 
-  // TODO: Implement rate limiting - max 10 properties per day
-  // Prevents spam listings
+  // TODO: Add listing creation rate limiting per owner.
 
   const property = await PropertyService.create({ ...req.body, ownerId });
-
-  // TODO: Log property creation
-  // logger.info({
-  //   event: 'property_created',
-  //   propertyId: property.id,
-  //   ownerId,
-  //   city: property.city
-  // }, 'New property created');
 
   res.status(201).json(property);
 }

@@ -28,14 +28,25 @@ export async function createBooking(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
 
   logger.debug(
-    { userId, propertyId: req.body.propertyId, checkIn: req.body.checkIn, checkOut: req.body.checkOut },
+    {
+      userId,
+      propertyId: req.body.propertyId,
+      checkIn: req.body.checkIn,
+      checkOut: req.body.checkOut,
+    },
     "Attempting to create booking",
   );
 
   const booking = await BookingService.create({ ...req.body, userId });
 
   logger.info(
-    { event: "booking_created", bookingId: booking.id, userId, propertyId: booking.propertyId, totalPrice: Number(booking.totalPrice) },
+    {
+      event: "booking_created",
+      bookingId: booking.id,
+      userId,
+      propertyId: booking.propertyId,
+      totalPrice: Number(booking.totalPrice),
+    },
     "Booking created",
   );
 
@@ -50,7 +61,12 @@ export async function updateBookingStatus(
   const userId = req.user!.id;
   const userRole = req.user!.role;
   const { status } = req.body;
-  const booking = await BookingService.updateStatus(id, userId, userRole, status);
+  const booking = await BookingService.updateStatus(
+    id,
+    userId,
+    userRole,
+    status,
+  );
   res.json(booking);
 }
 
@@ -69,14 +85,18 @@ export async function updateBookingDates(
   const id = getIdParam(req);
   const userId = req.user!.id;
   const userRole = req.user!.role;
-  const booking = await BookingService.updateDates(id, userId, userRole, req.body);
+  const booking = await BookingService.updateDates(
+    id,
+    userId,
+    userRole,
+    req.body,
+  );
   res.json(booking);
 }
 
-// Public endpoints (no auth required)
+// Public endpoints.
 
 export async function checkAvailability(req: Request, res: Response) {
-  // Body already validated and transformed by availabilitySchema middleware
   const { propertyId, checkIn, checkOut } = req.body;
 
   const isAvailable = await BookingService.checkAvailability(
