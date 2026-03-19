@@ -215,3 +215,13 @@ model BlockedDate {
   @@index([propertyId, startDate, endDate])
   @@map("blocked_dates")
 }
+
+model ProcessedStripeEvent {
+  id        String   @id @default(uuid())
+  eventId   String   @unique
+  eventType String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("processed_stripe_events")
+}
