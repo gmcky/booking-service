@@ -5,3 +5,7 @@ export const createPaymentSchema = z.object({
   provider: z.enum(["STRIPE", "PAYPAL", "CASH"]),
   currency: z.string().length(3).default("USD"),
 });
+
+export const createPaymentIntentSchema = z.object({
+  bookingId: z.string().uuid(),
+});

@@ -3,7 +3,10 @@ import { authenticate } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as paymentController from "./payment.controller.js";
-import { createPaymentSchema } from "./payment.validators.js";
+import {
+  createPaymentIntentSchema,
+  createPaymentSchema,
+} from "./payment.validators.js";
 
 export const paymentRouter: IRouter = Router();
 
@@ -29,6 +32,7 @@ paymentRouter.post(
 // Create Stripe PaymentIntent → returns client_secret to frontend
 paymentRouter.post(
   "/intent",
+  validate(createPaymentIntentSchema),
   asyncHandler(paymentController.createPaymentIntent),
 );
 

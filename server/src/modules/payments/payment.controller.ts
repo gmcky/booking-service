@@ -2,10 +2,6 @@ import express, { type Response } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PaymentService } from "./payment.service.js";
-import { stripe } from "../../shared/lib/stripe.js";
-import { env } from "../../config/env.js";
-import { logger } from "../../shared/lib/logger.js";
-import { AppError } from "../../shared/middlewares/error.handler.js";
 
 // ─── Existing endpoints ───────────────────────────────────────────────────────
 
@@ -15,19 +11,13 @@ import { AppError } from "../../shared/middlewares/error.handler.js";
  * @access Private
  * @body { bookingId, currency? }
  */
-export async function createPayment(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function createPayment(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const payment = await PaymentService.create(req.body, userId);
   res.status(201).json(payment);
 }
 
-export async function getPaymentById(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const payment = await PaymentService.getById(id, userId);
@@ -40,10 +30,7 @@ export async function getPaymentById(
  * @access Private
  * @deprecated Use webhook for production
  */
-export async function processPayment(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function processPayment(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const payment = await PaymentService.process(id, userId);
@@ -66,28 +53,16 @@ export async function refundPayment(req: AuthenticatedRequest, res: Response) {
  *
  * @route  POST /api/v1/payments/intent
  * @access Private (authenticated user)
- * @body   { bookingId: string (UUID), currency?: string (ISO-4217, default "usd") }
- *
- * TODO (implementation checklist):
- *   1. Validate body with Zod: createPaymentIntentSchema
- *   2. Fetch booking from DB; verify it belongs to req.user.id
- *   3. Verify booking.status === 'PENDING' (only pending bookings need payment)
- *   4. Check there is no existing SUCCESS payment for this booking (idempotency)
- *   5. Call stripe.paymentIntents.create({
- *        amount: Math.round(booking.totalPrice * 100),  // cents
- *        currency: body.currency ?? 'usd',
- *        metadata: { bookingId, userId },
- *        idempotencyKey: `intent_${bookingId}`,
- *      })
- *   6. Persist { bookingId, stripePaymentIntentId, status: 'PENDING' } to DB
- *   7. Return { clientSecret: paymentIntent.client_secret }
+ * @body   { bookingId: string (UUID) }
+ * @returns { clientSecret: string }
  */
 export async function createPaymentIntent(
   req: AuthenticatedRequest,
   res: Response,
 ) {
-  // TODO: implement (see checklist above)
-  res.status(501).json({ message: "Not implemented yet" });
+  const userId = req.user!.id;
+  const result = await PaymentService.createIntent(req.body, userId);
+  res.status(201).json(result);
 }
 
 /**
@@ -118,6 +93,13 @@ export async function createPaymentIntent(
  *   stripe listen --forward-to localhost:3000/api/v1/payments/webhook
  */
 export async function handleWebhook(req: express.Request, res: Response) {
-  // TODO: implement (see checklist above)
+  const signature = req.headers["stripe-signature"] as string;
+
+  if (!signature) {
+    res.status(400).send("Missing stripe-signature header");
+    return;
+  }
+
+  await PaymentService.handleStripeWebhook(req.body, signature);
   res.status(200).json({ received: true });
 }
