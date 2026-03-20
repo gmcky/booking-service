@@ -197,6 +197,7 @@ model Payment {
 enum PaymentStatus {
   PENDING
   SUCCESS
+  REFUND_REQUESTED
   FAILED
   REFUNDED
 }
