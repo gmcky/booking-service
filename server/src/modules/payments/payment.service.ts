@@ -215,7 +215,7 @@ export class PaymentService {
     });
   }
 
-  static async requestRefund(id: string, userId: string) {
+  static async requestRefund(id: string, userId: string, reason?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
       include: {
@@ -274,6 +274,7 @@ export class PaymentService {
             refundPercent: policy.refundPercent,
             refundAmount,
             daysUntilCheckIn: policy.daysUntilCheckIn,
+            reason: reason ?? null,
           },
         },
       },

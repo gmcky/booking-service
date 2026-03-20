@@ -6,6 +6,8 @@ import * as paymentController from "./payment.controller.js";
 import {
   createPaymentIntentSchema,
   createPaymentSchema,
+  requestRefundSchema,
+  rejectRefundSchema,
 } from "./payment.validators.js";
 
 export const paymentRouter: IRouter = Router();
@@ -42,6 +44,7 @@ paymentRouter.post(
 
 paymentRouter.post(
   "/:id/refund",
+  validate(requestRefundSchema),
   asyncHandler(paymentController.requestRefund),
 );
 
@@ -54,5 +57,6 @@ paymentRouter.post(
 paymentRouter.post(
   "/:id/refund/reject",
   authorize("ADMIN"),
+  validate(rejectRefundSchema),
   asyncHandler(paymentController.rejectRefund),
 );

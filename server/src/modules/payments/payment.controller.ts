@@ -2,6 +2,7 @@ import express, { type Response } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PaymentService } from "./payment.service.js";
+import type { RequestRefundInput, RejectRefundInput } from "./payment.types.js";
 
 /**
  * Create payment record using the legacy payment flow.
@@ -38,7 +39,8 @@ export async function processPayment(req: AuthenticatedRequest, res: Response) {
 export async function requestRefund(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
-  const payment = await PaymentService.requestRefund(id, userId);
+  const { reason } = req.body as RequestRefundInput;
+  const payment = await PaymentService.requestRefund(id, userId, reason);
   res.json(payment);
 }
 
@@ -52,8 +54,7 @@ export async function approveRefund(req: AuthenticatedRequest, res: Response) {
 export async function rejectRefund(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const adminId = req.user!.id;
-  const reason =
-    typeof req.body?.reason === "string" ? req.body.reason.trim() : undefined;
+  const { reason } = req.body as RejectRefundInput;
   const payment = await PaymentService.rejectRefund(id, adminId, reason);
   res.json(payment);
 }
