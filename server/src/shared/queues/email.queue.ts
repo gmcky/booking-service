@@ -6,7 +6,10 @@ export type EmailJobName =
   | "booking-created-guest"
   | "booking-cancelled-guest"
   | "booking-cancelled-host"
-  | "review-received-host";
+  | "review-received-host"
+  | "payment-success-guest"
+  | "refund-requested-admin"
+  | "refund-processed-guest";
 
 export interface PropertyCreatedHostJob {
   ownerEmail: string;
@@ -59,13 +62,53 @@ export interface ReviewReceivedHostJob {
   comment: string | null;
 }
 
+export interface PaymentSuccessGuestJob {
+  paymentId: string;
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+  amountPaid: number;
+  currency: string;
+}
+
+export interface RefundRequestedAdminJob {
+  adminEmail: string;
+  adminFirstName: string;
+  paymentId: string;
+  bookingId: string;
+  guestFullName: string;
+  guestEmail: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+  refundPercent: number;
+  refundAmount: number;
+  reason: string | null;
+}
+
+export interface RefundProcessedGuestJob {
+  paymentId: string;
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyTitle: string;
+  isApproved: boolean;
+  reason: string | null;
+}
+
 /** Discriminated union — extend with new job names as needed. */
 export type EmailJobData =
   | { name: "property-created-host"; data: PropertyCreatedHostJob }
   | { name: "booking-created-guest"; data: BookingCreatedGuestJob }
   | { name: "booking-cancelled-guest"; data: BookingCancelledGuestJob }
   | { name: "booking-cancelled-host"; data: BookingCancelledHostJob }
-  | { name: "review-received-host"; data: ReviewReceivedHostJob };
+  | { name: "review-received-host"; data: ReviewReceivedHostJob }
+  | { name: "payment-success-guest"; data: PaymentSuccessGuestJob }
+  | { name: "refund-requested-admin"; data: RefundRequestedAdminJob }
+  | { name: "refund-processed-guest"; data: RefundProcessedGuestJob };
 
 export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>(
   "email",

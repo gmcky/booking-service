@@ -16,6 +16,9 @@ import type {
   BookingCreatedGuestJob,
   BookingCancelledGuestJob,
   BookingCancelledHostJob,
+  PaymentSuccessGuestJob,
+  RefundRequestedAdminJob,
+  RefundProcessedGuestJob,
 } from "../shared/queues/email.queue.js";
 
 const transporter = nodemailer.createTransport({
@@ -155,6 +158,115 @@ async function sendBookingCancelledHost(
   });
 }
 
+async function sendPaymentSuccessGuest(
+  data: PaymentSuccessGuestJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Payment successful — ${data.propertyTitle} ✅`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `We received your payment for \"${data.propertyTitle}\".`,
+      "",
+      `Amount paid: ${data.amountPaid.toFixed(2)} ${data.currency}`,
+      `Check-in:    ${data.checkIn}`,
+      `Check-out:   ${data.checkOut}`,
+      `Booking ID:  ${data.bookingId}`,
+      `Payment ID:  ${data.paymentId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>We received your payment for <strong>${data.propertyTitle}</strong>.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Amount paid</td><td><strong>${data.amountPaid.toFixed(2)} ${data.currency}</strong></td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-in</td><td>${data.checkIn}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-out</td><td>${data.checkOut}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendRefundRequestedAdmin(
+  data: RefundRequestedAdminJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.adminEmail,
+    subject: `Refund request received — Booking ${data.bookingId}`,
+    text: [
+      `Hi ${data.adminFirstName},`,
+      "",
+      "A guest submitted a refund request.",
+      "",
+      `Guest: ${data.guestFullName} (${data.guestEmail})`,
+      `Property: ${data.propertyTitle}`,
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Requested refund: ${data.refundPercent}% (${data.refundAmount.toFixed(2)} USD)`,
+      `Reason: ${data.reason ?? "Not provided"}`,
+      `Booking ID: ${data.bookingId}`,
+      `Payment ID: ${data.paymentId}`,
+      "",
+      "Please review and process this request in the admin panel.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.adminFirstName},</p>
+      <p>A guest submitted a refund request.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFullName} (${data.guestEmail})</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Property</td><td>${data.propertyTitle}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Requested refund</td><td><strong>${data.refundPercent}% (${data.refundAmount.toFixed(2)} USD)</strong></td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Reason</td><td>${data.reason ?? "Not provided"}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
+      <p>Please review and process this request in the admin panel.</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendRefundProcessedGuest(
+  data: RefundProcessedGuestJob,
+): Promise<void> {
+  const decision = data.isApproved ? "approved" : "rejected";
+  const decisionLabel = data.isApproved ? "Approved" : "Rejected";
+
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Refund ${decision} — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `Your refund request for \"${data.propertyTitle}\" was ${decision}.`,
+      ...(data.reason ? ["", `Reason: ${data.reason}`] : []),
+      "",
+      `Booking ID: ${data.bookingId}`,
+      `Payment ID: ${data.paymentId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>Your refund request for <strong>${data.propertyTitle}</strong> was <strong>${decision}</strong>.</p>
+      ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ""}
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
+      <p>— The Booking Service team</p>
+    `,
+    headers: {
+      "X-Refund-Decision": decisionLabel,
+    },
+  });
+}
+
 async function processEmail(
   job: Job<EmailJobData["data"], void, EmailJobName>,
 ): Promise<void> {
@@ -172,6 +284,15 @@ async function processEmail(
       break;
     case "booking-cancelled-host":
       await sendBookingCancelledHost(job.data as BookingCancelledHostJob);
+      break;
+    case "payment-success-guest":
+      await sendPaymentSuccessGuest(job.data as PaymentSuccessGuestJob);
+      break;
+    case "refund-requested-admin":
+      await sendRefundRequestedAdmin(job.data as RefundRequestedAdminJob);
+      break;
+    case "refund-processed-guest":
+      await sendRefundProcessedGuest(job.data as RefundProcessedGuestJob);
       break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");

@@ -4,6 +4,7 @@ import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { env } from "../../config/env.js";
+import { emailQueue } from "../../shared/queues/email.queue.js";
 import type {
   CreatePaymentInput,
   CreatePaymentIntentInput,
@@ -23,6 +24,15 @@ import type {
  * 8. Maintain PCI compliance by never storing card details.
  */
 export class PaymentService {
+  private static formatDate(date: Date) {
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  }
+
   private static getMetadataObject(metadata: Prisma.JsonValue | null) {
     if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
       return metadata as Prisma.JsonObject;
@@ -219,7 +229,22 @@ export class PaymentService {
     const payment = await prisma.payment.findUnique({
       where: { id },
       include: {
-        booking: true,
+        booking: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            property: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -262,7 +287,7 @@ export class PaymentService {
     const refundAmount =
       (Number(payment.amount) * Number(policy.refundPercent)) / 100;
 
-    return prisma.payment.update({
+    const updatedPayment = await prisma.payment.update({
       where: { id },
       data: {
         status: "REFUND_REQUESTED",
@@ -279,13 +304,53 @@ export class PaymentService {
         },
       },
     });
+
+    const admins = await prisma.user.findMany({
+      where: { role: "ADMIN" },
+      select: { email: true, firstName: true },
+    });
+
+    await Promise.all(
+      admins.map((admin) =>
+        emailQueue.add("refund-requested-admin", {
+          adminEmail: admin.email,
+          adminFirstName: admin.firstName,
+          paymentId: updatedPayment.id,
+          bookingId: updatedPayment.bookingId,
+          guestFullName: `${payment.booking.user.firstName} ${payment.booking.user.lastName}`,
+          guestEmail: payment.booking.user.email,
+          propertyTitle: payment.booking.property.title,
+          checkIn: this.formatDate(payment.booking.checkIn),
+          checkOut: this.formatDate(payment.booking.checkOut),
+          refundPercent: policy.refundPercent,
+          refundAmount,
+          reason: reason ?? null,
+        }),
+      ),
+    );
+
+    return updatedPayment;
   }
 
   static async approveRefund(id: string, adminId: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
       include: {
-        booking: true,
+        booking: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+              },
+            },
+            property: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -326,7 +391,7 @@ export class PaymentService {
 
     const existingMetadata = this.getMetadataObject(payment.metadata);
 
-    return prisma.$transaction(async (tx) => {
+    const updatedPayment = await prisma.$transaction(async (tx) => {
       const updatedPayment = await tx.payment.update({
         where: { id },
         data: {
@@ -351,11 +416,40 @@ export class PaymentService {
 
       return updatedPayment;
     });
+
+    await emailQueue.add("refund-processed-guest", {
+      paymentId: updatedPayment.id,
+      bookingId: updatedPayment.bookingId,
+      guestEmail: payment.booking.user.email,
+      guestFirstName: payment.booking.user.firstName,
+      propertyTitle: payment.booking.property.title,
+      isApproved: true,
+      reason: null,
+    });
+
+    return updatedPayment;
   }
 
   static async rejectRefund(id: string, adminId: string, reason?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
+      include: {
+        booking: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+              },
+            },
+            property: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!payment) {
@@ -368,7 +462,7 @@ export class PaymentService {
 
     const existingMetadata = this.getMetadataObject(payment.metadata);
 
-    return prisma.payment.update({
+    const updatedPayment = await prisma.payment.update({
       where: { id },
       data: {
         status: "SUCCESS",
@@ -382,6 +476,18 @@ export class PaymentService {
         },
       },
     });
+
+    await emailQueue.add("refund-processed-guest", {
+      paymentId: updatedPayment.id,
+      bookingId: updatedPayment.bookingId,
+      guestEmail: payment.booking.user.email,
+      guestFirstName: payment.booking.user.firstName,
+      propertyTitle: payment.booking.property.title,
+      isApproved: false,
+      reason: reason ?? null,
+    });
+
+    return updatedPayment;
   }
 
   /**
@@ -476,8 +582,10 @@ export class PaymentService {
     );
     const amountInMainCurrency = Number.isFinite(amount) ? amount / 100 : 0;
 
+    let updatedPaymentId: string | null = null;
+
     await prisma.$transaction(async (tx) => {
-      await tx.payment.upsert({
+      const upsertedPayment = await tx.payment.upsert({
         where: { bookingId },
         create: {
           bookingId,
@@ -495,11 +603,44 @@ export class PaymentService {
         },
       });
 
+      updatedPaymentId = upsertedPayment.id;
+
       await tx.booking.update({
         where: { id: bookingId },
         data: { status: "CONFIRMED" },
       });
     });
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        user: {
+          select: {
+            email: true,
+            firstName: true,
+          },
+        },
+        property: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (booking && updatedPaymentId) {
+      await emailQueue.add("payment-success-guest", {
+        paymentId: updatedPaymentId,
+        bookingId: booking.id,
+        guestEmail: booking.user.email,
+        guestFirstName: booking.user.firstName,
+        propertyTitle: booking.property.title,
+        checkIn: this.formatDate(booking.checkIn),
+        checkOut: this.formatDate(booking.checkOut),
+        amountPaid: amountInMainCurrency,
+        currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
+      });
+    }
 
     logger.info(
       { bookingId, paymentIntentId: paymentIntent.id },
