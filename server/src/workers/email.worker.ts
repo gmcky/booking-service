@@ -1,8 +1,8 @@
 /**
  * Email Worker
  *
- * Runs as a separate process: `pnpm worker:email`
- * Picks up jobs from the "email" BullMQ queue and sends transactional emails.
+ * Runs in a dedicated process via `pnpm worker:email`.
+ * Consumes jobs from the `email` BullMQ queue and dispatches transactional emails.
  */
 import { Worker, type Job } from "bullmq";
 import nodemailer from "nodemailer";
@@ -18,9 +18,6 @@ import type {
   BookingCancelledHostJob,
 } from "../shared/queues/email.queue.js";
 
-// ---------------------------------------------------------------------------
-// Transporter
-// ---------------------------------------------------------------------------
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
@@ -30,9 +27,6 @@ const transporter = nodemailer.createTransport({
   }),
 });
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
 async function sendPropertyCreatedHost(
   data: PropertyCreatedHostJob,
 ): Promise<void> {
@@ -161,9 +155,6 @@ async function sendBookingCancelledHost(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Worker
-// ---------------------------------------------------------------------------
 async function processEmail(
   job: Job<EmailJobData["data"], void, EmailJobName>,
 ): Promise<void> {
