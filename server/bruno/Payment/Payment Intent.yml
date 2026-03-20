@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-        "bookingId": "{{bookingId2}}"
+        "bookingId": "{{bookingId}}"
       }
   auth: inherit
 

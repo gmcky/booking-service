@@ -1,0 +1,21 @@
+info:
+  name: Reject Refund
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{baseUrl}}/payments/{{paymentId}}/refund/reject"
+  body:
+    type: json
+    data: |-
+      {
+        "reason": "refund rejection reason 12345"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

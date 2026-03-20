@@ -14,3 +14,5 @@ variables:
     name: intentId
   - secret: true
     name: sk_test
+  - secret: true
+    name: paymentId

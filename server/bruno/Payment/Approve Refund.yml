@@ -1,0 +1,15 @@
+info:
+  name: Approve Refund
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/payments/{{paymentId}}/refund/approve"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
