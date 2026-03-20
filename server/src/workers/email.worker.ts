@@ -14,11 +14,14 @@ import type {
   EmailJobName,
   PropertyCreatedHostJob,
   BookingCreatedGuestJob,
+  BookingCreatedHostJob,
   BookingCancelledGuestJob,
   BookingCancelledHostJob,
   PaymentSuccessGuestJob,
+  PaymentSuccessHostJob,
   RefundRequestedAdminJob,
   RefundProcessedGuestJob,
+  RefundProcessedHostJob,
 } from "../shared/queues/email.queue.js";
 
 const transporter = nodemailer.createTransport({
@@ -89,6 +92,43 @@ async function sendBookingCreatedGuest(
         <tr><td style="padding:4px 12px 4px 0;color:#666">Nights</td><td>${data.nights}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Guests</td><td>${data.guests}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Total</td><td><strong>$${data.totalPrice.toFixed(2)}</strong></td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendBookingCreatedHost(
+  data: BookingCreatedHostJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.hostEmail,
+    subject: `New booking request — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.hostFirstName},`,
+      "",
+      `A guest booked your property \"${data.propertyTitle}\" in ${data.propertyCity}.`,
+      "",
+      `Guest:     ${data.guestFirstName} ${data.guestLastName}`,
+      `Check-in:  ${data.checkIn}`,
+      `Check-out: ${data.checkOut}`,
+      `Nights:    ${data.nights}`,
+      `Guests:    ${data.guests}`,
+      `Booking ID:${data.bookingId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.hostFirstName},</p>
+      <p>A guest booked your property <strong>${data.propertyTitle}</strong> in ${data.propertyCity}.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFirstName} ${data.guestLastName}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-in</td><td>${data.checkIn}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-out</td><td>${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Nights</td><td>${data.nights}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guests</td><td>${data.guests}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
       <p>— The Booking Service team</p>
@@ -192,6 +232,42 @@ async function sendPaymentSuccessGuest(
   });
 }
 
+async function sendPaymentSuccessHost(
+  data: PaymentSuccessHostJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.hostEmail,
+    subject: `Payment received — ${data.propertyTitle} ✅`,
+    text: [
+      `Hi ${data.hostFirstName},`,
+      "",
+      `Payment for booking \"${data.propertyTitle}\" has been confirmed.`,
+      "",
+      `Guest:      ${data.guestFirstName} ${data.guestLastName}`,
+      `Amount:     ${data.amountPaid.toFixed(2)} ${data.currency}`,
+      `Check-in:   ${data.checkIn}`,
+      `Check-out:  ${data.checkOut}`,
+      `Booking ID: ${data.bookingId}`,
+      `Payment ID: ${data.paymentId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.hostFirstName},</p>
+      <p>Payment for booking <strong>${data.propertyTitle}</strong> has been confirmed.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFirstName} ${data.guestLastName}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Amount</td><td><strong>${data.amountPaid.toFixed(2)} ${data.currency}</strong></td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-in</td><td>${data.checkIn}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Check-out</td><td>${data.checkOut}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 async function sendRefundRequestedAdmin(
   data: RefundRequestedAdminJob,
 ): Promise<void> {
@@ -267,6 +343,52 @@ async function sendRefundProcessedGuest(
   });
 }
 
+async function sendRefundProcessedHost(
+  data: RefundProcessedHostJob,
+): Promise<void> {
+  const hostPayoutPercent = Math.max(0, 100 - data.refundPercent);
+  const hostPayoutAmount = Math.max(0, data.totalAmount - data.refundedAmount);
+  const payoutMessage =
+    data.refundPercent >= 100
+      ? "You will not receive a payout for this booking."
+      : `Expected payout after refund: ${hostPayoutAmount.toFixed(2)} ${data.currency} (${hostPayoutPercent}%).`;
+
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.hostEmail,
+    subject: `Refund processed — booking cancelled (${data.propertyTitle})`,
+    text: [
+      `Hi ${data.hostFirstName},`,
+      "",
+      `The booking for \"${data.propertyTitle}\" has been cancelled after a refund was processed.`,
+      "",
+      `Guest: ${data.guestFirstName} ${data.guestLastName}`,
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Refund: ${data.refundedAmount.toFixed(2)} ${data.currency} (${data.refundPercent}%)`,
+      payoutMessage,
+      "",
+      "The calendar dates are now available for new bookings.",
+      `Booking ID: ${data.bookingId}`,
+      `Payment ID: ${data.paymentId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.hostFirstName},</p>
+      <p>The booking for <strong>${data.propertyTitle}</strong> has been cancelled after a refund was processed.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFirstName} ${data.guestLastName}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Refund</td><td><strong>${data.refundedAmount.toFixed(2)} ${data.currency} (${data.refundPercent}%)</strong></td></tr>
+      </table>
+      <p>${payoutMessage}</p>
+      <p>The calendar dates are now available for new bookings.</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 async function processEmail(
   job: Job<EmailJobData["data"], void, EmailJobName>,
 ): Promise<void> {
@@ -279,6 +401,9 @@ async function processEmail(
     case "booking-created-guest":
       await sendBookingCreatedGuest(job.data as BookingCreatedGuestJob);
       break;
+    case "booking-created-host":
+      await sendBookingCreatedHost(job.data as BookingCreatedHostJob);
+      break;
     case "booking-cancelled-guest":
       await sendBookingCancelledGuest(job.data as BookingCancelledGuestJob);
       break;
@@ -288,11 +413,17 @@ async function processEmail(
     case "payment-success-guest":
       await sendPaymentSuccessGuest(job.data as PaymentSuccessGuestJob);
       break;
+    case "payment-success-host":
+      await sendPaymentSuccessHost(job.data as PaymentSuccessHostJob);
+      break;
     case "refund-requested-admin":
       await sendRefundRequestedAdmin(job.data as RefundRequestedAdminJob);
       break;
     case "refund-processed-guest":
       await sendRefundProcessedGuest(job.data as RefundProcessedGuestJob);
+      break;
+    case "refund-processed-host":
+      await sendRefundProcessedHost(job.data as RefundProcessedHostJob);
       break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");

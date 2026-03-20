@@ -33,6 +33,17 @@ export class PaymentService {
     }).format(date);
   }
 
+  private static toFiniteNumber(value: unknown): number | null {
+    const parsed =
+      typeof value === "number"
+        ? value
+        : typeof value === "string"
+          ? Number(value)
+          : NaN;
+
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   private static getMetadataObject(metadata: Prisma.JsonValue | null) {
     if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
       return metadata as Prisma.JsonObject;
@@ -342,11 +353,18 @@ export class PaymentService {
               select: {
                 email: true,
                 firstName: true,
+                lastName: true,
               },
             },
             property: {
               select: {
                 title: true,
+                owner: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                  },
+                },
               },
             },
           },
@@ -366,11 +384,39 @@ export class PaymentService {
       throw new AppError(400, "Missing payment transaction id");
     }
 
+    const existingMetadata = this.getMetadataObject(payment.metadata);
+    const refundRequestRaw = existingMetadata.refundRequest;
+    const refundRequest =
+      refundRequestRaw &&
+      typeof refundRequestRaw === "object" &&
+      !Array.isArray(refundRequestRaw)
+        ? (refundRequestRaw as Prisma.JsonObject)
+        : null;
+
+    const paymentAmount = Number(payment.amount);
+    const requestedRefundAmount = this.toFiniteNumber(
+      refundRequest?.refundAmount,
+    );
+    const refundAmount =
+      requestedRefundAmount &&
+      requestedRefundAmount > 0 &&
+      requestedRefundAmount <= paymentAmount
+        ? requestedRefundAmount
+        : paymentAmount;
+    const refundPercent =
+      paymentAmount > 0
+        ? Math.min(
+            100,
+            Math.max(0, Math.round((refundAmount / paymentAmount) * 100)),
+          )
+        : 100;
+
     let stripeRefund;
     try {
       stripeRefund = await stripe.refunds.create(
         {
           payment_intent: payment.transactionId,
+          amount: Math.round(refundAmount * 100),
           metadata: {
             paymentId: payment.id,
             bookingId: payment.bookingId,
@@ -389,8 +435,6 @@ export class PaymentService {
       throw new AppError(502, "Payment provider error during refund");
     }
 
-    const existingMetadata = this.getMetadataObject(payment.metadata);
-
     const updatedPayment = await prisma.$transaction(async (tx) => {
       const updatedPayment = await tx.payment.update({
         where: { id },
@@ -402,6 +446,8 @@ export class PaymentService {
               approvedAt: new Date().toISOString(),
               approvedBy: adminId,
               stripeRefundId: stripeRefund.id,
+              refundAmount,
+              refundPercent,
             },
           },
         },
@@ -618,11 +664,18 @@ export class PaymentService {
           select: {
             email: true,
             firstName: true,
+            lastName: true,
           },
         },
         property: {
           select: {
             title: true,
+            owner: {
+              select: {
+                email: true,
+                firstName: true,
+              },
+            },
           },
         },
       },
@@ -635,6 +688,20 @@ export class PaymentService {
         guestEmail: booking.user.email,
         guestFirstName: booking.user.firstName,
         propertyTitle: booking.property.title,
+        checkIn: this.formatDate(booking.checkIn),
+        checkOut: this.formatDate(booking.checkOut),
+        amountPaid: amountInMainCurrency,
+        currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
+      });
+
+      await emailQueue.add("payment-success-host", {
+        paymentId: updatedPaymentId,
+        bookingId: booking.id,
+        hostEmail: booking.property.owner.email,
+        hostFirstName: booking.property.owner.firstName,
+        propertyTitle: booking.property.title,
+        guestFirstName: booking.user.firstName,
+        guestLastName: booking.user.lastName,
         checkIn: this.formatDate(booking.checkIn),
         checkOut: this.formatDate(booking.checkOut),
         amountPaid: amountInMainCurrency,
@@ -696,7 +763,29 @@ export class PaymentService {
 
     const payment = await prisma.payment.findFirst({
       where: { transactionId: paymentIntentId },
-      include: { booking: true },
+      include: {
+        booking: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+            property: {
+              select: {
+                title: true,
+                owner: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!payment) {
@@ -732,6 +821,36 @@ export class PaymentService {
           data: { status: "CANCELLED" },
         });
       }
+    });
+
+    const chargeRefundedRaw = this.toFiniteNumber(charge?.amount_refunded);
+    const refundedAmount =
+      chargeRefundedRaw && chargeRefundedRaw > 0
+        ? chargeRefundedRaw / 100
+        : Number(payment.amount);
+    const totalAmount = Number(payment.amount);
+    const refundPercent =
+      totalAmount > 0
+        ? Math.min(
+            100,
+            Math.max(0, Math.round((refundedAmount / totalAmount) * 100)),
+          )
+        : 100;
+
+    await emailQueue.add("refund-processed-host", {
+      paymentId: payment.id,
+      bookingId: payment.bookingId,
+      hostEmail: payment.booking.property.owner.email,
+      hostFirstName: payment.booking.property.owner.firstName,
+      propertyTitle: payment.booking.property.title,
+      guestFirstName: payment.booking.user.firstName,
+      guestLastName: payment.booking.user.lastName,
+      checkIn: this.formatDate(payment.booking.checkIn),
+      checkOut: this.formatDate(payment.booking.checkOut),
+      refundPercent,
+      refundedAmount,
+      totalAmount,
+      currency: payment.currency,
     });
 
     logger.info(

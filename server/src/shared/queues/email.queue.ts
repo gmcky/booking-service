@@ -4,12 +4,15 @@ import { redisConnection } from "../lib/redis.js";
 export type EmailJobName =
   | "property-created-host"
   | "booking-created-guest"
+  | "booking-created-host"
   | "booking-cancelled-guest"
   | "booking-cancelled-host"
   | "review-received-host"
   | "payment-success-guest"
+  | "payment-success-host"
   | "refund-requested-admin"
-  | "refund-processed-guest";
+  | "refund-processed-guest"
+  | "refund-processed-host";
 
 export interface PropertyCreatedHostJob {
   ownerEmail: string;
@@ -29,6 +32,20 @@ export interface BookingCreatedGuestJob {
   nights: number;
   guests: number;
   totalPrice: number;
+}
+
+export interface BookingCreatedHostJob {
+  bookingId: string;
+  hostEmail: string;
+  hostFirstName: string;
+  guestFirstName: string;
+  guestLastName: string;
+  propertyTitle: string;
+  propertyCity: string;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  guests: number;
 }
 
 export interface BookingCancelledGuestJob {
@@ -74,6 +91,20 @@ export interface PaymentSuccessGuestJob {
   currency: string;
 }
 
+export interface PaymentSuccessHostJob {
+  paymentId: string;
+  bookingId: string;
+  hostEmail: string;
+  hostFirstName: string;
+  propertyTitle: string;
+  guestFirstName: string;
+  guestLastName: string;
+  checkIn: string;
+  checkOut: string;
+  amountPaid: number;
+  currency: string;
+}
+
 export interface RefundRequestedAdminJob {
   adminEmail: string;
   adminFirstName: string;
@@ -99,16 +130,35 @@ export interface RefundProcessedGuestJob {
   reason: string | null;
 }
 
+export interface RefundProcessedHostJob {
+  paymentId: string;
+  bookingId: string;
+  hostEmail: string;
+  hostFirstName: string;
+  propertyTitle: string;
+  guestFirstName: string;
+  guestLastName: string;
+  checkIn: string;
+  checkOut: string;
+  refundPercent: number;
+  refundedAmount: number;
+  totalAmount: number;
+  currency: string;
+}
+
 /** Discriminated union — extend with new job names as needed. */
 export type EmailJobData =
   | { name: "property-created-host"; data: PropertyCreatedHostJob }
   | { name: "booking-created-guest"; data: BookingCreatedGuestJob }
+  | { name: "booking-created-host"; data: BookingCreatedHostJob }
   | { name: "booking-cancelled-guest"; data: BookingCancelledGuestJob }
   | { name: "booking-cancelled-host"; data: BookingCancelledHostJob }
   | { name: "review-received-host"; data: ReviewReceivedHostJob }
   | { name: "payment-success-guest"; data: PaymentSuccessGuestJob }
+  | { name: "payment-success-host"; data: PaymentSuccessHostJob }
   | { name: "refund-requested-admin"; data: RefundRequestedAdminJob }
-  | { name: "refund-processed-guest"; data: RefundProcessedGuestJob };
+  | { name: "refund-processed-guest"; data: RefundProcessedGuestJob }
+  | { name: "refund-processed-host"; data: RefundProcessedHostJob };
 
 export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>(
   "email",

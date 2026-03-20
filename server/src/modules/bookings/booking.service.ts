@@ -141,11 +141,11 @@ export class BookingService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    // Enqueue confirmation email (fire-and-forget, don't block response)
-    this.enqueueBookingCreatedEmail(booking, userId).catch((err) =>
+    // Enqueue booking emails (fire-and-forget, don't block response)
+    this.enqueueBookingCreatedEmails(booking, userId).catch((err) =>
       logger.error(
         { err, bookingId: booking.id },
-        "Failed to enqueue booking-created email",
+        "Failed to enqueue booking-created emails",
       ),
     );
 
@@ -424,7 +424,7 @@ export class BookingService {
     }).format(date);
   }
 
-  private static async enqueueBookingCreatedEmail(
+  private static async enqueueBookingCreatedEmails(
     booking: {
       id: string;
       propertyId: string;
@@ -432,22 +432,29 @@ export class BookingService {
       checkOut: Date;
       guests: number;
       totalPrice: Prisma.Decimal | number;
-      property: { title: string; city: string };
+      property: { title: string; city: string; ownerId: string };
     },
     userId: string,
   ) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, firstName: true },
-    });
-    if (!user) return;
+    const [guest, host] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, firstName: true, lastName: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: booking.property.ownerId },
+        select: { email: true, firstName: true },
+      }),
+    ]);
+
+    if (!guest) return;
 
     const nights = calculateNights(booking.checkIn, booking.checkOut);
 
     await emailQueue.add("booking-created-guest", {
       bookingId: booking.id,
-      guestEmail: user.email,
-      guestFirstName: user.firstName,
+      guestEmail: guest.email,
+      guestFirstName: guest.firstName,
       propertyTitle: booking.property.title,
       propertyCity: booking.property.city,
       checkIn: this.formatDate(booking.checkIn),
@@ -456,6 +463,45 @@ export class BookingService {
       guests: booking.guests,
       totalPrice: Number(booking.totalPrice),
     });
+
+    if (!host) {
+      logger.warn(
+        {
+          bookingId: booking.id,
+          propertyId: booking.propertyId,
+          ownerId: booking.property.ownerId,
+        },
+        "Host user not found, skipping booking-created-host email",
+      );
+      return;
+    }
+
+    try {
+      await emailQueue.add("booking-created-host", {
+        bookingId: booking.id,
+        hostEmail: host.email,
+        hostFirstName: host.firstName,
+        guestFirstName: guest.firstName,
+        guestLastName: guest.lastName,
+        propertyTitle: booking.property.title,
+        propertyCity: booking.property.city,
+        checkIn: this.formatDate(booking.checkIn),
+        checkOut: this.formatDate(booking.checkOut),
+        nights,
+        guests: booking.guests,
+      });
+    } catch (err) {
+      logger.error(
+        {
+          err,
+          bookingId: booking.id,
+          propertyId: booking.propertyId,
+          ownerId: booking.property.ownerId,
+          hostEmail: host.email,
+        },
+        "Failed to enqueue booking-created-host email",
+      );
+    }
   }
 
   private static async enqueueCancellationEmails(
