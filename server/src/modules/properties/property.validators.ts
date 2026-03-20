@@ -1,9 +1,10 @@
 import { Amenity, PropertyType } from "@prisma/client";
 import { z } from "zod";
+import { sanitizeString } from "../../shared/utils/sanitize.js";
 
 export const createPropertySchema = z.object({
   title: z.string().min(5).max(200),
-  description: z.string().min(20),
+  description: z.string().trim().min(20).transform(sanitizeString),
   type: z.nativeEnum(PropertyType),
   city: z.string().min(2),
   address: z.string().min(5),
@@ -17,7 +18,7 @@ export const createPropertySchema = z.object({
 
 export const updatePropertySchema = z.object({
   title: z.string().min(5).max(200).optional(),
-  description: z.string().min(20).optional(),
+  description: z.string().trim().min(20).transform(sanitizeString).optional(),
   type: z.nativeEnum(PropertyType).optional(),
   city: z.string().min(2).optional(),
   address: z.string().min(5).optional(),

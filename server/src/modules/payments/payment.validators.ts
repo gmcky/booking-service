@@ -1,12 +1,12 @@
 import { z } from "zod";
-import xss from "xss";
+import { sanitizeString } from "../../shared/utils/sanitize.js";
 
 const sanitizedReasonSchema = z
   .string()
   .trim()
   .min(1)
   .max(1000)
-  .transform((value) => xss(value));
+  .transform(sanitizeString);
 
 export const createPaymentSchema = z.object({
   bookingId: z.string().uuid(),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizeString } from "../../shared/utils/sanitize.js";
 
 const HH_MM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -14,8 +15,16 @@ export const createBookingSchema = z
       .datetime()
       .transform((val) => new Date(val)),
     guests: z.number().int().positive(),
-    specialRequests: z.string().max(500).optional(),
-    arrivalTime: z.string().regex(HH_MM_REGEX, "Expected HH:mm format").optional(),
+    specialRequests: z
+      .string()
+      .trim()
+      .max(500)
+      .transform(sanitizeString)
+      .optional(),
+    arrivalTime: z
+      .string()
+      .regex(HH_MM_REGEX, "Expected HH:mm format")
+      .optional(),
   })
   .refine((data) => data.checkOut > data.checkIn, {
     message: "Check-out must be after check-in",
