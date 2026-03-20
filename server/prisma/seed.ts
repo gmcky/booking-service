@@ -1,4 +1,10 @@
-import { Role, PropertyType, Amenity } from "@prisma/client";
+import {
+  Role,
+  PropertyType,
+  Amenity,
+  BookingStatus,
+  PaymentStatus,
+} from "@prisma/client";
 import bcrypt from "bcrypt";
 import { prisma } from "../src/shared/lib/prisma.js";
 
@@ -38,6 +44,22 @@ const users = [
     phoneNumber: "+380671234567",
     role: Role.USER,
     password: "Us3r_D3mo_456*",
+  },
+  {
+    email: "user2@demo.com",
+    firstName: "Olena",
+    lastName: "Melnyk",
+    phoneNumber: "+380672345678",
+    role: Role.USER,
+    password: "Us3r_D3mo_789*",
+  },
+  {
+    email: "user3@demo.com",
+    firstName: "Dmytro",
+    lastName: "Bondarenko",
+    phoneNumber: "+380673456789",
+    role: Role.USER,
+    password: "Us3r_D3mo_999*",
   },
 ];
 
@@ -491,6 +513,17 @@ const propertyTemplates: Array<{
   },
 ];
 
+function getStayDates(checkInOffsetDays: number, nights: number) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const checkIn = new Date(Date.now() + checkInOffsetDays * dayMs);
+  checkIn.setHours(14, 0, 0, 0);
+
+  const checkOut = new Date(checkIn.getTime() + nights * dayMs);
+  checkOut.setHours(12, 0, 0, 0);
+
+  return { checkIn, checkOut, nights };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -523,26 +556,192 @@ async function main() {
 
   // Create properties
   let created = 0;
+  const createdProperties: Array<{
+    id: string;
+    title: string;
+    pricePerNight: number;
+    maxGuests: number;
+  }> = [];
+
   for (const [index, template] of propertyTemplates.entries()) {
     // Alternate properties between owner1 and owner2
     const assignedOwnerId = index % 2 === 0 ? owner1Id : owner2Id;
 
-    await prisma.property.create({
+    const createdProperty = await prisma.property.create({
       data: {
         ...template,
         pricePerNight: template.pricePerNight,
         ownerId: assignedOwnerId,
         isActive: true,
       },
+      select: {
+        id: true,
+        title: true,
+        pricePerNight: true,
+        maxGuests: true,
+      },
     });
+
+    createdProperties.push({
+      id: createdProperty.id,
+      title: createdProperty.title,
+      pricePerNight: Number(createdProperty.pricePerNight),
+      maxGuests: createdProperty.maxGuests,
+    });
+
     created++;
     console.log(
       `  🏠 ${template.title} — ${template.city} ($${template.pricePerNight}/night)`,
     );
   }
 
+  const regularUserIds = users
+    .filter((user) => user.role === Role.USER)
+    .map((user) => createdUsers[user.email]!.id);
+
+  type BookingScenario = {
+    code: "A" | "B" | "C" | "D" | "E";
+    bookingStatus: BookingStatus;
+    paymentStatus: PaymentStatus | null;
+    checkInOffsetDays: number;
+    nights: number;
+  };
+
+  const bookingScenarios: BookingScenario[] = [
+    {
+      code: "A",
+      bookingStatus: "PENDING",
+      paymentStatus: null,
+      checkInOffsetDays: 12,
+      nights: 3,
+    },
+    {
+      code: "A",
+      bookingStatus: "PENDING",
+      paymentStatus: null,
+      checkInOffsetDays: 16,
+      nights: 2,
+    },
+    {
+      code: "B",
+      bookingStatus: "CONFIRMED",
+      paymentStatus: "SUCCESS",
+      checkInOffsetDays: 20,
+      nights: 4,
+    },
+    {
+      code: "B",
+      bookingStatus: "CONFIRMED",
+      paymentStatus: "SUCCESS",
+      checkInOffsetDays: 24,
+      nights: 5,
+    },
+    {
+      code: "C",
+      bookingStatus: "CONFIRMED",
+      paymentStatus: "REFUND_REQUESTED",
+      checkInOffsetDays: 18,
+      nights: 3,
+    },
+    {
+      code: "C",
+      bookingStatus: "CONFIRMED",
+      paymentStatus: "REFUND_REQUESTED",
+      checkInOffsetDays: 22,
+      nights: 4,
+    },
+    {
+      code: "D",
+      bookingStatus: "CANCELLED",
+      paymentStatus: "REFUNDED",
+      checkInOffsetDays: 14,
+      nights: 2,
+    },
+    {
+      code: "D",
+      bookingStatus: "CANCELLED",
+      paymentStatus: "REFUNDED",
+      checkInOffsetDays: 26,
+      nights: 3,
+    },
+    {
+      code: "E",
+      bookingStatus: "COMPLETED",
+      paymentStatus: "SUCCESS",
+      checkInOffsetDays: -18,
+      nights: 5,
+    },
+    {
+      code: "E",
+      bookingStatus: "COMPLETED",
+      paymentStatus: "SUCCESS",
+      checkInOffsetDays: -30,
+      nights: 4,
+    },
+  ];
+
+  let createdBookings = 0;
+  for (const [index, scenario] of bookingScenarios.entries()) {
+    const userId = regularUserIds[index % regularUserIds.length]!;
+    const property = createdProperties[index % createdProperties.length]!;
+    const stay = getStayDates(scenario.checkInOffsetDays, scenario.nights);
+
+    const guests = Math.min(2 + (index % 2), property.maxGuests);
+    const totalPrice = property.pricePerNight * stay.nights;
+
+    const bookingCreateData: any = {
+      property: { connect: { id: property.id } },
+      checkIn: stay.checkIn,
+      checkOut: stay.checkOut,
+      totalPrice,
+      guests,
+      status: scenario.bookingStatus,
+    };
+
+    if (scenario.paymentStatus) {
+      const paymentMetadata: Record<string, unknown> = {
+        seededScenario: scenario.code,
+      };
+
+      if (scenario.paymentStatus === "REFUND_REQUESTED") {
+        paymentMetadata.refundRequest = {
+          requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          requestedBy: userId,
+          refundPercent: 50,
+          refundAmount: totalPrice * 0.5,
+          daysUntilCheckIn: Math.max(0, Math.ceil(scenario.checkInOffsetDays)),
+        };
+      }
+
+      bookingCreateData.payment = {
+        create: {
+          amount: totalPrice,
+          currency: "USD",
+          status: scenario.paymentStatus,
+          provider: "STRIPE",
+          transactionId: `seed_pi_${scenario.code}_${index + 1}`,
+          metadata: paymentMetadata,
+        },
+      };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        bookings: {
+          create: bookingCreateData,
+        },
+      },
+    });
+
+    createdBookings++;
+    console.log(
+      `  📅 Booking #${index + 1} (${scenario.code}) — ${scenario.bookingStatus}${scenario.paymentStatus ? ` / ${scenario.paymentStatus}` : " / no payment"} — ${property.title}`,
+    );
+  }
+
   console.log(
-    `\n✅ Seed complete: ${users.length} users, ${created} properties`,
+    `\n✅ Seed complete: ${users.length} users, ${created} properties, ${createdBookings} bookings`,
   );
   console.log("\nTest credentials:");
   for (const user of users) {
