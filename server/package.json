@@ -80,6 +80,7 @@
     "stripe": "^20.4.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "xss": "^1.0.15",
     "zod": "^4.3.6",
     "zxcvbn": "^4.4.2"
   },
