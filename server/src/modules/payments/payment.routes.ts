@@ -1,5 +1,5 @@
 import express, { Router, type IRouter } from "express";
-import { authenticate } from "../../shared/middlewares/auth.js";
+import { authenticate, authorize } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as paymentController from "./payment.controller.js";
@@ -42,5 +42,17 @@ paymentRouter.post(
 
 paymentRouter.post(
   "/:id/refund",
-  asyncHandler(paymentController.refundPayment),
+  asyncHandler(paymentController.requestRefund),
+);
+
+paymentRouter.post(
+  "/:id/refund/approve",
+  authorize("ADMIN"),
+  asyncHandler(paymentController.approveRefund),
+);
+
+paymentRouter.post(
+  "/:id/refund/reject",
+  authorize("ADMIN"),
+  asyncHandler(paymentController.rejectRefund),
 );

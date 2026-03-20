@@ -23,6 +23,34 @@ import type {
  * 8. Maintain PCI compliance by never storing card details.
  */
 export class PaymentService {
+  private static getMetadataObject(metadata: Prisma.JsonValue | null) {
+    if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+      return metadata as Prisma.JsonObject;
+    }
+
+    return {} as Prisma.JsonObject;
+  }
+
+  private static calculateRefundPolicy(checkIn: Date) {
+    const msUntilCheckIn = checkIn.getTime() - Date.now();
+    const hoursUntilCheckIn = msUntilCheckIn / (1000 * 60 * 60);
+    const daysUntilCheckIn = Math.max(0, Math.ceil(hoursUntilCheckIn / 24));
+
+    let refundPercent = 0;
+    if (hoursUntilCheckIn > 48) {
+      refundPercent = 100;
+    } else if (hoursUntilCheckIn >= 24) {
+      refundPercent = 50;
+    }
+
+    return {
+      msUntilCheckIn,
+      hoursUntilCheckIn,
+      daysUntilCheckIn,
+      refundPercent,
+    };
+  }
+
   static async createIntent(data: CreatePaymentIntentInput, userId: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: data.bookingId },
@@ -187,22 +215,171 @@ export class PaymentService {
     });
   }
 
-  static async refund(id: string, userId: string) {
-    const payment = await this.getById(id, userId);
+  static async requestRefund(id: string, userId: string) {
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+      include: {
+        booking: true,
+      },
+    });
 
-    if (payment.status !== "SUCCESS") {
-      throw new AppError(400, "Can only refund successful payments");
+    if (!payment) {
+      throw new AppError(404, "Payment not found");
     }
 
-    // TODO: Make refunds idempotent for repeated requests.
-    // TODO: Validate refund eligibility against booking lifecycle state.
-    // TODO: Execute provider refund before local status transition.
-    // TODO: Update payment and booking state atomically.
-    // TODO: Enqueue refund confirmation notification after completion.
+    if (payment.booking.userId !== userId) {
+      throw new AppError(403, "Not authorized");
+    }
+
+    if (payment.status === "REFUND_REQUESTED") {
+      return payment;
+    }
+
+    if (payment.status !== "SUCCESS") {
+      throw new AppError(
+        400,
+        "Refund request can only be created for successful payments",
+      );
+    }
+
+    if (payment.booking.status === "COMPLETED") {
+      throw new AppError(400, "Cannot request refund for completed booking");
+    }
+
+    const policy = this.calculateRefundPolicy(payment.booking.checkIn);
+    if (policy.msUntilCheckIn <= 0) {
+      throw new AppError(400, "Cannot request refund after check-in date");
+    }
+
+    if (policy.refundPercent === 0) {
+      throw new AppError(
+        400,
+        "Refund request is not allowed less than 24 hours before check-in",
+      );
+    }
+
+    const existingMetadata = this.getMetadataObject(payment.metadata);
+    const refundAmount =
+      (Number(payment.amount) * Number(policy.refundPercent)) / 100;
 
     return prisma.payment.update({
       where: { id },
-      data: { status: "REFUNDED" },
+      data: {
+        status: "REFUND_REQUESTED",
+        metadata: {
+          ...existingMetadata,
+          refundRequest: {
+            requestedAt: new Date().toISOString(),
+            requestedBy: userId,
+            refundPercent: policy.refundPercent,
+            refundAmount,
+            daysUntilCheckIn: policy.daysUntilCheckIn,
+          },
+        },
+      },
+    });
+  }
+
+  static async approveRefund(id: string, adminId: string) {
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+      include: {
+        booking: true,
+      },
+    });
+
+    if (!payment) {
+      throw new AppError(404, "Payment not found");
+    }
+
+    if (payment.status !== "REFUND_REQUESTED") {
+      throw new AppError(400, "Payment is not waiting for refund approval");
+    }
+
+    if (!payment.transactionId) {
+      throw new AppError(400, "Missing payment transaction id");
+    }
+
+    let stripeRefund;
+    try {
+      stripeRefund = await stripe.refunds.create(
+        {
+          payment_intent: payment.transactionId,
+          metadata: {
+            paymentId: payment.id,
+            bookingId: payment.bookingId,
+            approvedBy: adminId,
+          },
+        },
+        {
+          idempotencyKey: `refund_${payment.id}`,
+        },
+      );
+    } catch (error) {
+      logger.error(
+        { error, paymentId: payment.id, bookingId: payment.bookingId },
+        "Failed to create Stripe refund",
+      );
+      throw new AppError(502, "Payment provider error during refund");
+    }
+
+    const existingMetadata = this.getMetadataObject(payment.metadata);
+
+    return prisma.$transaction(async (tx) => {
+      const updatedPayment = await tx.payment.update({
+        where: { id },
+        data: {
+          status: "REFUNDED",
+          metadata: {
+            ...existingMetadata,
+            refundApproval: {
+              approvedAt: new Date().toISOString(),
+              approvedBy: adminId,
+              stripeRefundId: stripeRefund.id,
+            },
+          },
+        },
+      });
+
+      if (payment.booking.status !== "CANCELLED") {
+        await tx.booking.update({
+          where: { id: payment.bookingId },
+          data: { status: "CANCELLED" },
+        });
+      }
+
+      return updatedPayment;
+    });
+  }
+
+  static async rejectRefund(id: string, adminId: string, reason?: string) {
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+    });
+
+    if (!payment) {
+      throw new AppError(404, "Payment not found");
+    }
+
+    if (payment.status !== "REFUND_REQUESTED") {
+      throw new AppError(400, "Payment is not waiting for refund approval");
+    }
+
+    const existingMetadata = this.getMetadataObject(payment.metadata);
+
+    return prisma.payment.update({
+      where: { id },
+      data: {
+        status: "SUCCESS",
+        metadata: {
+          ...existingMetadata,
+          refundRejection: {
+            rejectedAt: new Date().toISOString(),
+            rejectedBy: adminId,
+            reason: reason ?? null,
+          },
+        },
+      },
     });
   }
 
@@ -259,6 +436,9 @@ export class PaymentService {
           break;
         case "payment_intent.payment_failed":
           await this.handlePaymentFailed(stripeEvent.data.object);
+          break;
+        case "charge.refunded":
+          await this.handleChargeRefunded(stripeEvent.data.object);
           break;
         default:
           logger.info(
@@ -351,6 +531,70 @@ export class PaymentService {
     logger.warn(
       { bookingId, paymentIntentId: paymentIntent.id },
       "Payment failed",
+    );
+  }
+
+  /**
+   * Handle refunds initiated directly in Stripe Dashboard.
+   */
+  private static async handleChargeRefunded(charge: any) {
+    const paymentIntentRaw = charge?.payment_intent;
+    const paymentIntentId =
+      typeof paymentIntentRaw === "string"
+        ? paymentIntentRaw
+        : paymentIntentRaw?.id;
+
+    if (!paymentIntentId) {
+      logger.warn(
+        { chargeId: charge?.id },
+        "Missing payment_intent in charge.refunded webhook",
+      );
+      return;
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: { transactionId: paymentIntentId },
+      include: { booking: true },
+    });
+
+    if (!payment) {
+      logger.warn(
+        { paymentIntentId, chargeId: charge?.id },
+        "Payment not found for charge.refunded webhook",
+      );
+      return;
+    }
+
+    const existingMetadata = this.getMetadataObject(payment.metadata);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "REFUNDED",
+          metadata: {
+            ...existingMetadata,
+            refundFromStripeDashboard: {
+              receivedAt: new Date().toISOString(),
+              chargeId: charge?.id ?? null,
+              paymentIntentId,
+              amountRefunded: charge?.amount_refunded ?? null,
+            },
+          },
+        },
+      });
+
+      if (payment.booking.status !== "CANCELLED") {
+        await tx.booking.update({
+          where: { id: payment.bookingId },
+          data: { status: "CANCELLED" },
+        });
+      }
+    });
+
+    logger.info(
+      { paymentId: payment.id, bookingId: payment.bookingId, paymentIntentId },
+      "Refund synchronized from charge.refunded webhook",
     );
   }
 }

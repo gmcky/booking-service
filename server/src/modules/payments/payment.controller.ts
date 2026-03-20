@@ -35,10 +35,26 @@ export async function processPayment(req: AuthenticatedRequest, res: Response) {
   res.json(payment);
 }
 
-export async function refundPayment(req: AuthenticatedRequest, res: Response) {
+export async function requestRefund(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
-  const payment = await PaymentService.refund(id, userId);
+  const payment = await PaymentService.requestRefund(id, userId);
+  res.json(payment);
+}
+
+export async function approveRefund(req: AuthenticatedRequest, res: Response) {
+  const id = getIdParam(req);
+  const adminId = req.user!.id;
+  const payment = await PaymentService.approveRefund(id, adminId);
+  res.json(payment);
+}
+
+export async function rejectRefund(req: AuthenticatedRequest, res: Response) {
+  const id = getIdParam(req);
+  const adminId = req.user!.id;
+  const reason =
+    typeof req.body?.reason === "string" ? req.body.reason.trim() : undefined;
+  const payment = await PaymentService.rejectRefund(id, adminId, reason);
   res.json(payment);
 }
 
