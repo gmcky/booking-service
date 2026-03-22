@@ -8,6 +8,7 @@
     "setup": "node scripts/setup.mjs",
     "dev": "tsx watch src/server.ts",
     "dev:full": "pnpm infra:up && pnpm dev",
+    "stripe": "stripe listen --forward-to localhost:3000/api/v1/payments/webhook",
     "worker:image": "tsx --env-file=.env src/workers/image.worker.ts",
     "worker:email": "tsx --env-file=.env src/workers/email.worker.ts",
     "worker:cleanup": "tsx --env-file=.env src/workers/cleanup.worker.ts",
