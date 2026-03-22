@@ -54,6 +54,32 @@ export class PaymentService {
     return {} as Prisma.JsonObject;
   }
 
+  private static getAuditObject(metadata: Prisma.JsonObject) {
+    const auditRaw = metadata.audit;
+    if (auditRaw && typeof auditRaw === "object" && !Array.isArray(auditRaw)) {
+      return auditRaw as Prisma.JsonObject;
+    }
+
+    return {} as Prisma.JsonObject;
+  }
+
+  private static getStripePayloadObject(metadata: Prisma.JsonObject) {
+    const stripePayloadRaw = metadata.stripePayload;
+    if (
+      stripePayloadRaw &&
+      typeof stripePayloadRaw === "object" &&
+      !Array.isArray(stripePayloadRaw)
+    ) {
+      return stripePayloadRaw as Prisma.JsonObject;
+    }
+
+    return {} as Prisma.JsonObject;
+  }
+
+  private static toInputJsonObject(value: unknown): Prisma.InputJsonObject {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
+  }
+
   private static calculateRefundPolicy(checkIn: Date) {
     const msUntilCheckIn = checkIn.getTime() - Date.now();
     const hoursUntilCheckIn = msUntilCheckIn / (1000 * 60 * 60);
@@ -312,6 +338,8 @@ export class PaymentService {
     }
 
     const existingMetadata = this.getMetadataObject(payment.metadata);
+    const existingAudit = this.getAuditObject(existingMetadata);
+    const existingStripePayload = this.getStripePayloadObject(existingMetadata);
     const refundAmount =
       (Number(payment.amount) * Number(policy.refundPercent)) / 100;
 
@@ -348,25 +376,34 @@ export class PaymentService {
       }
 
       const refundedPayment = await prisma.$transaction(async (tx) => {
+        const stripeRefundPayload = this.toInputJsonObject(stripeRefund);
+
         const updatedPayment = await tx.payment.update({
           where: { id },
           data: {
             status: "REFUNDED",
             metadata: {
               ...existingMetadata,
-              refundRequest: {
-                requestedAt: new Date().toISOString(),
-                requestedBy: userId,
-                refundPercent: policy.refundPercent,
-                refundAmount,
-                daysUntilCheckIn: policy.daysUntilCheckIn,
-                reason: reason ?? null,
+              audit: {
+                ...existingAudit,
+                refundRequest: {
+                  requestedAt: new Date().toISOString(),
+                  requestedBy: userId,
+                  refundPercent: policy.refundPercent,
+                  refundAmount,
+                  daysUntilCheckIn: policy.daysUntilCheckIn,
+                  reason: reason ?? null,
+                },
+                refundAutoApproval: {
+                  approvedAt: new Date().toISOString(),
+                  stripeRefundId: stripeRefund.id,
+                  refundAmount,
+                  refundPercent: policy.refundPercent,
+                },
               },
-              refundAutoApproval: {
-                approvedAt: new Date().toISOString(),
-                stripeRefundId: stripeRefund.id,
-                refundAmount,
-                refundPercent: policy.refundPercent,
+              stripePayload: {
+                ...existingStripePayload,
+                autoApprovedRefund: stripeRefundPayload,
               },
             },
           },
@@ -418,13 +455,16 @@ export class PaymentService {
         status: "REFUND_REQUESTED",
         metadata: {
           ...existingMetadata,
-          refundRequest: {
-            requestedAt: new Date().toISOString(),
-            requestedBy: userId,
-            refundPercent: policy.refundPercent,
-            refundAmount,
-            daysUntilCheckIn: policy.daysUntilCheckIn,
-            reason: reason ?? null,
+          audit: {
+            ...existingAudit,
+            refundRequest: {
+              requestedAt: new Date().toISOString(),
+              requestedBy: userId,
+              refundPercent: policy.refundPercent,
+              refundAmount,
+              daysUntilCheckIn: policy.daysUntilCheckIn,
+              reason: reason ?? null,
+            },
           },
         },
       },
@@ -506,7 +546,9 @@ export class PaymentService {
     }
 
     const existingMetadata = this.getMetadataObject(payment.metadata);
-    const refundRequestRaw = existingMetadata.refundRequest;
+    const existingAudit = this.getAuditObject(existingMetadata);
+    const existingStripePayload = this.getStripePayloadObject(existingMetadata);
+    const refundRequestRaw = existingAudit.refundRequest;
     const refundRequest =
       refundRequestRaw &&
       typeof refundRequestRaw === "object" &&
@@ -557,18 +599,27 @@ export class PaymentService {
     }
 
     const updatedPayment = await prisma.$transaction(async (tx) => {
+      const stripeRefundPayload = this.toInputJsonObject(stripeRefund);
+
       const updatedPayment = await tx.payment.update({
         where: { id },
         data: {
           status: "REFUNDED",
           metadata: {
             ...existingMetadata,
-            refundApproval: {
-              approvedAt: new Date().toISOString(),
-              approvedBy: adminId,
-              stripeRefundId: stripeRefund.id,
-              refundAmount,
-              refundPercent,
+            audit: {
+              ...existingAudit,
+              refundApproval: {
+                approvedAt: new Date().toISOString(),
+                approvedBy: adminId,
+                stripeRefundId: stripeRefund.id,
+                refundAmount,
+                refundPercent,
+              },
+            },
+            stripePayload: {
+              ...existingStripePayload,
+              approvedRefund: stripeRefundPayload,
             },
           },
         },
@@ -629,6 +680,7 @@ export class PaymentService {
     }
 
     const existingMetadata = this.getMetadataObject(payment.metadata);
+    const existingAudit = this.getAuditObject(existingMetadata);
 
     const updatedPayment = await prisma.payment.update({
       where: { id },
@@ -636,10 +688,13 @@ export class PaymentService {
         status: "SUCCESS",
         metadata: {
           ...existingMetadata,
-          refundRejection: {
-            rejectedAt: new Date().toISOString(),
-            rejectedBy: adminId,
-            reason: reason ?? null,
+          audit: {
+            ...existingAudit,
+            refundRejection: {
+              rejectedAt: new Date().toISOString(),
+              rejectedBy: adminId,
+              reason: reason ?? null,
+            },
           },
         },
       },
@@ -762,12 +817,20 @@ export class PaymentService {
           provider: "STRIPE",
           status: "SUCCESS",
           transactionId: paymentIntent.id,
-          metadata: paymentIntent,
+          metadata: {
+            stripePayload: {
+              paymentIntentSucceeded: paymentIntent,
+            },
+          },
         },
         update: {
           status: "SUCCESS",
           transactionId: paymentIntent.id,
-          metadata: paymentIntent,
+          metadata: {
+            stripePayload: {
+              paymentIntentSucceeded: paymentIntent,
+            },
+          },
         },
       });
 
@@ -850,14 +913,34 @@ export class PaymentService {
       return;
     }
 
-    await prisma.payment.updateMany({
+    const existingPayment = await prisma.payment.findUnique({
       where: { bookingId },
-      data: {
-        status: "FAILED",
-        transactionId: paymentIntent.id,
-        metadata: paymentIntent,
+      select: {
+        id: true,
+        metadata: true,
       },
     });
+
+    if (existingPayment) {
+      const existingMetadata = this.getMetadataObject(existingPayment.metadata);
+      const existingStripePayload =
+        this.getStripePayloadObject(existingMetadata);
+
+      await prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          status: "FAILED",
+          transactionId: paymentIntent.id,
+          metadata: {
+            ...existingMetadata,
+            stripePayload: {
+              ...existingStripePayload,
+              paymentIntentFailed: paymentIntent,
+            },
+          },
+        },
+      });
+    }
 
     logger.warn(
       { bookingId, paymentIntentId: paymentIntent.id },
@@ -919,19 +1002,30 @@ export class PaymentService {
     }
 
     const existingMetadata = this.getMetadataObject(payment.metadata);
+    const existingAudit = this.getAuditObject(existingMetadata);
+    const existingStripePayload = this.getStripePayloadObject(existingMetadata);
 
     await prisma.$transaction(async (tx) => {
+      const chargeRefundedPayload = this.toInputJsonObject(charge);
+
       await tx.payment.update({
         where: { id: payment.id },
         data: {
           status: "REFUNDED",
           metadata: {
             ...existingMetadata,
-            refundFromStripeDashboard: {
-              receivedAt: new Date().toISOString(),
-              chargeId: charge?.id ?? null,
-              paymentIntentId,
-              amountRefunded: charge?.amount_refunded ?? null,
+            audit: {
+              ...existingAudit,
+              refundFromStripeDashboard: {
+                receivedAt: new Date().toISOString(),
+                chargeId: charge?.id ?? null,
+                paymentIntentId,
+                amountRefunded: charge?.amount_refunded ?? null,
+              },
+            },
+            stripePayload: {
+              ...existingStripePayload,
+              chargeRefunded: chargeRefundedPayload,
             },
           },
         },
