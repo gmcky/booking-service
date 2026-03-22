@@ -24,6 +24,8 @@ import type {
  * 8. Maintain PCI compliance by never storing card details.
  */
 export class PaymentService {
+  private static readonly AUTO_APPROVE_REFUND_DAYS = 7;
+
   private static formatDate(date: Date) {
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
@@ -56,6 +58,7 @@ export class PaymentService {
     const msUntilCheckIn = checkIn.getTime() - Date.now();
     const hoursUntilCheckIn = msUntilCheckIn / (1000 * 60 * 60);
     const daysUntilCheckIn = Math.max(0, Math.ceil(hoursUntilCheckIn / 24));
+    const isAutoApprove = daysUntilCheckIn > this.AUTO_APPROVE_REFUND_DAYS;
 
     let refundPercent = 0;
     if (hoursUntilCheckIn > 48) {
@@ -69,6 +72,7 @@ export class PaymentService {
       hoursUntilCheckIn,
       daysUntilCheckIn,
       refundPercent,
+      isAutoApprove,
     };
   }
 
@@ -252,6 +256,12 @@ export class PaymentService {
             property: {
               select: {
                 title: true,
+                owner: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                  },
+                },
               },
             },
           },
@@ -304,6 +314,103 @@ export class PaymentService {
     const existingMetadata = this.getMetadataObject(payment.metadata);
     const refundAmount =
       (Number(payment.amount) * Number(policy.refundPercent)) / 100;
+
+    // TODO: Implement refund abuse prevention based on user refund history.
+    // If user exceeds automatic-refund thresholds, force admin review instead.
+    if (policy.isAutoApprove) {
+      if (!payment.transactionId) {
+        throw new AppError(400, "Missing payment transaction id");
+      }
+
+      let stripeRefund;
+      try {
+        stripeRefund = await stripe.refunds.create(
+          {
+            payment_intent: payment.transactionId,
+            amount: Math.round(refundAmount * 100),
+            metadata: {
+              paymentId: payment.id,
+              bookingId: payment.bookingId,
+              autoApproved: "true",
+              refundReason: reason ?? "",
+            },
+          },
+          {
+            idempotencyKey: `refund_auto_${payment.id}`,
+          },
+        );
+      } catch (error) {
+        logger.error(
+          { error, paymentId: payment.id, bookingId: payment.bookingId },
+          "Failed to create Stripe auto-approved refund",
+        );
+        throw new AppError(502, "Payment provider error during auto refund");
+      }
+
+      const refundedPayment = await prisma.$transaction(async (tx) => {
+        const updatedPayment = await tx.payment.update({
+          where: { id },
+          data: {
+            status: "REFUNDED",
+            metadata: {
+              ...existingMetadata,
+              refundRequest: {
+                requestedAt: new Date().toISOString(),
+                requestedBy: userId,
+                refundPercent: policy.refundPercent,
+                refundAmount,
+                daysUntilCheckIn: policy.daysUntilCheckIn,
+                reason: reason ?? null,
+              },
+              refundAutoApproval: {
+                approvedAt: new Date().toISOString(),
+                stripeRefundId: stripeRefund.id,
+                refundAmount,
+                refundPercent: policy.refundPercent,
+              },
+            },
+          },
+        });
+
+        await tx.booking.update({
+          where: { id: payment.bookingId },
+          data: {
+            status: "CANCELLED",
+            payoutStatus: "CANCELLED",
+          },
+        });
+
+        return updatedPayment;
+      });
+
+      await emailQueue.add("refund-processed-guest", {
+        paymentId: refundedPayment.id,
+        bookingId: refundedPayment.bookingId,
+        guestEmail: payment.booking.user.email,
+        guestFirstName: payment.booking.user.firstName,
+        propertyTitle: payment.booking.property.title,
+        isApproved: true,
+        reason: reason ?? null,
+      });
+
+      await emailQueue.add("refund-processed-host", {
+        paymentId: refundedPayment.id,
+        bookingId: refundedPayment.bookingId,
+        hostEmail: payment.booking.property.owner.email,
+        hostFirstName: payment.booking.property.owner.firstName,
+        propertyTitle: payment.booking.property.title,
+        guestFirstName: payment.booking.user.firstName,
+        guestLastName: payment.booking.user.lastName,
+        checkIn: this.formatDate(payment.booking.checkIn),
+        checkOut: this.formatDate(payment.booking.checkOut),
+        refundPercent: policy.refundPercent,
+        refundedAmount: refundAmount,
+        totalAmount: Number(payment.amount),
+        currency: payment.currency,
+      });
+
+      return refundedPayment;
+    }
 
     const updatedPayment = await prisma.payment.update({
       where: { id },
