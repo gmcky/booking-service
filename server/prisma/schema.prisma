@@ -119,6 +119,7 @@ model Booking {
   totalPrice Decimal       @db.Decimal(10, 2)
   guests     Int
   status     BookingStatus @default(PENDING)
+  payoutStatus PayoutStatus @default(PENDING)
   createdAt  DateTime      @default(now())
   payment    Payment?
   updatedAt  DateTime      @updatedAt
@@ -129,6 +130,7 @@ model Booking {
   @@index([propertyId, checkIn, checkOut])
   @@index([userId])
   @@index([status])
+  @@index([payoutStatus])
   @@map("bookings")
 }
 
@@ -137,6 +139,13 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+}
+
+enum PayoutStatus {
+  PENDING
+  READY
+  PAID_OUT
+  CANCELLED
 }
 
 model RefreshToken {
