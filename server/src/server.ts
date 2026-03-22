@@ -2,8 +2,10 @@ import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./shared/lib/logger.js";
 import { prisma } from "./shared/lib/prisma.js";
+import { startPayoutMaturationCron } from "./shared/lib/payout-maturation.cron.js";
 
 const app = createApp();
+const payoutCron = env.NODE_ENV === "test" ? null : startPayoutMaturationCron();
 
 // Start server
 const server = app.listen(env.PORT, () => {
@@ -20,6 +22,7 @@ const server = app.listen(env.PORT, () => {
 // Graceful shutdown
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "Shutting down gracefully");
+  payoutCron?.stop();
 
   server.close(async () => {
     logger.info("HTTP server closed");

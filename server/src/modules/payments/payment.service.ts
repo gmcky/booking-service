@@ -278,6 +278,13 @@ export class PaymentService {
       );
     }
 
+    if (payment.booking.payoutStatus === "PAID_OUT") {
+      throw new AppError(
+        400,
+        "Cannot request refund after payout has been disbursed to host",
+      );
+    }
+
     if (payment.booking.status === "COMPLETED") {
       throw new AppError(400, "Cannot request refund for completed booking");
     }
@@ -380,6 +387,13 @@ export class PaymentService {
       throw new AppError(400, "Payment is not waiting for refund approval");
     }
 
+    if (payment.booking.payoutStatus === "PAID_OUT") {
+      throw new AppError(
+        400,
+        "Cannot approve refund after payout has been disbursed to host",
+      );
+    }
+
     if (!payment.transactionId) {
       throw new AppError(400, "Missing payment transaction id");
     }
@@ -453,12 +467,13 @@ export class PaymentService {
         },
       });
 
-      if (payment.booking.status !== "CANCELLED") {
-        await tx.booking.update({
-          where: { id: payment.bookingId },
-          data: { status: "CANCELLED" },
-        });
-      }
+      await tx.booking.update({
+        where: { id: payment.bookingId },
+        data: {
+          status: "CANCELLED",
+          payoutStatus: "CANCELLED",
+        },
+      });
 
       return updatedPayment;
     });
@@ -815,12 +830,13 @@ export class PaymentService {
         },
       });
 
-      if (payment.booking.status !== "CANCELLED") {
-        await tx.booking.update({
-          where: { id: payment.bookingId },
-          data: { status: "CANCELLED" },
-        });
-      }
+      await tx.booking.update({
+        where: { id: payment.bookingId },
+        data: {
+          status: "CANCELLED",
+          payoutStatus: "CANCELLED",
+        },
+      });
     });
 
     const chargeRefundedRaw = this.toFiniteNumber(charge?.amount_refunded);
