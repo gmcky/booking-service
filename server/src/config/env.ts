@@ -52,6 +52,9 @@ export const env = cleanEnv(process.env, {
   STRIPE_SECRET_KEY: str({ default: "" }),
   STRIPE_WEBHOOK_SECRET: str({ default: "" }),
 
+  // Operational alerts (Slack/Telegram/email bridge webhook)
+  ALERT_WEBHOOK_URL: str({ default: "" }),
+
   // API Documentation
   SWAGGER_ENABLED: bool({ default: true }),
   API_VERSION: str({ default: "v1" }),
