@@ -2,10 +2,21 @@ import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./shared/lib/logger.js";
 import { prisma } from "./shared/lib/prisma.js";
-import { startPayoutMaturationCron } from "./shared/lib/payout-maturation.cron.js";
+import {
+  payoutQueue,
+  schedulePayoutLifecycleJobs,
+} from "./shared/queues/payout.queue.js";
 
 const app = createApp();
-const payoutCron = env.NODE_ENV === "test" ? null : startPayoutMaturationCron();
+
+if (env.NODE_ENV !== "test") {
+  try {
+    await schedulePayoutLifecycleJobs();
+    logger.info("Payout lifecycle jobs are scheduled via BullMQ");
+  } catch (error) {
+    logger.error({ error }, "Failed to schedule payout lifecycle jobs");
+  }
+}
 
 // Start server
 const server = app.listen(env.PORT, () => {
@@ -22,12 +33,13 @@ const server = app.listen(env.PORT, () => {
 // Graceful shutdown
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "Shutting down gracefully");
-  payoutCron?.stop();
 
   server.close(async () => {
     logger.info("HTTP server closed");
 
     try {
+      await payoutQueue.close();
+      logger.info("Payout queue connection closed");
       await prisma.$disconnect();
       logger.info("Database connection closed");
       process.exit(0);
