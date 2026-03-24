@@ -376,7 +376,9 @@ export class PaymentService {
         },
       });
 
-      const processingMetadata = this.getMetadataObject(processingPayment.metadata);
+      const processingMetadata = this.getMetadataObject(
+        processingPayment.metadata,
+      );
       const processingAudit = this.getAuditObject(processingMetadata);
       const processingStripePayload =
         this.getStripePayloadObject(processingMetadata);
