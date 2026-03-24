@@ -555,7 +555,10 @@ export class PaymentService {
       throw new AppError(404, "Payment not found");
     }
 
-    if (payment.status === "REFUND_PROCESSING" || payment.status === "REFUNDED") {
+    if (
+      payment.status === "REFUND_PROCESSING" ||
+      payment.status === "REFUNDED"
+    ) {
       return payment;
     }
 
