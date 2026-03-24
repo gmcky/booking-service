@@ -555,6 +555,10 @@ export class PaymentService {
       throw new AppError(404, "Payment not found");
     }
 
+    if (payment.status === "REFUND_PROCESSING" || payment.status === "REFUNDED") {
+      return payment;
+    }
+
     if (payment.status !== "REFUND_REQUESTED") {
       throw new AppError(400, "Payment is not waiting for refund approval");
     }
@@ -598,6 +602,32 @@ export class PaymentService {
             Math.max(0, Math.round((refundAmount / paymentAmount) * 100)),
           )
         : 100;
+
+    const movedToProcessing = await prisma.payment.updateMany({
+      where: {
+        id,
+        status: "REFUND_REQUESTED",
+      },
+      data: {
+        status: "REFUND_PROCESSING",
+      },
+    });
+
+    if (movedToProcessing.count === 0) {
+      const latestPayment = await prisma.payment.findUnique({ where: { id } });
+      if (!latestPayment) {
+        throw new AppError(404, "Payment not found");
+      }
+
+      if (
+        latestPayment.status === "REFUND_PROCESSING" ||
+        latestPayment.status === "REFUNDED"
+      ) {
+        return latestPayment;
+      }
+
+      throw new AppError(400, "Payment is not waiting for refund approval");
+    }
 
     let stripeRefund;
     try {
@@ -669,6 +699,22 @@ export class PaymentService {
       propertyTitle: payment.booking.property.title,
       isApproved: true,
       reason: null,
+    });
+
+    await emailQueue.add("refund-processed-host", {
+      paymentId: updatedPayment.id,
+      bookingId: updatedPayment.bookingId,
+      hostEmail: payment.booking.property.owner.email,
+      hostFirstName: payment.booking.property.owner.firstName,
+      propertyTitle: payment.booking.property.title,
+      guestFirstName: payment.booking.user.firstName,
+      guestLastName: payment.booking.user.lastName,
+      checkIn: this.formatDate(payment.booking.checkIn),
+      checkOut: this.formatDate(payment.booking.checkOut),
+      refundPercent,
+      refundedAmount: refundAmount,
+      totalAmount: Number(payment.amount),
+      currency: payment.currency,
     });
 
     return updatedPayment;
@@ -1022,6 +1068,14 @@ export class PaymentService {
       logger.warn(
         { paymentIntentId, chargeId: charge?.id },
         "Payment not found for charge.refunded webhook",
+      );
+      return;
+    }
+
+    if (payment.status === "REFUNDED") {
+      logger.info(
+        { paymentId: payment.id, paymentIntentId, chargeId: charge?.id },
+        "Skipping charge.refunded sync because payment is already refunded",
       );
       return;
     }
