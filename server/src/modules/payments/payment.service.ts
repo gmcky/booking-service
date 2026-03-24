@@ -882,33 +882,56 @@ export class PaymentService {
     let updatedPaymentId: string | null = null;
 
     await prisma.$transaction(async (tx) => {
-      const upsertedPayment = await tx.payment.upsert({
+      const existingPayment = await tx.payment.findUnique({
         where: { bookingId },
-        create: {
-          bookingId,
-          amount: amountInMainCurrency,
-          currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
-          provider: "STRIPE",
-          status: "SUCCESS",
-          transactionId: paymentIntent.id,
-          metadata: {
-            stripePayload: {
-              paymentIntentSucceeded: paymentIntent,
-            },
-          },
-        },
-        update: {
-          status: "SUCCESS",
-          transactionId: paymentIntent.id,
-          metadata: {
-            stripePayload: {
-              paymentIntentSucceeded: paymentIntent,
-            },
-          },
+        select: {
+          id: true,
+          metadata: true,
         },
       });
 
-      updatedPaymentId = upsertedPayment.id;
+      if (!existingPayment) {
+        const createdPayment = await tx.payment.create({
+          data: {
+            bookingId,
+            amount: amountInMainCurrency,
+            currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
+            provider: "STRIPE",
+            status: "SUCCESS",
+            transactionId: paymentIntent.id,
+            metadata: {
+              stripePayload: {
+                paymentIntentSucceeded: paymentIntent,
+              },
+            },
+          },
+        });
+
+        updatedPaymentId = createdPayment.id;
+      } else {
+        const existingMetadata = this.getMetadataObject(
+          existingPayment.metadata,
+        );
+        const existingStripePayload =
+          this.getStripePayloadObject(existingMetadata);
+
+        const updatedPayment = await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: {
+            status: "SUCCESS",
+            transactionId: paymentIntent.id,
+            metadata: {
+              ...existingMetadata,
+              stripePayload: {
+                ...existingStripePayload,
+                paymentIntentSucceeded: paymentIntent,
+              },
+            },
+          },
+        });
+
+        updatedPaymentId = updatedPayment.id;
+      }
 
       await tx.booking.update({
         where: { id: bookingId },
