@@ -792,10 +792,7 @@ export class PaymentService {
    * Handle Stripe webhook events
    * CRITICAL: This is the PRIMARY way payment status should be updated
    */
-  static async handleStripeWebhook(
-    event: string | Buffer,
-    signature: string,
-  ) {
+  static async handleStripeWebhook(event: string | Buffer, signature: string) {
     let stripeEvent: Stripe.Event;
     try {
       stripeEvent = stripe.webhooks.constructEvent(
@@ -871,7 +868,9 @@ export class PaymentService {
   /**
    * Handle successful payment (webhook event)
    */
-  private static async handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
+  private static async handlePaymentSuccess(
+    paymentIntent: Stripe.PaymentIntent,
+  ) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
       logger.error(
@@ -1008,7 +1007,9 @@ export class PaymentService {
   /**
    * Handle failed payment (webhook event)
    */
-  private static async handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
+  private static async handlePaymentFailed(
+    paymentIntent: Stripe.PaymentIntent,
+  ) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
       logger.warn(
