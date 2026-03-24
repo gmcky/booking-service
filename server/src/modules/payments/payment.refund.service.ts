@@ -52,11 +52,10 @@ export class PaymentRefundService {
       throw new AppError(403, "Not authorized");
     }
 
-    if (payment.status === "REFUND_REQUESTED") {
-      return payment;
-    }
-
-    if (payment.status === "REFUND_PROCESSING") {
+    if (
+      payment.status === "REFUND_REQUESTED" ||
+      payment.status === "REFUND_PROCESSING"
+    ) {
       return payment;
     }
 
@@ -90,6 +89,7 @@ export class PaymentRefundService {
       );
     }
 
+    // Snapshot taken before updateMany - safe because updateMany only touches status.
     const existingMetadata = getMetadataObject(payment.metadata);
     const existingAudit = getAuditObject(existingMetadata);
     const existingStripePayload = getStripePayloadObject(existingMetadata);
