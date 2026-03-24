@@ -25,7 +25,12 @@ import type {
  * 8. Maintain PCI compliance by never storing card details.
  */
 export class PaymentService {
-  private static readonly AUTO_APPROVE_REFUND_DAYS = 7;
+  private static readonly REFUND_POLICY = {
+    autoApproveAfterDays: 7,
+    fullRefundAfterHours: 48,
+    partialRefundAfterHours: 24,
+    partialRefundPercent: 50,
+  } as const;
 
   private static formatDate(date: Date) {
     return new Intl.DateTimeFormat("en-US", {
@@ -82,16 +87,23 @@ export class PaymentService {
   }
 
   private static calculateRefundPolicy(checkIn: Date) {
+    const {
+      autoApproveAfterDays,
+      fullRefundAfterHours,
+      partialRefundAfterHours,
+      partialRefundPercent,
+    } = this.REFUND_POLICY;
+
     const msUntilCheckIn = checkIn.getTime() - Date.now();
     const hoursUntilCheckIn = msUntilCheckIn / (1000 * 60 * 60);
     const daysUntilCheckIn = Math.max(0, Math.ceil(hoursUntilCheckIn / 24));
-    const isAutoApprove = daysUntilCheckIn > this.AUTO_APPROVE_REFUND_DAYS;
+    const isAutoApprove = daysUntilCheckIn > autoApproveAfterDays;
 
     let refundPercent = 0;
-    if (hoursUntilCheckIn > 48) {
+    if (hoursUntilCheckIn > fullRefundAfterHours) {
       refundPercent = 100;
-    } else if (hoursUntilCheckIn >= 24) {
-      refundPercent = 50;
+    } else if (hoursUntilCheckIn >= partialRefundAfterHours) {
+      refundPercent = partialRefundPercent;
     }
 
     return {
@@ -764,6 +776,7 @@ export class PaymentService {
     const updatedPayment = await prisma.payment.update({
       where: { id },
       data: {
+        // Refund was rejected by admin, so the original successful payment remains active.
         status: "SUCCESS",
         metadata: {
           ...existingMetadata,
