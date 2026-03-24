@@ -307,6 +307,10 @@ export class PaymentService {
       return payment;
     }
 
+    if (payment.status === "REFUND_PROCESSING") {
+      return payment;
+    }
+
     if (payment.status !== "SUCCESS") {
       throw new AppError(
         400,
@@ -342,6 +346,7 @@ export class PaymentService {
     const existingStripePayload = this.getStripePayloadObject(existingMetadata);
     const refundAmount =
       (Number(payment.amount) * Number(policy.refundPercent)) / 100;
+    const refundRequestedAt = new Date().toISOString();
 
     // TODO: Implement refund abuse prevention based on user refund history.
     // If user exceeds automatic-refund thresholds, force admin review instead.
@@ -349,6 +354,32 @@ export class PaymentService {
       if (!payment.transactionId) {
         throw new AppError(400, "Missing payment transaction id");
       }
+
+      const processingPayment = await prisma.payment.update({
+        where: { id },
+        data: {
+          status: "REFUND_PROCESSING",
+          metadata: {
+            ...existingMetadata,
+            audit: {
+              ...existingAudit,
+              refundRequest: {
+                requestedAt: refundRequestedAt,
+                requestedBy: userId,
+                refundPercent: policy.refundPercent,
+                refundAmount,
+                daysUntilCheckIn: policy.daysUntilCheckIn,
+                reason: reason ?? null,
+              },
+            },
+          },
+        },
+      });
+
+      const processingMetadata = this.getMetadataObject(processingPayment.metadata);
+      const processingAudit = this.getAuditObject(processingMetadata);
+      const processingStripePayload =
+        this.getStripePayloadObject(processingMetadata);
 
       let stripeRefund;
       try {
@@ -383,17 +414,9 @@ export class PaymentService {
           data: {
             status: "REFUNDED",
             metadata: {
-              ...existingMetadata,
+              ...processingMetadata,
               audit: {
-                ...existingAudit,
-                refundRequest: {
-                  requestedAt: new Date().toISOString(),
-                  requestedBy: userId,
-                  refundPercent: policy.refundPercent,
-                  refundAmount,
-                  daysUntilCheckIn: policy.daysUntilCheckIn,
-                  reason: reason ?? null,
-                },
+                ...processingAudit,
                 refundAutoApproval: {
                   approvedAt: new Date().toISOString(),
                   stripeRefundId: stripeRefund.id,
@@ -402,7 +425,7 @@ export class PaymentService {
                 },
               },
               stripePayload: {
-                ...existingStripePayload,
+                ...processingStripePayload,
                 autoApprovedRefund: stripeRefundPayload,
               },
             },
