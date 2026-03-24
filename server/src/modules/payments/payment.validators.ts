@@ -10,7 +10,7 @@ const sanitizedReasonSchema = z
 
 export const createPaymentSchema = z.object({
   bookingId: z.string().uuid(),
-  provider: z.enum(["STRIPE", "PAYPAL", "CASH"]),
+  provider: z.enum(["STRIPE"]),
   currency: z.string().length(3).default("USD"),
 });
 

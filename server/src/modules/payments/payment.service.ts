@@ -193,6 +193,10 @@ export class PaymentService {
 
   static async create(data: CreatePaymentInput, userId: string) {
     // TODO: Enforce PENDING booking status before payment creation.
+    if (data.provider !== "STRIPE") {
+      throw new AppError(400, `Unsupported payment provider: ${data.provider}`);
+    }
+
     const booking = await prisma.booking.findUnique({
       where: { id: data.bookingId },
       include: { payment: true },
