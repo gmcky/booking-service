@@ -5,6 +5,7 @@ import { logger } from "../../shared/lib/logger.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { env } from "../../config/env.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
+import type Stripe from "stripe";
 import type {
   CreatePaymentInput,
   CreatePaymentIntentInput,
@@ -792,10 +793,10 @@ export class PaymentService {
    * CRITICAL: This is the PRIMARY way payment status should be updated
    */
   static async handleStripeWebhook(
-    event: any, // Stripe.Event type
+    event: string | Buffer,
     signature: string,
   ) {
-    let stripeEvent;
+    let stripeEvent: Stripe.Event;
     try {
       stripeEvent = stripe.webhooks.constructEvent(
         event,
@@ -836,13 +837,19 @@ export class PaymentService {
     try {
       switch (stripeEvent.type) {
         case "payment_intent.succeeded":
-          await this.handlePaymentSuccess(stripeEvent.data.object);
+          await this.handlePaymentSuccess(
+            stripeEvent.data.object as Stripe.PaymentIntent,
+          );
           break;
         case "payment_intent.payment_failed":
-          await this.handlePaymentFailed(stripeEvent.data.object);
+          await this.handlePaymentFailed(
+            stripeEvent.data.object as Stripe.PaymentIntent,
+          );
           break;
         case "charge.refunded":
-          await this.handleChargeRefunded(stripeEvent.data.object);
+          await this.handleChargeRefunded(
+            stripeEvent.data.object as Stripe.Charge,
+          );
           break;
         default:
           logger.info(
@@ -864,7 +871,7 @@ export class PaymentService {
   /**
    * Handle successful payment (webhook event)
    */
-  private static async handlePaymentSuccess(paymentIntent: any) {
+  private static async handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
       logger.error(
@@ -878,6 +885,7 @@ export class PaymentService {
       paymentIntent.amount_received ?? paymentIntent.amount,
     );
     const amountInMainCurrency = Number.isFinite(amount) ? amount / 100 : 0;
+    const paymentIntentPayload = this.toInputJsonObject(paymentIntent);
 
     let updatedPaymentId: string | null = null;
 
@@ -901,7 +909,7 @@ export class PaymentService {
             transactionId: paymentIntent.id,
             metadata: {
               stripePayload: {
-                paymentIntentSucceeded: paymentIntent,
+                paymentIntentSucceeded: paymentIntentPayload,
               },
             },
           },
@@ -924,7 +932,7 @@ export class PaymentService {
               ...existingMetadata,
               stripePayload: {
                 ...existingStripePayload,
-                paymentIntentSucceeded: paymentIntent,
+                paymentIntentSucceeded: paymentIntentPayload,
               },
             },
           },
@@ -1000,7 +1008,7 @@ export class PaymentService {
   /**
    * Handle failed payment (webhook event)
    */
-  private static async handlePaymentFailed(paymentIntent: any) {
+  private static async handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
       logger.warn(
@@ -1022,6 +1030,7 @@ export class PaymentService {
       const existingMetadata = this.getMetadataObject(existingPayment.metadata);
       const existingStripePayload =
         this.getStripePayloadObject(existingMetadata);
+      const paymentIntentFailedPayload = this.toInputJsonObject(paymentIntent);
 
       await prisma.payment.update({
         where: { id: existingPayment.id },
@@ -1032,7 +1041,7 @@ export class PaymentService {
             ...existingMetadata,
             stripePayload: {
               ...existingStripePayload,
-              paymentIntentFailed: paymentIntent,
+              paymentIntentFailed: paymentIntentFailedPayload,
             },
           },
         },
@@ -1048,7 +1057,7 @@ export class PaymentService {
   /**
    * Handle refunds initiated directly in Stripe Dashboard.
    */
-  private static async handleChargeRefunded(charge: any) {
+  private static async handleChargeRefunded(charge: Stripe.Charge) {
     const paymentIntentRaw = charge?.payment_intent;
     const paymentIntentId =
       typeof paymentIntentRaw === "string"
