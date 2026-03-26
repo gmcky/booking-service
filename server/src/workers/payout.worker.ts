@@ -58,20 +58,28 @@ async function runPayoutLifecycle(
   const completedCount = await completeFinishedBookings(now);
   const maturedCount = await maturePayouts(now);
   const disbursement = await disburseReadyPayouts();
+  const totalActions = completedCount + maturedCount + disbursement.attempted;
+
+  if (totalActions === 0) {
+    logger.info(`Job done - none (ID: ${job.id})`);
+    return;
+  }
 
   logger.info(
     {
       jobId: job.id,
       trigger: job.data.trigger,
-      completedCount,
-      maturedCount,
-      payoutAttempted: disbursement.attempted,
-      payoutPaidOut: disbursement.paidOut,
-      payoutSkipped: disbursement.skipped,
-      payoutFailed: disbursement.failed,
-      runAt: now.toISOString(),
+      details: {
+        completedCount,
+        maturedCount,
+        payoutAttempted: disbursement.attempted,
+        payoutPaidOut: disbursement.paidOut,
+        payoutSkipped: disbursement.skipped,
+        payoutFailed: disbursement.failed,
+        runAt: now.toISOString(),
+      },
     },
-    "Payout lifecycle job finished",
+    `Job done - processed ${totalActions} actions!`,
   );
 }
 
