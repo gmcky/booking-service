@@ -5,7 +5,7 @@ import { redisConnection } from "../lib/redis.js";
 export type PayoutJobName = "run-payout-lifecycle";
 
 export interface PayoutLifecycleJobData {
-  trigger: "startup" | "repeat";
+  trigger: "startup" | "repeat" | "manual";
 }
 
 export const PAYOUT_LIFECYCLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -66,4 +66,25 @@ export async function schedulePayoutLifecycleJobs() {
       repeat: { every: PAYOUT_LIFECYCLE_INTERVAL_MS },
     },
   );
+}
+
+export async function enqueueManualPayoutLifecycleJob() {
+  const job = await payoutQueue.add("run-payout-lifecycle", {
+    trigger: "manual",
+  });
+
+  logger.info(
+    {
+      jobId: job.id,
+      trigger: "manual",
+      queue: "payout",
+    },
+    "Manual payout lifecycle job enqueued",
+  );
+
+  return {
+    jobId: String(job.id),
+    queue: "payout",
+    trigger: "manual" as const,
+  };
 }

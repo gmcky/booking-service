@@ -1,0 +1,15 @@
+info:
+  name: Trigger Payout
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{baseUrl}}/payments/payout-lifecycle/run-now"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

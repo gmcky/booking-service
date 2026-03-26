@@ -1,6 +1,7 @@
 import { PaymentIntentService } from "./payment.intent.service.js";
 import { PaymentRefundService } from "./payment.refund.service.js";
 import { PaymentWebhookService } from "./payment.webhook.service.js";
+import { enqueueManualPayoutLifecycleJob } from "../../shared/queues/payout.queue.js";
 
 /**
  * Public facade for the payment module.
@@ -23,4 +24,6 @@ export class PaymentService {
   static handleStripeWebhook = PaymentWebhookService.handleStripeWebhook.bind(
     PaymentWebhookService,
   );
+
+  static triggerPayoutLifecycle = enqueueManualPayoutLifecycleJob;
 }

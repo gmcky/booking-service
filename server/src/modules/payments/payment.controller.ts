@@ -96,3 +96,21 @@ export async function handleWebhook(req: express.Request, res: Response) {
   await PaymentService.handleStripeWebhook(req.body, signature);
   res.status(200).json({ received: true });
 }
+
+/**
+ * Manually enqueue payout lifecycle execution (complete/mature/disburse pass).
+ * Useful for operational checks without waiting for startup/repeat scheduling.
+ *
+ * @route POST /api/v1/payments/payout-lifecycle/run-now
+ * @access Private (admin)
+ */
+export async function runPayoutLifecycleNow(
+  _req: AuthenticatedRequest,
+  res: Response,
+) {
+  const job = await PaymentService.triggerPayoutLifecycle();
+  res.status(202).json({
+    message: "Payout lifecycle job queued",
+    ...job,
+  });
+}

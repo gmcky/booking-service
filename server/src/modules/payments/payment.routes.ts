@@ -35,6 +35,12 @@ paymentRouter.post(
   asyncHandler(paymentController.createPaymentIntent),
 );
 
+paymentRouter.post(
+  "/payout-lifecycle/run-now",
+  authorize("ADMIN"),
+  asyncHandler(paymentController.runPayoutLifecycleNow),
+);
+
 paymentRouter.get("/:id", asyncHandler(paymentController.getPaymentById));
 
 paymentRouter.post(
