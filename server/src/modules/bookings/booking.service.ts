@@ -18,10 +18,16 @@ import {
   formatDate,
 } from "../../shared/utils/date.helpers.js";
 import { getBookingRole } from "./booking.helpers.js";
+import {
+  calculateRefundPolicy,
+  REFUND_POLICY,
+} from "../payments/payment.helpers.js";
+import {
+  MAX_STAY_NIGHTS,
+  MIN_ADVANCE_HOURS,
+} from "./booking.constants.js";
 
 type TransactionClient = Prisma.TransactionClient;
-const MIN_ADVANCE_HOURS = 24;
-const MAX_STAY_NIGHTS = 90;
 
 // Only forward transitions allowed
 const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
@@ -63,7 +69,19 @@ export class BookingService {
       where: { id },
       include: {
         property: true,
-        payment: true,
+        payment: {
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            status: true,
+            provider: true,
+            transactionId: true,
+            bookingId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
 
@@ -231,18 +249,29 @@ export class BookingService {
     }
 
     if (booking.status === "CANCELLED") {
-      return booking; // Idempotent — safe to call twice
+      const policy = calculateRefundPolicy(booking.checkIn);
+      const refundPercent = policy.refundPercent;
+      const refundAmount = (Number(booking.totalPrice) * refundPercent) / 100;
+
+      return {
+        booking,
+        cancellation: {
+          refundPercent,
+          refundAmount,
+          hoursUntilCheckIn: policy.hoursUntilCheckIn,
+          policy: {
+            fullRefundAfterHours: REFUND_POLICY.fullRefundAfterHours,
+            partialRefundAfterHours: REFUND_POLICY.partialRefundAfterHours,
+            partialRefundPercent: REFUND_POLICY.partialRefundPercent,
+          },
+        },
+      }; // Idempotent — safe to call twice
     }
 
     // ── Cancellation / refund policy ──────────────────────────────────────────
-    const hoursUntilCheckIn =
-      (booking.checkIn.getTime() - Date.now()) / (1000 * 60 * 60);
-    let refundPercent = 0;
-    if (hoursUntilCheckIn > 48) {
-      refundPercent = 100;
-    } else if (hoursUntilCheckIn >= 24) {
-      refundPercent = 50;
-    }
+    const policy = calculateRefundPolicy(booking.checkIn);
+    const hoursUntilCheckIn = policy.hoursUntilCheckIn;
+    const refundPercent = policy.refundPercent;
     const refundAmount = (Number(booking.totalPrice) * refundPercent) / 100;
 
     logger.info(
@@ -252,6 +281,11 @@ export class BookingService {
         refundPercent,
         refundAmount,
         hoursUntilCheckIn: Math.round(hoursUntilCheckIn),
+        refundPolicy: {
+          fullRefundAfterHours: REFUND_POLICY.fullRefundAfterHours,
+          partialRefundAfterHours: REFUND_POLICY.partialRefundAfterHours,
+          partialRefundPercent: REFUND_POLICY.partialRefundPercent,
+        },
       },
       "Cancellation policy applied",
     );
@@ -274,7 +308,19 @@ export class BookingService {
       ),
     );
 
-    return cancelled;
+    return {
+      booking: cancelled,
+      cancellation: {
+        refundPercent,
+        refundAmount,
+        hoursUntilCheckIn,
+        policy: {
+          fullRefundAfterHours: REFUND_POLICY.fullRefundAfterHours,
+          partialRefundAfterHours: REFUND_POLICY.partialRefundAfterHours,
+          partialRefundPercent: REFUND_POLICY.partialRefundPercent,
+        },
+      },
+    };
   }
 
   static async updateDates(

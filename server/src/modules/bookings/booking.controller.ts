@@ -74,8 +74,8 @@ export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const userRole = req.user!.role;
-  await BookingService.cancel(id, userId, userRole);
-  res.status(204).send();
+  const result = await BookingService.cancel(id, userId, userRole);
+  res.json(result);
 }
 
 export async function updateBookingDates(
