@@ -84,9 +84,7 @@ export function createApp(): Application {
 
   const hasWildcardOrigin = allowedOrigins.includes("*");
   if (hasWildcardOrigin && allowedOrigins.length > 1) {
-    throw new Error(
-      "CORS_ORIGIN cannot mix '*' with specific origins.",
-    );
+    throw new Error("CORS_ORIGIN cannot mix '*' with specific origins.");
   }
 
   const corsOrigin = hasWildcardOrigin
