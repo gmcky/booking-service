@@ -1,7 +1,10 @@
 import { z } from "zod";
-import { sanitizeString } from "../../shared/utils/sanitize.js";
-
-const HH_MM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+import { calculateNights } from "../../shared/utils/date.helpers.js";
+import {
+  MAX_BOOKING_ADVANCE_YEARS,
+  MAX_STAY_NIGHTS,
+  MIN_ADVANCE_HOURS,
+} from "./booking.constants.js";
 
 export const createBookingSchema = z
   .object({
@@ -15,55 +18,34 @@ export const createBookingSchema = z
       .datetime()
       .transform((val) => new Date(val)),
     guests: z.number().int().positive(),
-    specialRequests: z
-      .string()
-      .trim()
-      .max(500)
-      .transform(sanitizeString)
-      .optional(),
-    arrivalTime: z
-      .string()
-      .regex(HH_MM_REGEX, "Expected HH:mm format")
-      .optional(),
   })
   .refine((data) => data.checkOut > data.checkIn, {
     message: "Check-out must be after check-in",
     path: ["checkOut"],
   })
-  .refine((data) => data.checkIn > new Date(), {
-    message: "Check-in date must be in the future",
-    path: ["checkIn"],
+  .refine(
+    (data) =>
+      data.checkIn.getTime() >=
+      Date.now() + MIN_ADVANCE_HOURS * 60 * 60 * 1000,
+    {
+      message: `Check-in must be at least ${MIN_ADVANCE_HOURS} hours from now`,
+      path: ["checkIn"],
+    },
+  )
+  .refine((data) => calculateNights(data.checkIn, data.checkOut) >= 1, {
+    message: "Minimum stay is 1 night",
+    path: ["checkOut"],
+  })
+  .refine((data) => calculateNights(data.checkIn, data.checkOut) <= MAX_STAY_NIGHTS, {
+    message: `Maximum stay is ${MAX_STAY_NIGHTS} nights`,
+    path: ["checkOut"],
   })
   .refine(
     (data) => {
-      const nights = Math.ceil(
-        (data.checkOut.getTime() - data.checkIn.getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-      return nights >= 1;
-    },
-    {
-      message: "Minimum stay is 1 night",
-      path: ["checkOut"],
-    },
-  )
-  .refine(
-    (data) => {
-      const nights = Math.ceil(
-        (data.checkOut.getTime() - data.checkIn.getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-      return nights <= 90;
-    },
-    {
-      message: "Maximum stay is 90 nights",
-      path: ["checkOut"],
-    },
-  )
-  .refine(
-    (data) => {
       const oneYearFromNow = new Date();
-      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+      oneYearFromNow.setFullYear(
+        oneYearFromNow.getFullYear() + MAX_BOOKING_ADVANCE_YEARS,
+      );
       return data.checkIn <= oneYearFromNow;
     },
     {
@@ -73,7 +55,7 @@ export const createBookingSchema = z
   );
 
 export const updateBookingStatusSchema = z.object({
-  status: z.enum(["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"]),
+  status: z.enum(["CONFIRMED", "COMPLETED"]),
 });
 
 export const availabilitySchema = z
