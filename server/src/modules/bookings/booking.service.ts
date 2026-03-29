@@ -22,10 +22,7 @@ import {
   calculateRefundPolicy,
   REFUND_POLICY,
 } from "../payments/payment.helpers.js";
-import {
-  MAX_STAY_NIGHTS,
-  MIN_ADVANCE_HOURS,
-} from "./booking.constants.js";
+import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -278,7 +275,10 @@ export class BookingService {
 
     const cancelled = await prisma.booking.update({
       where: { id },
-      data: { status: "CANCELLED" },
+      data: {
+        status: "CANCELLED",
+        payoutStatus: "CANCELLED",
+      },
       include: { property: true },
     });
 
