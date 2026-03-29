@@ -180,6 +180,7 @@ model Review {
 
   @@index([propertyId])
   @@index([userId])
+  // TODO: Add @@unique([userId, propertyId]) to prevent rating spam (one review per user per property).
   @@index([rating])
   @@map("reviews")
 }
