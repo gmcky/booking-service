@@ -189,7 +189,7 @@ model Payment {
   amount        Decimal       @db.Decimal(10, 2)
   currency      String        @default("USD")
   status        PaymentStatus @default(PENDING)
-  provider      String
+  provider      PaymentProvider
   transactionId String? // External payment provider transaction ID
   metadata      Json? // Additional provider-specific data
   createdAt     DateTime      @default(now())
@@ -210,6 +210,10 @@ enum PaymentStatus {
   REFUND_REQUESTED
   FAILED
   REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
 }
 
 model BlockedDate {
