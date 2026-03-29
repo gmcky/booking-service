@@ -13,7 +13,10 @@ import type {
 import { Prisma } from "@prisma/client";
 import type { BookingStatus } from "@prisma/client";
 import { emailQueue } from "../../shared/queues/email.queue.js";
-import { calculateNights, formatDate } from "../../shared/utils/date.helpers.js";
+import {
+  calculateNights,
+  formatDate,
+} from "../../shared/utils/date.helpers.js";
 import { getBookingRole } from "./booking.helpers.js";
 
 type TransactionClient = Prisma.TransactionClient;
