@@ -249,23 +249,7 @@ export class BookingService {
     }
 
     if (booking.status === "CANCELLED") {
-      const policy = calculateRefundPolicy(booking.checkIn);
-      const refundPercent = policy.refundPercent;
-      const refundAmount = (Number(booking.totalPrice) * refundPercent) / 100;
-
-      return {
-        booking,
-        cancellation: {
-          refundPercent,
-          refundAmount,
-          hoursUntilCheckIn: policy.hoursUntilCheckIn,
-          policy: {
-            fullRefundAfterHours: REFUND_POLICY.fullRefundAfterHours,
-            partialRefundAfterHours: REFUND_POLICY.partialRefundAfterHours,
-            partialRefundPercent: REFUND_POLICY.partialRefundPercent,
-          },
-        },
-      }; // Idempotent — safe to call twice
+      return { booking }; // Idempotent — safe to call twice
     }
 
     // ── Cancellation / refund policy ──────────────────────────────────────────
