@@ -1,6 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { logger } from "./logger.js";
+import { getMetadataObject } from "../utils/prisma.helpers.js";
 
 const DEFAULT_PAYOUT_BATCH_SIZE = 50;
 const PAYOUT_PROVIDER = "MOCK_HOST_PAYOUT";
@@ -11,16 +11,6 @@ type PayoutRunStats = {
   skipped: number;
   failed: number;
 };
-
-function getMetadataObject(
-  metadata: Prisma.JsonValue | null,
-): Prisma.JsonObject {
-  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    return metadata as Prisma.JsonObject;
-  }
-
-  return {} as Prisma.JsonObject;
-}
 
 async function sendPayoutToHost(params: {
   bookingId: string;

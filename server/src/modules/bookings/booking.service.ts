@@ -13,7 +13,7 @@ import type {
 import { Prisma } from "@prisma/client";
 import type { BookingStatus } from "@prisma/client";
 import { emailQueue } from "../../shared/queues/email.queue.js";
-import { calculateNights } from "../../shared/utils/date.helpers.js";
+import { calculateNights, formatDate } from "../../shared/utils/date.helpers.js";
 import { getBookingRole } from "./booking.helpers.js";
 
 type TransactionClient = Prisma.TransactionClient;
@@ -413,17 +413,6 @@ export class BookingService {
 
   // ---- Private helpers ----
 
-  private static formatDate(date: Date): string {
-    // Format in UTC so the displayed date matches what the guest selected,
-    // regardless of server timezone. "March 20, 2026"
-    return new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      timeZone: "UTC",
-    }).format(date);
-  }
-
   private static async enqueueBookingCreatedEmails(
     booking: {
       id: string;
@@ -457,8 +446,8 @@ export class BookingService {
       guestFirstName: guest.firstName,
       propertyTitle: booking.property.title,
       propertyCity: booking.property.city,
-      checkIn: this.formatDate(booking.checkIn),
-      checkOut: this.formatDate(booking.checkOut),
+      checkIn: formatDate(booking.checkIn),
+      checkOut: formatDate(booking.checkOut),
       nights,
       guests: booking.guests,
       totalPrice: Number(booking.totalPrice),
@@ -485,8 +474,8 @@ export class BookingService {
         guestLastName: guest.lastName,
         propertyTitle: booking.property.title,
         propertyCity: booking.property.city,
-        checkIn: this.formatDate(booking.checkIn),
-        checkOut: this.formatDate(booking.checkOut),
+        checkIn: formatDate(booking.checkIn),
+        checkOut: formatDate(booking.checkOut),
         nights,
         guests: booking.guests,
       });
@@ -528,8 +517,8 @@ export class BookingService {
     const sharedPayload = {
       bookingId: booking.id,
       propertyTitle: booking.property.title,
-      checkIn: this.formatDate(booking.checkIn),
-      checkOut: this.formatDate(booking.checkOut),
+      checkIn: formatDate(booking.checkIn),
+      checkOut: formatDate(booking.checkOut),
     };
 
     if (guest) {
