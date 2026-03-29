@@ -19,6 +19,7 @@ bookingRouter.post(
   asyncHandler(bookingController.checkAvailability),
 );
 
+// TODO: Move blocked-dates endpoint under properties router when API is stabilized.
 bookingRouter.get(
   "/:propertyId/blocked-dates",
   asyncHandler(bookingController.getBlockedDates),
