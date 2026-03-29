@@ -153,7 +153,8 @@ export class PaymentIntentService {
       throw new AppError(403, "Not authorized");
     }
 
-    return payment;
+    const { metadata: _metadata, ...paymentWithoutMetadata } = payment;
+    return paymentWithoutMetadata;
   }
 
   static async process(id: string, userId: string) {
