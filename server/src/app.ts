@@ -81,16 +81,25 @@ export function createApp(): Application {
   const allowedOrigins = env.CORS_ORIGIN.split(",")
     .map((o) => o.trim())
     .filter(Boolean);
-  if (allowedOrigins.includes("*") && true) {
+
+  const hasWildcardOrigin = allowedOrigins.includes("*");
+  if (hasWildcardOrigin && allowedOrigins.length > 1) {
     throw new Error(
-      "CORS_ORIGIN cannot be '*' when credentials are enabled; set a specific origin.",
+      "CORS_ORIGIN cannot mix '*' with specific origins.",
     );
   }
 
+  const corsOrigin = hasWildcardOrigin
+    ? true
+    : allowedOrigins.length === 1
+      ? allowedOrigins[0]
+      : allowedOrigins;
+
   app.use(
     cors({
-      origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
-      credentials: true,
+      origin: corsOrigin,
+      // Wildcard origin should not be combined with credentialed requests.
+      credentials: !hasWildcardOrigin,
     }),
   );
   app.use(compression());
