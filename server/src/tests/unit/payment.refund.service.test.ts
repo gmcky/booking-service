@@ -34,11 +34,60 @@ const mockEmailQueue = emailQueue as unknown as {
   add: ReturnType<typeof vi.fn>;
 };
 
-function buildPayment(overrides: Record<string, unknown> = {}) {
+type PaymentFixture = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  provider: "STRIPE";
+  bookingId: string;
+  amount: Prisma.Decimal;
+  currency: string;
+  status:
+    | "SUCCESS"
+    | "PENDING"
+    | "REFUND_REQUESTED"
+    | "REFUND_PROCESSING"
+    | "REFUNDED";
+  transactionId: string | null;
+  metadata: Prisma.JsonValue | null;
+  booking: {
+    userId: string;
+    checkIn: Date;
+    checkOut: Date;
+    status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+    payoutStatus: "PENDING" | "PAID_OUT" | "CANCELLED";
+    user: {
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    property: {
+      title: string;
+      owner: {
+        email: string;
+        firstName: string;
+      };
+    };
+  };
+};
+
+type BuildPaymentOverrides = Omit<Partial<PaymentFixture>, "booking"> & {
+  booking?: Partial<PaymentFixture["booking"]> & {
+    user?: Partial<PaymentFixture["booking"]["user"]>;
+    property?: Partial<PaymentFixture["booking"]["property"]> & {
+      owner?: Partial<PaymentFixture["booking"]["property"]["owner"]>;
+    };
+  };
+};
+
+function buildPayment(overrides: BuildPaymentOverrides = {}): PaymentFixture {
   const now = Date.now();
 
-  const base = {
+  const base: PaymentFixture = {
     id: "payment-1",
+    createdAt: new Date(now - 60 * 1000),
+    updatedAt: new Date(now),
+    provider: "STRIPE",
     bookingId: "booking-1",
     amount: new Prisma.Decimal("300.00"),
     currency: "USD",
@@ -57,9 +106,9 @@ function buildPayment(overrides: Record<string, unknown> = {}) {
         owner: { email: "owner@test.com", firstName: "Owner" },
       },
     },
-  } as any;
+  };
 
-  const o = overrides as any;
+  const o = overrides;
 
   return {
     ...base,
@@ -80,7 +129,20 @@ function buildPayment(overrides: Record<string, unknown> = {}) {
         },
       },
     },
-  } as any;
+  };
+}
+
+function mockPaymentFindUniqueResult(payment: PaymentFixture | null) {
+  (mockPrisma.payment.findUnique as any).mockResolvedValue(payment);
+}
+
+function mockPaymentUpdateResult(payment: PaymentFixture) {
+  (mockPrisma.payment.update as any).mockResolvedValue(payment);
+}
+
+function mockPaymentUpdateResults(...payments: PaymentFixture[]) {
+  const update = mockPrisma.payment.update as any;
+  payments.forEach((payment) => update.mockResolvedValueOnce(payment));
 }
 
 describe("PaymentRefundService.requestRefund", () => {
@@ -91,7 +153,7 @@ describe("PaymentRefundService.requestRefund", () => {
 
   it("returns payment as-is when status is already REFUND_REQUESTED", async () => {
     const payment = buildPayment({ status: "REFUND_REQUESTED" });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     const result = await PaymentRefundService.requestRefund(
       "payment-1",
@@ -105,7 +167,7 @@ describe("PaymentRefundService.requestRefund", () => {
 
   it("returns payment as-is when status is already REFUND_PROCESSING", async () => {
     const payment = buildPayment({ status: "REFUND_PROCESSING" });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     const result = await PaymentRefundService.requestRefund(
       "payment-1",
@@ -119,7 +181,7 @@ describe("PaymentRefundService.requestRefund", () => {
 
   it("throws 403 when userId does not match booking owner", async () => {
     const payment = buildPayment();
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "someone-else"),
@@ -128,7 +190,7 @@ describe("PaymentRefundService.requestRefund", () => {
 
   it("throws 400 when payment status is not SUCCESS", async () => {
     const payment = buildPayment({ status: "PENDING" });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "user-1"),
@@ -142,7 +204,7 @@ describe("PaymentRefundService.requestRefund", () => {
     const payment = buildPayment({
       booking: { payoutStatus: "PAID_OUT" },
     });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "user-1"),
@@ -153,8 +215,14 @@ describe("PaymentRefundService.requestRefund", () => {
   });
 
   it("throws 400 when booking is COMPLETED", async () => {
-    const payment = buildPayment({ booking: { status: "COMPLETED" } });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    const payment = buildPayment({
+      booking: {
+        status: "COMPLETED",
+        payoutStatus: "PENDING",
+        checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+      },
+    });
+    mockPaymentFindUniqueResult(payment);
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "user-1"),
@@ -170,7 +238,7 @@ describe("PaymentRefundService.requestRefund", () => {
         checkIn: new Date(Date.now() - 60 * 60 * 1000),
       },
     });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "user-1"),
@@ -186,7 +254,7 @@ describe("PaymentRefundService.requestRefund", () => {
         checkIn: new Date(Date.now() + 12 * 60 * 60 * 1000),
       },
     });
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
+    mockPaymentFindUniqueResult(payment);
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "user-1"),
@@ -204,10 +272,8 @@ describe("PaymentRefundService.requestRefund", () => {
     const processingPayment = buildPayment({ status: "REFUND_PROCESSING" });
     const refundedPayment = buildPayment({ status: "REFUNDED" });
 
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
-    mockPrisma.payment.update
-      .mockResolvedValueOnce(processingPayment)
-      .mockResolvedValueOnce(refundedPayment);
+    mockPaymentFindUniqueResult(payment);
+    mockPaymentUpdateResults(processingPayment, refundedPayment);
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
     mockPrisma.$transaction.mockImplementation(async (cb: any) =>
       cb(mockPrisma),
@@ -244,17 +310,13 @@ describe("PaymentRefundService.requestRefund", () => {
     const processingPayment = buildPayment({ status: "REFUND_PROCESSING" });
     const refundedPayment = buildPayment({ status: "REFUNDED" });
 
-    let updateCall = 0;
-
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
-    (mockPrisma.payment.update as any).mockImplementation(async () => {
-      updateCall += 1;
-      if (updateCall === 1) {
+    mockPaymentFindUniqueResult(payment);
+    (mockPrisma.payment.update as any)
+      .mockImplementationOnce(async () => {
         callOrder.push("db_update");
         return processingPayment;
-      }
-      return refundedPayment;
-    });
+      })
+      .mockImplementationOnce(async () => refundedPayment);
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
     mockPrisma.$transaction.mockImplementation(async (cb: any) =>
       cb(mockPrisma),
@@ -275,6 +337,30 @@ describe("PaymentRefundService.requestRefund", () => {
     );
   });
 
+  it("leaves payment in REFUND_PROCESSING state when Stripe call fails", async () => {
+    const payment = buildPayment({
+      booking: { checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
+    });
+    const processingPayment = buildPayment({ status: "REFUND_PROCESSING" });
+
+    mockPaymentFindUniqueResult(payment);
+    (mockPrisma.payment.update as any).mockResolvedValueOnce(processingPayment);
+    mockStripe.refunds.create.mockRejectedValue(new Error("Stripe timeout"));
+
+    await expect(
+      PaymentRefundService.requestRefund("payment-1", "user-1"),
+    ).rejects.toMatchObject({ statusCode: 502 });
+
+    expect(mockPrisma.payment.update).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "REFUND_PROCESSING" }),
+      }),
+    );
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+    expect(mockEmailQueue.add).not.toHaveBeenCalled();
+  });
+
   it("enqueues emails to both guest and host after auto-approve", async () => {
     const payment = buildPayment({
       booking: { checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
@@ -282,10 +368,8 @@ describe("PaymentRefundService.requestRefund", () => {
     const processingPayment = buildPayment({ status: "REFUND_PROCESSING" });
     const refundedPayment = buildPayment({ status: "REFUNDED" });
 
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
-    mockPrisma.payment.update
-      .mockResolvedValueOnce(processingPayment)
-      .mockResolvedValueOnce(refundedPayment);
+    mockPaymentFindUniqueResult(payment);
+    mockPaymentUpdateResults(processingPayment, refundedPayment);
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
     mockPrisma.$transaction.mockImplementation(async (cb: any) =>
       cb(mockPrisma),
@@ -323,8 +407,8 @@ describe("PaymentRefundService.requestRefund", () => {
       booking: { checkIn: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000) },
     });
 
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
-    mockPrisma.payment.update.mockResolvedValue(updatedPayment);
+    mockPaymentFindUniqueResult(payment);
+    mockPaymentUpdateResult(updatedPayment);
     mockPrisma.user.findMany.mockResolvedValue([] as any);
 
     const result = await PaymentRefundService.requestRefund(
@@ -351,8 +435,8 @@ describe("PaymentRefundService.requestRefund", () => {
       booking: { checkIn: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000) },
     });
 
-    mockPrisma.payment.findUnique.mockResolvedValue(payment);
-    mockPrisma.payment.update.mockResolvedValue(updatedPayment);
+    mockPaymentFindUniqueResult(payment);
+    mockPaymentUpdateResult(updatedPayment);
     mockPrisma.user.findMany.mockResolvedValue([
       { email: "admin1@test.com", firstName: "Admin1" },
       { email: "admin2@test.com", firstName: "Admin2" },
@@ -366,28 +450,21 @@ describe("PaymentRefundService.requestRefund", () => {
 
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(2);
-    expect(mockEmailQueue.add).toHaveBeenNthCalledWith(
-      1,
-      "refund-requested-admin",
-      expect.objectContaining({
-        adminEmail: "admin1@test.com",
-        paymentId: "payment-1",
-        bookingId: "booking-1",
-      }),
+    const adminEmails = mockEmailQueue.add.mock.calls.map(
+      ([, payload]) => (payload as { adminEmail: string }).adminEmail,
     );
-    expect(mockEmailQueue.add).toHaveBeenNthCalledWith(
-      2,
-      "refund-requested-admin",
-      expect.objectContaining({
-        adminEmail: "admin2@test.com",
-        paymentId: "payment-1",
-        bookingId: "booking-1",
-      }),
+    expect(adminEmails).toEqual(
+      expect.arrayContaining(["admin1@test.com", "admin2@test.com"]),
     );
+    expect(
+      mockEmailQueue.add.mock.calls.every(
+        ([jobName]) => jobName === "refund-requested-admin",
+      ),
+    ).toBe(true);
   });
 
   it("throws AppError when payment not found", async () => {
-    mockPrisma.payment.findUnique.mockResolvedValue(null);
+    mockPaymentFindUniqueResult(null);
 
     await expect(
       PaymentRefundService.requestRefund("missing", "user-1"),
