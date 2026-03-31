@@ -1,3 +1,5 @@
+import { AppError } from "../middlewares/error.handler.js";
+
 const UNITS: Record<string, number> = {
   s: 1_000,
   m: 60 * 1_000,
@@ -12,12 +14,12 @@ const UNITS: Record<string, number> = {
 export function parseExpiry(expiry: string): number {
   const match = expiry.match(/^(\d+)([smhd])$/);
   if (!match || !match[1] || !match[2]) {
-    throw new Error(`Invalid expiry format: "${expiry}"`);
+    throw new AppError(400, `Invalid expiry format: "${expiry}"`);
   }
 
   const multiplier = UNITS[match[2]];
   if (!multiplier) {
-    throw new Error(`Invalid time unit: "${match[2]}"`);
+    throw new AppError(400, `Invalid time unit: "${match[2]}"`);
   }
 
   return parseInt(match[1], 10) * multiplier;
