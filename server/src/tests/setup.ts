@@ -26,6 +26,16 @@ vi.mock("../shared/lib/stripe.js", () => ({
   stripe: {},
 }));
 
+vi.mock("../shared/lib/logger.js", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+  },
+}));
+
 vi.mock("../shared/queues/email.queue.js", () => ({
   emailQueue: {
     add: vi.fn(),
