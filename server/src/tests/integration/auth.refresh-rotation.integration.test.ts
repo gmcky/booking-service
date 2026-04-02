@@ -4,7 +4,11 @@ import request from "supertest";
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
+import {
+  GenericContainer,
+  Wait,
+  type StartedTestContainer,
+} from "testcontainers";
 import type { PrismaClient } from "@prisma/client";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,16 +47,21 @@ function getCookieValue(
 }
 
 async function registerAndGetRefreshToken() {
-  const response = await request(app).post("/api/v1/auth/register").send({
-    email: `rotation-${Date.now()}@example.com`,
-    password: "S3cure!Passw0rd#2026",
-    firstName: "Rotation",
-    lastName: "Tester",
-  });
+  const response = await request(app)
+    .post("/api/v1/auth/register")
+    .send({
+      email: `rotation-${Date.now()}@example.com`,
+      password: "S3cure!Passw0rd#2026",
+      firstName: "Rotation",
+      lastName: "Tester",
+    });
 
   expect(response.status).toBe(201);
 
-  const refreshToken = getCookieValue(response.headers["set-cookie"], "refreshToken");
+  const refreshToken = getCookieValue(
+    response.headers["set-cookie"],
+    "refreshToken",
+  );
 
   return {
     userId: response.body.user.id as string,
@@ -94,14 +103,19 @@ describe("Auth refresh token rotation integration", () => {
       stdio: "pipe",
     });
 
-    const [{ authRouter }, { errorHandler }, { prisma: prismaClient }, expressModule, cookieParserModule] =
-      await Promise.all([
-        import("../../modules/auth/auth.routes.js"),
-        import("../../shared/middlewares/error.handler.js"),
-        import("../../shared/lib/prisma.js"),
-        import("express"),
-        import("cookie-parser"),
-      ]);
+    const [
+      { authRouter },
+      { errorHandler },
+      { prisma: prismaClient },
+      expressModule,
+      cookieParserModule,
+    ] = await Promise.all([
+      import("../../modules/auth/auth.routes.js"),
+      import("../../shared/middlewares/error.handler.js"),
+      import("../../shared/lib/prisma.js"),
+      import("express"),
+      import("cookie-parser"),
+    ]);
 
     prisma = prismaClient;
 
@@ -131,7 +145,8 @@ describe("Auth refresh token rotation integration", () => {
   });
 
   it("returns a new refresh token on successful rotation", async () => {
-    const { refreshToken: initialRefreshToken } = await registerAndGetRefreshToken();
+    const { refreshToken: initialRefreshToken } =
+      await registerAndGetRefreshToken();
 
     const refreshResponse = await request(app)
       .post("/api/v1/auth/refresh")
@@ -151,7 +166,8 @@ describe("Auth refresh token rotation integration", () => {
   });
 
   it("rejects old token after rotation and revokes all sessions", async () => {
-    const { userId, refreshToken: initialRefreshToken } = await registerAndGetRefreshToken();
+    const { userId, refreshToken: initialRefreshToken } =
+      await registerAndGetRefreshToken();
 
     const firstRotation = await request(app)
       .post("/api/v1/auth/refresh")
@@ -160,7 +176,10 @@ describe("Auth refresh token rotation integration", () => {
 
     expect(firstRotation.status).toBe(200);
 
-    const newRefreshToken = getCookieValue(firstRotation.headers["set-cookie"], "refreshToken");
+    const newRefreshToken = getCookieValue(
+      firstRotation.headers["set-cookie"],
+      "refreshToken",
+    );
 
     const reusedOldTokenResponse = await request(app)
       .post("/api/v1/auth/refresh")
@@ -187,7 +206,8 @@ describe("Auth refresh token rotation integration", () => {
   });
 
   it("handles concurrent refresh requests with the same token", async () => {
-    const { refreshToken: initialRefreshToken } = await registerAndGetRefreshToken();
+    const { refreshToken: initialRefreshToken } =
+      await registerAndGetRefreshToken();
 
     const [first, second] = await Promise.all([
       request(app)
