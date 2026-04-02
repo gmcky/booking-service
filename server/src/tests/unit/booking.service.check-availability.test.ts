@@ -94,4 +94,53 @@ describe("BookingService.checkAvailability", () => {
 
     expect(available).toBe(expected);
   });
+
+  describe("blocked dates", () => {
+    it("returns false when dates overlap with a blocked period", async () => {
+      (mockPrisma.booking.count as any).mockResolvedValue(0);
+      mockPrisma.blockedDate.count.mockResolvedValue(1);
+
+      const result = await BookingService.checkAvailability(
+        "property-1",
+        d("2026-06-10"),
+        d("2026-06-15"),
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it("returns true when no bookings and no blocked dates", async () => {
+      (mockPrisma.booking.count as any).mockResolvedValue(0);
+      mockPrisma.blockedDate.count.mockResolvedValue(0);
+
+      const result = await BookingService.checkAvailability(
+        "property-1",
+        d("2026-06-10"),
+        d("2026-06-15"),
+      );
+
+      expect(result).toBe(true);
+    });
+  });
+
+  it("passes excludeBookingId to query when provided", async () => {
+    (mockPrisma.booking.count as any).mockResolvedValue(0);
+    mockPrisma.blockedDate.count.mockResolvedValue(0);
+
+    await BookingService.checkAvailability(
+      "property-1",
+      d("2026-06-10"),
+      d("2026-06-15"),
+      prisma,
+      "booking-to-exclude",
+    );
+
+    expect(mockPrisma.booking.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { not: "booking-to-exclude" },
+        }),
+      }),
+    );
+  });
 });
