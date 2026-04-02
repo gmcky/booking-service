@@ -144,6 +144,68 @@ describe("Auth refresh token rotation integration", () => {
     }
   });
 
+  it("login -> refresh rotates token, old token reuse returns 401 and revokes sessions", async () => {
+    const email = `login-rotation-${Date.now()}@example.com`;
+    const password = "S3cure!Passw0rd#2026";
+
+    const registerResponse = await request(app)
+      .post("/api/v1/auth/register")
+      .send({
+        email,
+        password,
+        firstName: "Login",
+        lastName: "Rotation",
+      });
+
+    expect(registerResponse.status).toBe(201);
+    const userId = registerResponse.body.user.id as string;
+
+    const loginResponse = await request(app).post("/api/v1/auth/login").send({
+      email,
+      password,
+    });
+
+    // 1. login -> receives refresh token (in cookie)
+    expect(loginResponse.status).toBe(200);
+    expect(loginResponse.body.accessToken).toEqual(expect.any(String));
+    const initialRefreshToken = getCookieValue(
+      loginResponse.headers["set-cookie"],
+      "refreshToken",
+    );
+
+    // 2. refresh -> receives new access token + rotated refresh token
+    const refreshResponse = await request(app)
+      .post("/api/v1/auth/refresh")
+      .set("Cookie", `refreshToken=${initialRefreshToken}`)
+      .send();
+
+    expect(refreshResponse.status).toBe(200);
+    expect(refreshResponse.body.accessToken).toEqual(expect.any(String));
+    const rotatedRefreshToken = getCookieValue(
+      refreshResponse.headers["set-cookie"],
+      "refreshToken",
+    );
+    expect(rotatedRefreshToken).not.toBe(initialRefreshToken);
+
+    // 3. old refresh token reuse -> 401
+    const reusedOldTokenResponse = await request(app)
+      .post("/api/v1/auth/refresh")
+      .set("Cookie", `refreshToken=${initialRefreshToken}`)
+      .send();
+
+    expect(reusedOldTokenResponse.status).toBe(401);
+    expect(reusedOldTokenResponse.body).toMatchObject({
+      error: "Invalid refresh token",
+    });
+
+    // 4. all user sessions revoked after reuse detection
+    const activeTokens = await prisma.refreshToken.count({
+      where: { userId },
+    });
+
+    expect(activeTokens).toBe(0);
+  });
+
   it("returns a new refresh token on successful rotation", async () => {
     const { refreshToken: initialRefreshToken } =
       await registerAndGetRefreshToken();
