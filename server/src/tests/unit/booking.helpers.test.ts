@@ -21,6 +21,10 @@ describe("getBookingRole", () => {
     expect(getBookingRole(booking, "stranger", "USER")).toBe("NONE");
   });
 
+  it("returns ADMIN when user has ADMIN role and is unrelated to booking", () => {
+    expect(getBookingRole(booking, "some-admin", "ADMIN")).toBe("ADMIN");
+  });
+
   it("prioritizes ADMIN over HOST when user is both admin and owner", () => {
     expect(getBookingRole(booking, "owner-1", "ADMIN")).toBe("ADMIN");
   });
