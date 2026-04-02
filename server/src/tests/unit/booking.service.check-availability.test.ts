@@ -28,16 +28,18 @@ describe("BookingService.checkAvailability", () => {
 
     mockPrisma.blockedDate.count.mockResolvedValue(0);
 
-    (mockPrisma.booking.count as any).mockImplementation(async ({ where }: any) => {
-      const newCheckIn = where.checkOut.gt as Date;
-      const newCheckOut = where.checkIn.lt as Date;
+    (mockPrisma.booking.count as any).mockImplementation(
+      async ({ where }: any) => {
+        const newCheckIn = where.checkOut.gt as Date;
+        const newCheckOut = where.checkIn.lt as Date;
 
-      const overlaps =
-        existingBooking.checkIn < newCheckOut &&
-        existingBooking.checkOut > newCheckIn;
+        const overlaps =
+          existingBooking.checkIn < newCheckOut &&
+          existingBooking.checkOut > newCheckIn;
 
-      return overlaps ? 1 : 0;
-    });
+        return overlaps ? 1 : 0;
+      },
+    );
   });
 
   it.each([
