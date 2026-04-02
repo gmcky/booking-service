@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
 import { Prisma, type PrismaClient } from "@prisma/client";
 
+// Overrides global setup.ts mocks with deep mocks needed for this test file.
 vi.mock("../../shared/lib/prisma.js", () => ({
   prisma: mockDeep<PrismaClient>(),
 }));
