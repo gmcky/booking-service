@@ -96,6 +96,9 @@ importers:
         specifier: ^4.4.2
         version: 4.4.2
     devDependencies:
+      '@testcontainers/postgresql':
+        specifier: ^11.13.0
+        version: 11.13.0
       '@types/bcrypt':
         specifier: ^6.0.0
         version: 6.0.0
@@ -1132,6 +1135,9 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@testcontainers/postgresql@11.13.0':
+    resolution: {integrity: sha512-Y+HLf+IEu9+h3MgxRhnFunw9ldk3jxN2PO6zyejN5AiDd1aSeBQ7hfpc/4MlMm65St2DdLGf39oE/vdW1+hc/Q==}
 
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
@@ -4617,6 +4623,15 @@ snapshots:
       '@sinonjs/commons': 3.0.1
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@testcontainers/postgresql@11.13.0':
+    dependencies:
+      testcontainers: 11.13.0
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
 
   '@tsconfig/node10@1.0.12': {}
 

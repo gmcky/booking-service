@@ -1,21 +1,9 @@
-import { beforeAll, afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { Application } from "express";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import express, { type Application } from "express";
+import cookieParser from "cookie-parser";
 import request from "supertest";
-import { execSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  GenericContainer,
-  Wait,
-  type StartedTestContainer,
-} from "testcontainers";
 import type { PrismaClient } from "@prisma/client";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const projectRoot = resolve(__dirname, "../../../");
-
-let postgresContainer: StartedTestContainer;
 let app: Application;
 let prisma: PrismaClient;
 
@@ -71,56 +59,14 @@ async function registerAndGetRefreshToken() {
 
 describe("Auth refresh token rotation integration", () => {
   beforeAll(async () => {
-    postgresContainer = await new GenericContainer("postgres:16-alpine")
-      .withEnvironment({
-        POSTGRES_DB: "booking_test",
-        POSTGRES_USER: "booking",
-        POSTGRES_PASSWORD: "booking",
-      })
-      .withExposedPorts(5432)
-      .withWaitStrategy(
-        Wait.forLogMessage("database system is ready to accept connections"),
-      )
-      .start();
-
-    const host = postgresContainer.getHost();
-    const port = postgresContainer.getMappedPort(5432);
-
-    process.env.NODE_ENV = "test";
-    process.env.DATABASE_URL = `postgresql://booking:booking@${host}:${port}/booking_test?schema=public`;
-    process.env.JWT_ACCESS_SECRET = "integration-access-secret";
-    process.env.JWT_REFRESH_SECRET = "integration-refresh-secret";
-    process.env.JWT_ACCESS_EXPIRES_IN = "15m";
-    process.env.JWT_REFRESH_EXPIRES_IN = "7d";
-    process.env.CORS_ORIGIN = "http://localhost:3000";
-    process.env.API_VERSION = "v1";
-    process.env.REDIS_HOST = "127.0.0.1";
-    process.env.REDIS_PORT = "6379";
-
-    execSync("pnpm prisma migrate deploy --config prisma.config.ts", {
-      cwd: projectRoot,
-      env: process.env,
-      stdio: "pipe",
-    });
-
-    const [
-      { authRouter },
-      { errorHandler },
-      { prisma: prismaClient },
-      expressModule,
-      cookieParserModule,
-    ] = await Promise.all([
-      import("../../modules/auth/auth.routes.js"),
-      import("../../shared/middlewares/error.handler.js"),
-      import("../../shared/lib/prisma.js"),
-      import("express"),
-      import("cookie-parser"),
-    ]);
+    const [{ authRouter }, { errorHandler }, { prisma: prismaClient }] =
+      await Promise.all([
+        import("../../modules/auth/auth.routes.js"),
+        import("../../shared/middlewares/error.handler.js"),
+        import("../../shared/lib/prisma.js"),
+      ]);
 
     prisma = prismaClient;
-
-    const express = expressModule.default;
-    const cookieParser = cookieParserModule.default;
 
     app = express();
     app.use(express.json());
@@ -133,15 +79,6 @@ describe("Auth refresh token rotation integration", () => {
     if (!prisma) return;
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany();
-  });
-
-  afterAll(async () => {
-    if (prisma) {
-      await prisma.$disconnect();
-    }
-    if (postgresContainer) {
-      await postgresContainer.stop();
-    }
   });
 
   it("login -> refresh rotates token, old token reuse returns 401 and revokes sessions", async () => {
