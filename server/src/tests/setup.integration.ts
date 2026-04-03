@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeAll, afterAll } from "vitest";
+import { beforeAll, afterAll, vi } from "vitest";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
@@ -9,6 +9,16 @@ import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from "@testcontainers/postgresql";
+
+vi.mock("../shared/lib/logger.js", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+  },
+}));
 
 declare global {
   // Shared singleton used by src/shared/lib/prisma.ts in test mode.
@@ -74,7 +84,7 @@ beforeAll(async () => {
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({
     adapter,
-    log: ["error"],
+    log: [],
   });
   await prisma.$connect();
 
