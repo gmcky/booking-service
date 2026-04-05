@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 vi.mock("../../shared/lib/prisma.js", () => ({
   prisma: mockDeep<PrismaClient>(),
@@ -184,5 +184,194 @@ describe("ReviewService", () => {
       "review-reported-admin",
       expect.objectContaining({ reviewId: "review-1" }),
     );
+  });
+
+  it("returns report even if admin notification enqueue fails", async () => {
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-1",
+      userId: "guest-1",
+      property: { title: "Lake House" },
+    } as any);
+
+    mockPrisma.reviewReport.create.mockResolvedValue({
+      id: "report-1",
+      reviewId: "review-1",
+      reporterId: "user-2",
+      reason: "Spam and insults in the review",
+      status: "PENDING",
+    } as any);
+
+    mockPrisma.user.findUnique.mockResolvedValue({
+      firstName: "Ira",
+      lastName: "Reporter",
+      email: "ira@example.com",
+    } as any);
+
+    mockPrisma.user.findMany.mockResolvedValue([
+      { email: "admin1@example.com", firstName: "Admin1" },
+    ] as any);
+
+    mockEmailQueue.add.mockRejectedValue(new Error("Queue unavailable"));
+
+    const report = await ReviewService.reportReview("review-1", {
+      reporterId: "user-2",
+      reason: "Spam and insults in the review",
+    });
+
+    expect(report.id).toBe("report-1");
+    expect(mockPrisma.reviewReport.create).toHaveBeenCalledTimes(1);
+    expect(mockEmailQueue.add).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns report even if admin lookup fails", async () => {
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-1",
+      userId: "guest-1",
+      property: { title: "Lake House" },
+    } as any);
+
+    mockPrisma.reviewReport.create.mockResolvedValue({
+      id: "report-1",
+      reviewId: "review-1",
+      reporterId: "user-2",
+      reason: "Spam and insults in the review",
+      status: "PENDING",
+    } as any);
+
+    mockPrisma.user.findUnique.mockResolvedValue({
+      firstName: "Ira",
+      lastName: "Reporter",
+      email: "ira@example.com",
+    } as any);
+
+    mockPrisma.user.findMany.mockRejectedValue(new Error("Lookup failed"));
+
+    const report = await ReviewService.reportReview("review-1", {
+      reporterId: "user-2",
+      reason: "Spam and insults in the review",
+    });
+
+    expect(report.id).toBe("report-1");
+    expect(mockPrisma.reviewReport.create).toHaveBeenCalledTimes(1);
+    expect(mockEmailQueue.add).not.toHaveBeenCalled();
+  });
+
+  it("maps bookingId unique violation to 409 on create", async () => {
+    const prismaError = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint failed",
+      {
+        code: "P2002",
+        clientVersion: "test",
+      },
+    );
+    (prismaError as any).meta = { target: ["bookingId"] };
+
+    mockPrisma.booking.findFirst.mockResolvedValue({
+      id: "booking-1",
+      propertyId: "property-1",
+      checkOut: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      property: {
+        title: "Test Property",
+        owner: { email: "owner@test.com", firstName: "Host" },
+      },
+    } as any);
+
+    mockPrisma.$transaction.mockRejectedValue(prismaError);
+
+    await expect(
+      ReviewService.create({
+        bookingId: "booking-1",
+        userId: "user-1",
+        rating: 5,
+        comment: "Great place and very responsive host",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "This booking already has a review",
+    });
+  });
+
+  it("rethrows unknown Prisma constraint errors on create", async () => {
+    const prismaError = new Prisma.PrismaClientKnownRequestError(
+      "Unexpected constraint error",
+      {
+        code: "P2010",
+        clientVersion: "test",
+      },
+    );
+
+    mockPrisma.booking.findFirst.mockResolvedValue({
+      id: "booking-1",
+      propertyId: "property-1",
+      checkOut: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      property: {
+        title: "Test Property",
+        owner: { email: "owner@test.com", firstName: "Host" },
+      },
+    } as any);
+
+    mockPrisma.$transaction.mockRejectedValue(prismaError);
+
+    await expect(
+      ReviewService.create({
+        bookingId: "booking-1",
+        userId: "user-1",
+        rating: 4,
+        comment: "Nice stay and smooth check-in experience",
+      }),
+    ).rejects.toBe(prismaError);
+  });
+
+  it("maps rating check constraint violation to 400 on update", async () => {
+    const prismaError = new Prisma.PrismaClientKnownRequestError(
+      "Check constraint failed",
+      {
+        code: "P2004",
+        clientVersion: "test",
+      },
+    );
+
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-1",
+      userId: "user-1",
+      propertyId: "property-1",
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    } as any);
+
+    mockPrisma.$transaction.mockRejectedValue(prismaError);
+
+    await expect(
+      ReviewService.update("review-1", "user-1", {
+        rating: 7,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Rating must be between 1 and 5",
+    });
+  });
+
+  it("rethrows unknown Prisma constraint errors on update", async () => {
+    const prismaError = new Prisma.PrismaClientKnownRequestError(
+      "Unexpected constraint error",
+      {
+        code: "P2010",
+        clientVersion: "test",
+      },
+    );
+
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-1",
+      userId: "user-1",
+      propertyId: "property-1",
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    } as any);
+
+    mockPrisma.$transaction.mockRejectedValue(prismaError);
+
+    await expect(
+      ReviewService.update("review-1", "user-1", {
+        rating: 4,
+      }),
+    ).rejects.toBe(prismaError);
   });
 });
