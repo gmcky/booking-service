@@ -105,6 +105,7 @@ export class PropertyService {
           orderBy: { createdAt: "desc" },
           include: {
             user: { select: { firstName: true, lastName: true } },
+            hostReplyBy: { select: { firstName: true, lastName: true } },
           },
         },
       },
