@@ -1,0 +1,21 @@
+info:
+  name: Reply To Review
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/reviews/{{reviewId}}/reply"
+  body:
+    type: json
+    data: |-
+      {
+        "text": "Thank you for your feedback. We are glad you enjoyed your stay."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

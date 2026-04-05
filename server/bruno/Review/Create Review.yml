@@ -1,0 +1,31 @@
+info:
+  name: Create Review
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{baseUrl}}/reviews"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{bookingId}}",
+        "rating": 5,
+        "comment": "Excellent stay with a very responsive host and spotless property."
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 201) {
+          bru.setEnvVar("reviewId", res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

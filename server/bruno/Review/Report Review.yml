@@ -1,0 +1,21 @@
+info:
+  name: Report Review
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{baseUrl}}/reviews/{{reviewId}}/report"
+  body:
+    type: json
+    data: |-
+      {
+        "reason": "This review appears to contain abusive or inappropriate language."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,22 @@
+info:
+  name: Update Review
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/reviews/{{reviewId}}"
+  body:
+    type: json
+    data: |-
+      {
+        "rating": 4,
+        "comment": "Updating my review after a quick follow-up from the host."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

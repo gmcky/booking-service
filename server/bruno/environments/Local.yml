@@ -16,3 +16,5 @@ variables:
     name: sk_test
   - secret: true
     name: paymentId
+  - secret: true
+    name: reviewId
