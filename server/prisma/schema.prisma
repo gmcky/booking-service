@@ -67,6 +67,7 @@ enum PropertyType {
   HOUSE
   MEETING_ROOM
 }
+
 // consider many to many relationship for amenities if we want to allow custom amenities in the future
 // for now, we can use an enum to keep it simple and ensure data consistency
 enum Amenity {
@@ -113,19 +114,19 @@ enum Amenity {
 }
 
 model Booking {
-  id         String        @id @default(uuid())
-  propertyId String
-  userId     String
-  checkIn    DateTime
-  checkOut   DateTime
-  totalPrice Decimal       @db.Decimal(10, 2)
-  guests     Int
-  status     BookingStatus @default(PENDING)
-  payoutStatus PayoutStatus @default(PENDING)
-  createdAt  DateTime      @default(now())
-  payment    Payment?
-  review     Review?
-  updatedAt  DateTime      @updatedAt
+  id           String        @id @default(uuid())
+  propertyId   String
+  userId       String
+  checkIn      DateTime
+  checkOut     DateTime
+  totalPrice   Decimal       @db.Decimal(10, 2)
+  guests       Int
+  status       BookingStatus @default(PENDING)
+  payoutStatus PayoutStatus  @default(PENDING)
+  createdAt    DateTime      @default(now())
+  payment      Payment?
+  review       Review?
+  updatedAt    DateTime      @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id])
@@ -169,25 +170,25 @@ model RefreshToken {
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  rating    Int      @db.SmallInt // 1-5 scale (enforced by DB CHECK in migration)
-  comment   String?  @db.Text
+  id                 String    @id @default(uuid())
+  rating             Int       @db.SmallInt // 1-5 scale (enforced by DB CHECK in migration)
+  comment            String?   @db.Text
   hostReplyText      String?   @db.Text
   hostReplyCreatedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  bookingId String   @unique
-  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String  @unique
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation("ReviewAuthor", fields: [userId], references: [id], onDelete: Cascade)
 
   hostReplyById String?
-  hostReplyBy   User? @relation("ReviewHostReply", fields: [hostReplyById], references: [id])
+  hostReplyBy   User?   @relation("ReviewHostReply", fields: [hostReplyById], references: [id])
 
   propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   reports    ReviewReport[]
 
   @@index([propertyId])
@@ -223,15 +224,15 @@ enum ReviewReportStatus {
 }
 
 model Payment {
-  id            String        @id @default(uuid())
-  amount        Decimal       @db.Decimal(10, 2)
-  currency      String        @default("USD")
-  status        PaymentStatus @default(PENDING)
+  id            String          @id @default(uuid())
+  amount        Decimal         @db.Decimal(10, 2)
+  currency      String          @default("USD")
+  status        PaymentStatus   @default(PENDING)
   provider      PaymentProvider
   transactionId String? // External payment provider transaction ID
   metadata      Json? // Additional provider-specific data
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   bookingId String  @unique // One payment per booking
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
