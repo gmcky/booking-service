@@ -8,6 +8,7 @@ export type EmailJobName =
   | "booking-cancelled-guest"
   | "booking-cancelled-host"
   | "review-received-host"
+  | "review-reported-admin"
   | "payment-success-guest"
   | "payment-success-host"
   | "refund-requested-admin"
@@ -77,6 +78,16 @@ export interface ReviewReceivedHostJob {
   guestLastName: string;
   rating: number;
   comment: string | null;
+}
+
+export interface ReviewReportedAdminJob {
+  adminEmail: string;
+  adminFirstName: string;
+  reviewId: string;
+  propertyTitle: string;
+  reporterFullName: string;
+  reporterEmail: string;
+  reason: string;
 }
 
 export interface PaymentSuccessGuestJob {
@@ -154,6 +165,7 @@ export type EmailJobData =
   | { name: "booking-cancelled-guest"; data: BookingCancelledGuestJob }
   | { name: "booking-cancelled-host"; data: BookingCancelledHostJob }
   | { name: "review-received-host"; data: ReviewReceivedHostJob }
+  | { name: "review-reported-admin"; data: ReviewReportedAdminJob }
   | { name: "payment-success-guest"; data: PaymentSuccessGuestJob }
   | { name: "payment-success-host"; data: PaymentSuccessHostJob }
   | { name: "refund-requested-admin"; data: RefundRequestedAdminJob }

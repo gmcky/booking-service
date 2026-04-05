@@ -17,6 +17,8 @@ import type {
   BookingCreatedHostJob,
   BookingCancelledGuestJob,
   BookingCancelledHostJob,
+  ReviewReceivedHostJob,
+  ReviewReportedAdminJob,
   PaymentSuccessGuestJob,
   PaymentSuccessHostJob,
   RefundRequestedAdminJob,
@@ -194,6 +196,68 @@ async function sendBookingCancelledHost(
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
       <p>The dates are now available for new bookings.</p>
       <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendReviewReceivedHost(
+  data: ReviewReceivedHostJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.hostEmail,
+    subject: `New review for ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.hostFirstName},`,
+      "",
+      `You received a new ${data.rating}-star review for \"${data.propertyTitle}\".`,
+      `Guest: ${data.guestFirstName} ${data.guestLastName}`,
+      ...(data.comment ? ["", `Comment: ${data.comment}`] : []),
+      "",
+      `Review ID: ${data.reviewId}`,
+      "",
+      "- The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.hostFirstName},</p>
+      <p>You received a new <strong>${data.rating}-star</strong> review for <strong>${data.propertyTitle}</strong>.</p>
+      <p>Guest: ${data.guestFirstName} ${data.guestLastName}</p>
+      ${data.comment ? `<p><strong>Comment:</strong> ${data.comment}</p>` : ""}
+      <p style="color:#888;font-size:12px">Review ID: ${data.reviewId}</p>
+      <p>- The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendReviewReportedAdmin(
+  data: ReviewReportedAdminJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.adminEmail,
+    subject: `Review reported - ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.adminFirstName},`,
+      "",
+      "A review has been reported and needs moderation.",
+      "",
+      `Property: ${data.propertyTitle}`,
+      `Review ID: ${data.reviewId}`,
+      `Reported by: ${data.reporterFullName} (${data.reporterEmail})`,
+      `Reason: ${data.reason}`,
+      "",
+      "- The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.adminFirstName},</p>
+      <p>A review has been reported and needs moderation.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Property</td><td>${data.propertyTitle}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Review ID</td><td>${data.reviewId}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Reported by</td><td>${data.reporterFullName} (${data.reporterEmail})</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Reason</td><td>${data.reason}</td></tr>
+      </table>
+      <p>- The Booking Service team</p>
     `,
   });
 }
@@ -409,6 +473,12 @@ async function processEmail(
       break;
     case "booking-cancelled-host":
       await sendBookingCancelledHost(job.data as BookingCancelledHostJob);
+      break;
+    case "review-received-host":
+      await sendReviewReceivedHost(job.data as ReviewReceivedHostJob);
+      break;
+    case "review-reported-admin":
+      await sendReviewReportedAdmin(job.data as ReviewReportedAdminJob);
       break;
     case "payment-success-guest":
       await sendPaymentSuccessGuest(job.data as PaymentSuccessGuestJob);
