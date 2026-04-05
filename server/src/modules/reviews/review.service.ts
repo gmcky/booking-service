@@ -191,7 +191,7 @@ export class ReviewService {
 
       return review;
     } catch (error) {
-      this.handleConstraintError(error);
+      this.throwKnownReviewConstraintError(error);
       throw error;
     }
   }
@@ -256,7 +256,7 @@ export class ReviewService {
 
       return updated;
     } catch (error) {
-      this.handleConstraintError(error);
+      this.throwKnownReviewConstraintError(error);
       throw error;
     }
   }
@@ -293,10 +293,6 @@ export class ReviewService {
   static async replyToReview(reviewId: string, data: ReplyToReviewInput) {
     const { hostId } = data;
     const text = data.text.trim();
-
-    if (!text) {
-      throw new AppError(400, "Reply text cannot be empty");
-    }
 
     const review = await prisma.review.findUnique({
       where: { id: reviewId },
@@ -420,39 +416,51 @@ export class ReviewService {
         },
       });
 
-      const [reporter, admins] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: reporterId },
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        }),
-        prisma.user.findMany({
-          where: {
-            role: "ADMIN",
-          },
-          select: {
-            email: true,
-            firstName: true,
-          },
-        }),
-      ]);
+      try {
+        const [reporter, admins] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: reporterId },
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          }),
+          prisma.user.findMany({
+            where: {
+              role: "ADMIN",
+            },
+            select: {
+              email: true,
+              firstName: true,
+            },
+          }),
+        ]);
 
-      if (reporter && admins.length > 0) {
-        await Promise.all(
-          admins.map((admin) =>
-            emailQueue.add("review-reported-admin", {
-              adminEmail: admin.email,
-              adminFirstName: admin.firstName,
-              reviewId,
-              propertyTitle: review.property.title,
-              reporterFullName: `${reporter.firstName} ${reporter.lastName}`,
-              reporterEmail: reporter.email,
-              reason,
-            }),
-          ),
+        if (reporter && admins.length > 0) {
+          await Promise.all(
+            admins.map((admin) =>
+              emailQueue.add("review-reported-admin", {
+                adminEmail: admin.email,
+                adminFirstName: admin.firstName,
+                reviewId,
+                propertyTitle: review.property.title,
+                reporterFullName: `${reporter.firstName} ${reporter.lastName}`,
+                reporterEmail: reporter.email,
+                reason,
+              }),
+            ),
+          );
+        }
+      } catch (error) {
+        logger.error(
+          {
+            error,
+            reportId: report.id,
+            reviewId,
+            reporterId,
+          },
+          "Failed to enqueue review-reported-admin emails",
         );
       }
 
@@ -504,7 +512,7 @@ export class ReviewService {
         where: {
           propertyId,
           createdAt: {
-            gte: this.getMonthsAgoDate(6),
+            gte: this.getTrendWindowStartDate(6),
           },
         },
         select: {
@@ -646,7 +654,8 @@ export class ReviewService {
     return elapsedMs <= days * 24 * 60 * 60 * 1000;
   }
 
-  private static getMonthsAgoDate(months: number) {
+  // Includes the current month plus the previous (months - 1) full months.
+  private static getTrendWindowStartDate(months: number) {
     const date = new Date();
     date.setUTCDate(1);
     date.setUTCHours(0, 0, 0, 0);
@@ -654,15 +663,17 @@ export class ReviewService {
     return date;
   }
 
-  private static handleConstraintError(error: unknown) {
+  private static throwKnownReviewConstraintError(error: unknown) {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
       return;
     }
 
+    if (error.code === "P2004") {
+      throw new AppError(400, "Rating must be between 1 and 5");
+    }
+
     if (error.code !== "P2002") {
-      if (error.code === "P2004") {
-        throw new AppError(400, "Rating must be between 1 and 5");
-      }
+      // Unknown Prisma constraint for reviews; caller rethrows original error.
       return;
     }
 
@@ -673,5 +684,7 @@ export class ReviewService {
     if (target.includes("bookingId")) {
       throw new AppError(409, "This booking already has a review");
     }
+
+    // Non-booking unique violations are not remapped here.
   }
 }
