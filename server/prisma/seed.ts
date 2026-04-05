@@ -524,6 +524,22 @@ function getStayDates(checkInOffsetDays: number, nights: number) {
   return { checkIn, checkOut, nights };
 }
 
+const getRandomItem = <T>(arr: T[]): T =>
+  arr[Math.floor(Math.random() * arr.length)]!;
+
+const reviewComments = [
+  "Great stay: clean place, smooth check-in, and excellent communication.",
+  "Very good overall. The apartment matched the listing.",
+  "Comfortable stay with everything needed for a short trip. Would book again.",
+  "Location is amazing, but the Wi-Fi was a bit slow.",
+  "Absolutely loved the interior! Highly recommended.",
+  "The host was very helpful, but the street was too noisy at night.",
+  "Perfect for a weekend getaway. 10/10.",
+  "Clean, cozy, and near the metro. What else do you need?",
+  "A bit smaller than it looked in the photos, but perfectly fine.",
+  "Seamless experience. I will definitely come back next year.",
+];
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -740,8 +756,85 @@ async function main() {
     );
   }
 
+  // Seed reviews for completed bookings from all users.
+  const completedBookings = await prisma.booking.findMany({
+    where: {
+      status: "COMPLETED",
+    },
+    select: {
+      id: true,
+      userId: true,
+      propertyId: true,
+      property: {
+        select: {
+          title: true,
+        },
+      },
+    },
+    orderBy: {
+      checkOut: "desc",
+    },
+  });
+
+  let seededReviews = 0;
+  const touchedPropertyIds = new Set<string>();
+
+  for (const [index, booking] of completedBookings.entries()) {
+    const rating = Math.floor(Math.random() * 3) + 3;
+    const comment = getRandomItem(reviewComments);
+
+    await prisma.review.upsert({
+      where: {
+        bookingId: booking.id,
+      },
+      update: {
+        userId: booking.userId,
+        propertyId: booking.propertyId,
+        rating,
+        comment,
+      },
+      create: {
+        bookingId: booking.id,
+        userId: booking.userId,
+        propertyId: booking.propertyId,
+        rating,
+        comment,
+      },
+    });
+
+    touchedPropertyIds.add(booking.propertyId);
+    seededReviews++;
+
+    console.log(
+      `  ⭐ Review #${index + 1} for booking ${booking.id} — ${booking.property.title} (${rating}/5)`,
+    );
+  }
+
+  for (const propertyId of touchedPropertyIds) {
+    const reviewStats = await prisma.review.aggregate({
+      where: { propertyId },
+      _avg: { rating: true },
+      _count: { id: true },
+    });
+
+    await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        averageRating:
+          reviewStats._avg.rating === null
+            ? null
+            : Number(reviewStats._avg.rating.toFixed(1)),
+        reviewCount: reviewStats._count.id,
+      },
+    });
+  }
+
+  if (seededReviews === 0) {
+    console.log("  ℹ️ No completed bookings found, so no reviews were created.");
+  }
+
   console.log(
-    `\n✅ Seed complete: ${users.length} users, ${created} properties, ${createdBookings} bookings`,
+    `\n✅ Seed complete: ${users.length} users, ${created} properties, ${createdBookings} bookings, ${seededReviews} reviews`,
   );
   console.log("\nTest credentials:");
   for (const user of users) {
