@@ -5,17 +5,20 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/reviews/property/{{propertyId}}?page=1&limit=10&sort=recent"
+  url: "{{baseUrl}}/reviews/property/{{propertyId}}"
   params:
     - name: page
       value: "1"
       type: query
+      disabled: true
     - name: limit
       value: "10"
       type: query
+      disabled: true
     - name: sort
       value: recent
       type: query
+      disabled: true
   auth: inherit
 
 settings:

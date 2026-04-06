@@ -5,13 +5,10 @@ import {
   BookingStatus,
   PaymentStatus,
 } from "@prisma/client";
+import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
 import { prisma } from "../src/shared/lib/prisma.js";
 
-//console.log("DEBUG: DATABASE_URL is:", process.env.DATABASE_URL);
-// ---------------------------------------------------------------------------
-// Test users
-// ---------------------------------------------------------------------------
 const users = [
   {
     email: "owner@demo.com",
@@ -63,9 +60,6 @@ const users = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Property seed data (массив оставил твоим, он отличный)
-// ---------------------------------------------------------------------------
 const propertyTemplates: Array<{
   title: string;
   description: string;
@@ -77,7 +71,6 @@ const propertyTemplates: Array<{
   amenities: Amenity[];
   images: string[];
 }> = [
-  // ── Kyiv ──────────────────────────────────────────────────────────────────
   {
     title: "Modern Studio in Podil",
     description:
@@ -184,7 +177,6 @@ const propertyTemplates: Array<{
     ],
   },
 
-  // ── Lviv ──────────────────────────────────────────────────────────────────
   {
     title: "Old Town Apartment in Lviv Centre",
     description:
@@ -248,7 +240,6 @@ const propertyTemplates: Array<{
     ],
   },
 
-  // ── Odesa ─────────────────────────────────────────────────────────────────
   {
     title: "Sea View Apartment in Arcadia",
     description:
@@ -315,7 +306,6 @@ const propertyTemplates: Array<{
     ],
   },
 
-  // ── Berlin ────────────────────────────────────────────────────────────────
   {
     title: "Minimalist Studio in Mitte",
     description:
@@ -379,7 +369,6 @@ const propertyTemplates: Array<{
     ],
   },
 
-  // ── Paris ─────────────────────────────────────────────────────────────────
   {
     title: "Charming Studio near the Eiffel Tower",
     description:
@@ -423,7 +412,6 @@ const propertyTemplates: Array<{
     ],
   },
 
-  // ── Rome ──────────────────────────────────────────────────────────────────
   {
     title: "Trastevere Apartment with Rooftop",
     description:
@@ -467,7 +455,6 @@ const propertyTemplates: Array<{
     ],
   },
 
-  // ── Amsterdam ─────────────────────────────────────────────────────────────
   {
     title: "Canal House Apartment, Jordaan",
     description:
@@ -524,29 +511,134 @@ function getStayDates(checkInOffsetDays: number, nights: number) {
   return { checkIn, checkOut, nights };
 }
 
-const getRandomItem = <T>(arr: T[]): T =>
-  arr[Math.floor(Math.random() * arr.length)]!;
+// Keep seed deterministic: stable snapshots across reruns/CI.
+faker.seed(20260406);
 
-const reviewComments = [
-  "Great stay: clean place, smooth check-in, and excellent communication.",
-  "Very good overall. The apartment matched the listing.",
-  "Comfortable stay with everything needed for a short trip. Would book again.",
-  "Location is amazing, but the Wi-Fi was a bit slow.",
-  "Absolutely loved the interior! Highly recommended.",
-  "The host was very helpful, but the street was too noisy at night.",
-  "Perfect for a weekend getaway. 10/10.",
-  "Clean, cozy, and near the metro. What else do you need?",
-  "A bit smaller than it looked in the photos, but perfectly fine.",
-  "Seamless experience. I will definitely come back next year.",
+// Skewed distribution: realistic demo payload (mostly 4-5, some 3).
+const reviewRatingPool = [5, 5, 5, 4, 4, 4, 3, 3] as const;
+
+const reviewOpeners = [
+  "Really enjoyed this stay.",
+  "Overall, this was a solid booking.",
+  "We had a pleasant stay here.",
+  "This place worked very well for our trip.",
+  "Stayed here recently and had a good experience.",
+  "Came with moderate expectations and was positively surprised.",
 ];
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
+const reviewTripContexts = [
+  "for a short city break",
+  "during a work trip",
+  "for a weekend getaway",
+  "while visiting friends nearby",
+  "for a few nights before a conference",
+  "as a base to explore the area",
+];
+
+const reviewPositives = [
+  "the place was spotless on arrival",
+  "check-in instructions were clear and easy to follow",
+  "Wi-Fi was stable for video calls",
+  "the bed was genuinely comfortable",
+  "kitchen had everything needed for simple meals",
+  "host replies were quick and polite",
+  "photos matched reality",
+  "location made it easy to get around",
+  "the apartment felt safe even late at night",
+  "heating and hot water worked perfectly",
+  "noise insulation was better than expected",
+  "common areas were tidy and well maintained",
+];
+
+const reviewNegatives = [
+  "street noise was noticeable after midnight",
+  "soundproofing between rooms could be better",
+  "shower pressure was weaker than expected",
+  "sofa in the living room is starting to wear out",
+  "blackout curtains did not fully block the morning light",
+  "elevator wait time was long during peak hours",
+  "parking nearby was hard to find in the evening",
+  "air conditioning needed extra time to cool the room",
+  "there was a slight smell in the hallway in the evening",
+  "pillows were too soft for my preference",
+];
+
+const reviewClosingsPositive = [
+  "Would happily book this place again.",
+  "I would recommend it to friends.",
+  "Would return on the next trip.",
+  "Good value for money overall.",
+  "Easy recommendation for similar trips.",
+];
+
+const reviewClosingsNeutral = [
+  "Still a decent option if your expectations are realistic.",
+  "With a couple of tweaks this place could be excellent.",
+  "Not perfect, but overall satisfactory for the price.",
+  "Could be improved in small details, but it did the job.",
+];
+
+const reviewDetailSnippets = [
+  () =>
+    `We arrived around ${faker.number.int({ min: 15, max: 23 })}:00 and got in without issues.`,
+  () =>
+    `The walk to public transport took about ${faker.number.int({ min: 4, max: 14 })} minutes.`,
+  () =>
+    `We stayed for ${faker.number.int({ min: 2, max: 7 })} nights and the experience stayed consistent throughout.`,
+  () =>
+    `Room temperature stayed comfortable at around ${faker.number.int({ min: 20, max: 24 })} degrees.`,
+  () =>
+    `I especially appreciated the ${faker.helpers.arrayElement(["clear house manual", "quick support in chat", "self check-in flow", "well-organized kitchen essentials"])}.`,
+];
+
+function buildReviewComment(params: {
+  rating: number;
+  propertyTitle: string;
+  usedComments: Set<string>;
+}): string {
+  const { rating, propertyTitle, usedComments } = params;
+  const positiveCount = rating >= 5 ? 3 : rating === 4 ? 2 : 1;
+
+  // Hard cap avoids pathological loops when combination space gets tight.
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const negativeCount =
+      rating >= 5 ? 0 : rating === 4 ? faker.number.int({ min: 0, max: 1 }) : 1;
+
+    const positives = faker.helpers.arrayElements(reviewPositives, positiveCount);
+    const negatives =
+      negativeCount > 0
+        ? faker.helpers.arrayElements(reviewNegatives, negativeCount)
+        : [];
+
+    const opener = faker.helpers.arrayElement(reviewOpeners);
+    const tripContext = faker.helpers.arrayElement(reviewTripContexts);
+    const detail = faker.helpers.arrayElement(reviewDetailSnippets)();
+    const closing =
+      rating >= 4
+        ? faker.helpers.arrayElement(reviewClosingsPositive)
+        : faker.helpers.arrayElement(reviewClosingsNeutral);
+
+    const positivesText = positives.join("; ");
+    const negativesText =
+      negatives.length > 0 ? ` Minor downside: ${negatives.join("; ")}.` : "";
+
+    const comment = `${opener} Stayed at ${propertyTitle} ${tripContext}. Highlights: ${positivesText}.${negativesText} ${detail} ${closing}`;
+
+    if (!usedComments.has(comment)) {
+      usedComments.add(comment);
+      return comment;
+    }
+  }
+
+  // Collision fallback: guarantees uniqueness without blocking the seed run.
+  const fallback = `${propertyTitle} had a ${rating >= 4 ? "good" : "decent"} overall experience. Ref ${faker.string.alphanumeric({ length: 8, casing: "upper" })}.`;
+  usedComments.add(fallback);
+  return fallback;
+}
+
 async function main() {
   console.log("🌱 Starting seed...");
 
-  // Create test users
   const createdUsers: Record<string, { id: string }> = {};
   for (const user of users) {
     const passwordHash = await bcrypt.hash(user.password, 12);
@@ -566,11 +658,9 @@ async function main() {
     console.log(`  ✅ User: ${user.email} (${user.role})`);
   }
 
-  // Get IDs for our two owners
   const owner1Id = createdUsers["owner@demo.com"]!.id;
   const owner2Id = createdUsers["owner2@demo.com"]!.id;
 
-  // Create properties
   let created = 0;
   const createdProperties: Array<{
     id: string;
@@ -580,7 +670,6 @@ async function main() {
   }> = [];
 
   for (const [index, template] of propertyTemplates.entries()) {
-    // Alternate properties between owner1 and owner2
     const assignedOwnerId = index % 2 === 0 ? owner1Id : owner2Id;
 
     const createdProperty = await prisma.property.create({
@@ -756,7 +845,6 @@ async function main() {
     );
   }
 
-  // Seed reviews for completed bookings from all users.
   const completedBookings = await prisma.booking.findMany({
     where: {
       status: "COMPLETED",
@@ -778,15 +866,21 @@ async function main() {
 
   let seededReviews = 0;
   const touchedPropertyIds = new Set<string>();
+  const usedReviewComments = new Set<string>();
 
   for (const [index, booking] of completedBookings.entries()) {
-    const rating = Math.floor(Math.random() * 3) + 3;
-    const comment = getRandomItem(reviewComments);
+    const rating = faker.helpers.arrayElement(reviewRatingPool);
+    const comment = buildReviewComment({
+      rating,
+      propertyTitle: booking.property.title,
+      usedComments: usedReviewComments,
+    });
 
     await prisma.review.upsert({
       where: {
         bookingId: booking.id,
       },
+      // bookingId is unique: upsert keeps reruns idempotent.
       update: {
         userId: booking.userId,
         propertyId: booking.propertyId,
