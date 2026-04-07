@@ -1,9 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-/**
- * Remove undefined values from object for Prisma operations
- * This helps with exactOptionalPropertyTypes: true
- */
+/** Strips undefined fields before Prisma writes (exactOptionalPropertyTypes-safe). */
 export function omitUndefined<T extends Record<string, any>>(
   obj: T,
 ): Partial<T> {

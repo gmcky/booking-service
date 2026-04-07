@@ -3,7 +3,7 @@ import { Redis } from "ioredis";
 import { env } from "../../config/env.js";
 import { logger } from "./logger.js";
 
-/** Dedicated Redis client for application-level caching (separate from BullMQ). */
+/** Dedicated Redis client for app cache; isolated from BullMQ traffic. */
 export const cacheClient = new Redis({
   host: env.REDIS_HOST,
   port: env.REDIS_PORT,
@@ -15,11 +15,6 @@ cacheClient.on("error", (err) => {
   logger.error({ err }, "Redis cache client error");
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Deserialize and return cached value, or null on miss / parse error. */
 export async function cacheGet<T>(key: string): Promise<T | null> {
   const raw = await cacheClient.get(key);
   if (!raw) return null;
@@ -30,7 +25,6 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   }
 }
 
-/** Serialize and store a value with a TTL (seconds). */
 export async function cacheSet(
   key: string,
   value: unknown,
@@ -39,15 +33,11 @@ export async function cacheSet(
   await cacheClient.set(key, JSON.stringify(value), "EX", ttlSeconds);
 }
 
-/** Delete one or more exact keys. */
 export async function cacheDel(...keys: string[]): Promise<void> {
   if (keys.length > 0) await cacheClient.del(...keys);
 }
 
-/**
- * Delete all keys matching a glob pattern using SCAN (non-blocking).
- * e.g. invalidatePattern("properties:search:*")
- */
+/** Pattern invalidation via SCAN to avoid blocking Redis with KEYS. */
 export async function cacheInvalidatePattern(pattern: string): Promise<void> {
   let cursor = "0";
   do {
@@ -63,10 +53,7 @@ export async function cacheInvalidatePattern(pattern: string): Promise<void> {
   } while (cursor !== "0");
 }
 
-/**
- * Generate a short, stable cache key suffix from an arbitrary object.
- * Uses SHA-256 so keys stay fixed-length regardless of filter complexity.
- */
+/** Stable short hash for bounded-length cache keys. */
 export function hashKey(data: unknown): string {
   return createHash("sha256")
     .update(JSON.stringify(data))

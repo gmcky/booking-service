@@ -1,6 +1,6 @@
 import type { Request } from "express";
 
-// Extend Express Request globally so req.user is typed everywhere without casts
+// Global request augmentation keeps auth typing consistent across middleware/controllers.
 declare global {
   namespace Express {
     interface Request {
@@ -13,8 +13,7 @@ declare global {
   }
 }
 
-// AuthenticatedRequest is now identical to Request (user is globally augmented above).
-// Kept as a named export so existing controller imports continue to work.
+// Alias preserved for backward-compatible imports.
 export type AuthenticatedRequest = Request;
 
 export interface PaginationParams {

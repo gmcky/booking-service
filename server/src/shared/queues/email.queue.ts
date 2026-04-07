@@ -28,8 +28,8 @@ export interface BookingCreatedGuestJob {
   guestFirstName: string;
   propertyTitle: string;
   propertyCity: string;
-  checkIn: string; // ISO string
-  checkOut: string; // ISO string
+  checkIn: string;
+  checkOut: string;
   nights: number;
   guests: number;
   totalPrice: number;
@@ -157,7 +157,6 @@ export interface RefundProcessedHostJob {
   currency: string;
 }
 
-/** Discriminated union — extend with new job names as needed. */
 export type EmailJobData =
   | { name: "property-created-host"; data: PropertyCreatedHostJob }
   | { name: "booking-created-guest"; data: BookingCreatedGuestJob }

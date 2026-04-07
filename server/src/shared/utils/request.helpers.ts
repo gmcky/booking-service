@@ -17,18 +17,14 @@ export function getQueryParam(
 ): string | undefined {
   const value = req.query[paramName];
 
-  // Handle array - return first element
   if (Array.isArray(value)) {
     const first = value[0];
     return typeof first === "string" ? first : undefined;
   }
 
-  // Handle ParsedQs object (complex nested query params)
-  // For simple use cases, we only accept string values
   if (typeof value === "string") {
     return value;
   }
 
-  // Return undefined for ParsedQs objects or undefined
   return undefined;
 }

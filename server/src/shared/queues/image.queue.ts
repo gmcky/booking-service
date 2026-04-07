@@ -3,7 +3,7 @@ import { redisConnection } from "../lib/redis.js";
 
 export interface ImageProcessingJob {
   propertyId: string;
-  /** Temporary file paths or presigned upload keys sent by the client. */
+  /** Raw upload refs; worker resolves and persists final URLs. */
   rawImagePaths: string[];
 }
 
@@ -12,7 +12,7 @@ export const imageQueue = new Queue<ImageProcessingJob>("image-processing", {
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: "exponential", delay: 5000 },
-    removeOnComplete: 100, // Keep last N completed jobs for debugging.
+    removeOnComplete: 100, // Keep recent successes for postmortem/debug.
     removeOnFail: 200,
   },
 });

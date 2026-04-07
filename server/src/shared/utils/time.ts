@@ -7,10 +7,7 @@ const UNITS: Record<string, number> = {
   d: 24 * 60 * 60 * 1_000,
 };
 
-/**
- * Parse a compact duration string (e.g. "15m", "7d", "1h") to milliseconds.
- * Supported units: s · m · h · d
- */
+/** Parse compact duration (e.g. 15m, 7d) to milliseconds. */
 export function parseExpiry(expiry: string): number {
   const match = expiry.match(/^(\d+)([smhd])$/);
   if (!match || !match[1] || !match[2]) {

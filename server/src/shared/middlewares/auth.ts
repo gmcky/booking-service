@@ -3,10 +3,7 @@ import { AppError } from "./error.handler.js";
 import { AuthService } from "../../modules/auth/auth.service.js";
 import { logger } from "../lib/logger.js";
 
-/**
- * Extracts and verifies the JWT access token from the Authorization header.
- * Attaches decoded user info to req.user on success.
- */
+/** Mandatory auth middleware. */
 export async function authenticate(
   req: Request,
   res: Response,
@@ -18,7 +15,7 @@ export async function authenticate(
       throw new AppError(401, "No token provided");
     }
 
-    const token = authHeader.slice(7); // "Bearer ".length === 7
+    const token = authHeader.slice(7);
     const user = await AuthService.verifyAccessToken(token);
 
     req.user = user;
@@ -30,19 +27,12 @@ export async function authenticate(
 
     next();
   } catch (error) {
-    // Don't log here — errorHandler is the single, centralised log point.
-    // Logging here too would cause every auth failure to appear twice in the logs.
+    // errorHandler is the single auth-failure log source; avoid duplicate log lines.
     next(error);
   }
 }
 
-/**
- * Authorization middleware factory — checks that req.user has one of the
- * required roles. Must be placed after authenticate().
- *
- * Usage:
- *   router.post('/properties', authenticate, authorize('OWNER', 'ADMIN'), handler)
- */
+/** Role gate middleware; requires authenticate() upstream. */
 export function authorize(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -50,7 +40,6 @@ export function authorize(...roles: string[]) {
     }
 
     if (!roles.includes(req.user.role)) {
-      // Don't log here — errorHandler handles the single authoritative log.
       return next(new AppError(403, "Insufficient permissions"));
     }
 
@@ -58,11 +47,7 @@ export function authorize(...roles: string[]) {
   };
 }
 
-/**
- * Optional authentication — attaches req.user if a valid token is present,
- * but lets the request through regardless. Useful for public endpoints that
- * return enriched data for logged-in users.
- */
+/** Best-effort auth for public endpoints. */
 export async function optionalAuth(
   req: Request,
   res: Response,
@@ -76,7 +61,7 @@ export async function optionalAuth(
     try {
       req.user = await AuthService.verifyAccessToken(token);
     } catch {
-      // Invalid / expired token — continue as unauthenticated
+      // Invalid token downgrades to anonymous context.
     }
   }
 

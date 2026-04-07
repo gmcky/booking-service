@@ -9,11 +9,7 @@ export function formatDate(date: Date): string {
   }).format(date);
 }
 
-/**
- * Returns the number of nights between checkIn and checkOut.
- * Uses Math.ceil so that a partial day counts as a full night
- * (e.g. 1 day 1 hour → 2 nights).
- */
+/** Night diff with ceil semantics (partial day counts as full night). */
 export function calculateNights(checkIn: Date, checkOut: Date): number {
   return Math.ceil((checkOut.getTime() - checkIn.getTime()) / MS_PER_DAY);
 }

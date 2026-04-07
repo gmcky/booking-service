@@ -14,8 +14,7 @@ export function validate(schema: ZodSchema, target: ValidationTarget = "body") {
       const parsed = await schema.parseAsync(req[target]);
       const current = req[target];
 
-      // Express 5 exposes req.query through a getter-only property.
-      // To keep transformed values (coercion/defaults), mutate in place.
+      // Express 5 keeps req.query getter-only; mutate object to retain coercion/defaults.
       if (isPlainObject(current) && isPlainObject(parsed)) {
         for (const key of Object.keys(current)) {
           delete current[key];
