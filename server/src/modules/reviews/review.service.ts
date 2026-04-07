@@ -33,18 +33,9 @@ type ReviewListFilters = Pick<
   "sort" | "rating" | "hasHostReply"
 >;
 
-/**
- * ReviewService - Manages property reviews and ratings
- *
- * BUSINESS RULES:
- * 1. Users can only review properties they have COMPLETED bookings for
- * 2. One review per booking (prevent duplicate reviews/race conditions)
- * 3. Rating must be 1-5 stars
- * 4. Property averageRating must be updated atomically with review creation
- * 5. Reviews can be edited by owner only within 7 days
- * 6. Hosts can reply exactly once to reviews on their own properties
- */
+/** Review lifecycle service with booking-scoped invariants and cache invalidation. */
 export class ReviewService {
+  /** Read flow: filter/sort/paginate property reviews via cache-aside. */
   static async getPropertyReviews(
     propertyId: string,
     params: PaginationParams,
@@ -96,6 +87,7 @@ export class ReviewService {
     return result;
   }
 
+  /** Create flow: completed-booking gate + atomic rating aggregate update. */
   static async create(data: CreateReviewInput) {
     const { userId, bookingId, rating, comment } = data;
 
@@ -196,6 +188,7 @@ export class ReviewService {
     }
   }
 
+  /** Update flow: owner-only edit within time window + aggregate recompute. */
   static async update(id: string, userId: string, data: UpdateReviewInput) {
     const review = await prisma.review.findUnique({ where: { id } });
 
@@ -261,6 +254,7 @@ export class ReviewService {
     }
   }
 
+  /** Delete flow: owner-only delete with aggregate recompute. */
   static async delete(id: string, userId: string) {
     const review = await prisma.review.findUnique({ where: { id } });
 
@@ -290,6 +284,7 @@ export class ReviewService {
     );
   }
 
+  /** Host reply flow: one-shot reply enforced with updateMany race guard. */
   static async replyToReview(reviewId: string, data: ReplyToReviewInput) {
     const { hostId } = data;
     const text = data.text.trim();
@@ -382,6 +377,7 @@ export class ReviewService {
     return repliedReview;
   }
 
+  /** Abuse-report flow with duplicate-report guard and async admin notification. */
   static async reportReview(reviewId: string, data: ReportReviewInput) {
     const { reporterId } = data;
     const reason = data.reason.trim();
@@ -487,6 +483,7 @@ export class ReviewService {
     }
   }
 
+  /** Stats flow for rating distribution and monthly trend series. */
   static async getPropertyReviewStats(propertyId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -654,7 +651,7 @@ export class ReviewService {
     return elapsedMs <= days * 24 * 60 * 60 * 1000;
   }
 
-  // Includes the current month plus the previous (months - 1) full months.
+  // Trend window includes current month plus previous full (months - 1) months.
   private static getTrendWindowStartDate(months: number) {
     const date = new Date();
     date.setUTCDate(1);
@@ -673,7 +670,7 @@ export class ReviewService {
     }
 
     if (error.code !== "P2002") {
-      // Unknown Prisma constraint for reviews; caller rethrows original error.
+      // Unknown review constraint; let caller rethrow original Prisma error.
       return;
     }
 
@@ -685,6 +682,6 @@ export class ReviewService {
       throw new AppError(409, "This booking already has a review");
     }
 
-    // Non-booking unique violations are not remapped here.
+    // Only bookingId unique is remapped; other uniques pass through.
   }
 }

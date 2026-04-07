@@ -13,7 +13,6 @@ import {
 
 export const reviewRouter: IRouter = Router();
 
-// Public: Get reviews for a property
 reviewRouter.get(
   "/property/:propertyId",
   validate(reviewQuerySchema, "query"),
@@ -25,7 +24,6 @@ reviewRouter.get(
   asyncHandler(reviewController.getPropertyReviewStats),
 );
 
-// Protected routes
 reviewRouter.use(authenticate);
 
 reviewRouter.post(

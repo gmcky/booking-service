@@ -5,7 +5,6 @@ import { ReviewService } from "./review.service.js";
 import type { ReviewQueryInput } from "./review.types.js";
 
 /**
- * Get all reviews for a property
  * @route GET /api/v1/reviews/property/:propertyId?page=1&limit=10
  * @access Public
  */
@@ -31,9 +30,9 @@ export async function getPropertyReviews(req: Request, res: Response) {
 }
 
 /**
- * Create a new review
  * @route POST /api/v1/reviews
  * @access Private (must have completed booking)
+ * @security Bearer token required.
  * @body { bookingId, rating, comment }
  */
 
@@ -43,6 +42,11 @@ export async function createReview(req: AuthenticatedRequest, res: Response) {
   res.status(201).json(review);
 }
 
+/**
+ * @route PATCH /api/v1/reviews/:id
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function updateReview(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
@@ -50,6 +54,11 @@ export async function updateReview(req: AuthenticatedRequest, res: Response) {
   res.json(review);
 }
 
+/**
+ * @route DELETE /api/v1/reviews/:id
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function deleteReview(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
@@ -57,6 +66,11 @@ export async function deleteReview(req: AuthenticatedRequest, res: Response) {
   res.status(204).send();
 }
 
+/**
+ * @route PATCH /api/v1/reviews/:id/reply
+ * @access Private
+ * @security Bearer token required + OWNER role.
+ */
 export async function replyToReview(req: AuthenticatedRequest, res: Response) {
   const reviewId = getIdParam(req);
   const hostId = req.user!.id;
@@ -68,6 +82,11 @@ export async function replyToReview(req: AuthenticatedRequest, res: Response) {
   res.json(review);
 }
 
+/**
+ * @route POST /api/v1/reviews/:id/report
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function reportReview(req: AuthenticatedRequest, res: Response) {
   const reviewId = getIdParam(req);
   const reporterId = req.user!.id;
@@ -80,6 +99,10 @@ export async function reportReview(req: AuthenticatedRequest, res: Response) {
   res.status(201).json(report);
 }
 
+/**
+ * @route GET /api/v1/reviews/property/:propertyId/stats
+ * @access Public
+ */
 export async function getPropertyReviewStats(req: Request, res: Response) {
   const propertyId = getIdParam(req, "propertyId");
   const stats = await ReviewService.getPropertyReviewStats(propertyId);
