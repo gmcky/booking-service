@@ -26,7 +26,7 @@ import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
 
 type TransactionClient = Prisma.TransactionClient;
 
-// Only forward transitions allowed
+// Service-level FSM; block backward/skip transitions even if caller retries.
 const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["COMPLETED", "CANCELLED"],
@@ -97,7 +97,7 @@ export class BookingService {
   static async create(data: CreateBookingInput) {
     const { propertyId, userId, checkIn, checkOut, guests } = data;
 
-    // Date guards (before hitting the DB)
+    // Fail fast on cheap guards before opening Serializable tx.
     const now = new Date();
     const hoursUntilCheckIn =
       (checkIn.getTime() - now.getTime()) / (1000 * 60 * 60);
@@ -126,7 +126,7 @@ export class BookingService {
       throw new AppError(400, `Maximum ${property.maxGuests} guests allowed`);
     }
 
-    // Atomic availability check + insert to prevent race conditions
+    // Single tx for overlap check + insert; closes race window on concurrent bookings.
     const booking = await prisma.$transaction(
       async (tx) => {
         const isAvailable = await this.checkAvailability(
@@ -159,7 +159,7 @@ export class BookingService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    // Enqueue booking emails (fire-and-forget, don't block response)
+    // Async enqueue to keep API latency predictable.
     this.enqueueBookingCreatedEmails(booking, userId).catch((err) =>
       logger.error(
         { err, bookingId: booking.id },
@@ -167,9 +167,7 @@ export class BookingService {
       ),
     );
 
-    // TODO: Return a user-facing booking DTO.
-    // The current response is intentionally verbose for testing,
-    // but later we should hide internal IDs and expose only fields the user needs.
+    // TODO: replace with public DTO to avoid leaking internal linkage fields.
     return booking;
   }
 
@@ -179,8 +177,7 @@ export class BookingService {
     userRole: string,
     status: BookingStatus,
   ) {
-    // CANCELLED is not allowed here — all cancellations go through cancel().
-    // This keeps refund calculation, logging, and notification in one place.
+    // Keep cancel side effects centralized (refund/logging/notifications).
     if (status === "CANCELLED") {
       throw new AppError(400, "Use DELETE /bookings/:id to cancel a booking");
     }
@@ -196,16 +193,13 @@ export class BookingService {
       throw new AppError(404, "Booking not found");
     }
 
-    // ── Role resolution ───────────────────────────────────────────────────────
     const role = getBookingRole(booking, userId, userRole);
 
-    // Only hosts and admins can drive forward transitions (CONFIRMED, COMPLETED).
-    // Guests have no business using this endpoint.
+    // Guests cannot mutate status; only host/admin can advance FSM.
     if (role === "NONE" || role === "GUEST") {
       throw new AppError(403, "Not authorized to update this booking");
     }
 
-    // ── State-machine guard ───────────────────────────────────────────────────
     const allowed = ALLOWED_TRANSITIONS[booking.status];
     if (!allowed.includes(status)) {
       throw new AppError(
@@ -221,9 +215,7 @@ export class BookingService {
   }
 
   static async cancel(id: string, userId: string, userRole: string) {
-    // Single source of truth for all cancellations (guest, host, admin).
-    // We fetch with property so we can resolve the host role AND have
-    // property.title / property.ownerId available for notification emails.
+    // Centralize cancellation path; keeps policy + side effects consistent.
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: { property: true },
@@ -233,23 +225,21 @@ export class BookingService {
       throw new AppError(404, "Booking not found");
     }
 
-    // ── Role resolution ───────────────────────────────────────────────────────
     const role = getBookingRole(booking, userId, userRole);
 
     if (role === "NONE") {
       throw new AppError(403, "Not authorized to cancel this booking");
     }
 
-    // ── Business guards ───────────────────────────────────────────────────────
     if (booking.status === "COMPLETED") {
       throw new AppError(400, "Cannot cancel completed booking");
     }
 
     if (booking.status === "CANCELLED") {
-      return { booking }; // Idempotent — safe to call twice
+      return { booking }; // Idempotent cancel endpoint.
     }
 
-    // ── Cancellation / refund policy ──────────────────────────────────────────
+    // Snapshot policy inputs for logs/response; avoids drift if constants change later.
     const policy = calculateRefundPolicy(booking.checkIn);
     const hoursUntilCheckIn = policy.hoursUntilCheckIn;
     const refundPercent = policy.refundPercent;
@@ -271,7 +261,7 @@ export class BookingService {
       "Cancellation policy applied",
     );
 
-    // TODO: delegate actual refund to PaymentService when Stripe is integrated
+    // TODO: delegate refund execution to PaymentService once provider flow is wired.
 
     const cancelled = await prisma.booking.update({
       where: { id },
@@ -282,9 +272,7 @@ export class BookingService {
       include: { property: true },
     });
 
-    // Enqueue cancellation emails (fire-and-forget).
-    // Always use booking.userId (the guest) as the recipient, regardless of
-    // who initiated the cancellation.
+    // Notify original guest regardless of canceller role.
     this.enqueueCancellationEmails(cancelled, booking.userId).catch((err) =>
       logger.error(
         { err, bookingId: id },
@@ -313,8 +301,7 @@ export class BookingService {
     userRole: string,
     data: UpdateBookingDatesInput,
   ) {
-    // Only guests (the booking owner) and admins may reschedule.
-    // Hosts must not silently shift a guest's confirmed dates.
+    // Host reschedule is blocked to prevent unilateral date shifts.
     const booking = await this.getById(id, userId, userRole);
 
     const role = getBookingRole(booking, userId, userRole);
@@ -357,7 +344,7 @@ export class BookingService {
           newCheckIn,
           newCheckOut,
           tx,
-          id, // exclude this booking itself from the overlap check
+          id, // self-exclusion avoids false conflict on reschedule.
         );
         if (!isAvailable) {
           throw new AppError(409, "Property not available for selected dates");
@@ -425,8 +412,7 @@ export class BookingService {
         status: { in: ["PENDING", "CONFIRMED"] },
         checkIn: { lt: checkOut },
         checkOut: { gt: checkIn },
-        // When rescheduling, exclude the booking being updated so it doesn't
-        // conflict with its own current dates.
+        // Self-exclusion for update path; create path passes undefined.
         ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
     });
@@ -443,8 +429,6 @@ export class BookingService {
 
     return blockedDates === 0;
   }
-
-  // ---- Private helpers ----
 
   private static async enqueueBookingCreatedEmails(
     booking: {

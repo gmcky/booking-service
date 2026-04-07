@@ -1,12 +1,6 @@
-/** Roles a user can have relative to a booking. */
 export type BookingRole = "ADMIN" | "HOST" | "GUEST" | "NONE";
 
-/**
- * Resolve the caller role relative to a booking.
- *
- * Priority: ADMIN → HOST → GUEST → NONE.
- * This order ensures administrator privileges are not shadowed by ownership.
- */
+// Privilege order matters: admin must not be shadowed by host/guest ownership.
 export function getBookingRole(
   booking: { userId: string; property: { ownerId: string } },
   userId: string,

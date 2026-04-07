@@ -12,20 +12,18 @@ import {
 
 export const bookingRouter: IRouter = Router();
 
-// Public routes.
 bookingRouter.post(
   "/check-availability",
   validate(availabilitySchema),
   asyncHandler(bookingController.checkAvailability),
 );
 
-// TODO: Move blocked-dates endpoint under properties router when API is stabilized.
+// Transitional route until blocked-dates moves under /properties.
 bookingRouter.get(
   "/:propertyId/blocked-dates",
   asyncHandler(bookingController.getBlockedDates),
 );
 
-// Authenticated routes.
 bookingRouter.use(authenticate);
 
 bookingRouter.get("/", asyncHandler(bookingController.getUserBookings));

@@ -94,8 +94,6 @@ export async function updateBookingDates(
   res.json(booking);
 }
 
-// Public endpoints.
-
 export async function checkAvailability(req: Request, res: Response) {
   const { propertyId, checkIn, checkOut } = req.body;
 
