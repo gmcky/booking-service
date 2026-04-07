@@ -5,7 +5,6 @@ import { PropertyService } from "./property.service.js";
 import type { PropertyQueryInput } from "./property.types.js";
 
 /**
- * Get properties with filters and pagination.
  * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4&amenities=WIFI,PARKING&sort=price_asc
  * @access Public
  */
@@ -22,7 +21,7 @@ export async function getProperties(req: Request, res: Response) {
     sort,
   } = req.query as unknown as PropertyQueryInput;
 
-  // TODO: Add controller-level cache-aside if service-level caching is moved.
+  // TODO: add controller cache-aside if service cache is removed.
 
   const result = await PropertyService.getAll(
     { page, limit },
@@ -32,24 +31,38 @@ export async function getProperties(req: Request, res: Response) {
   res.json(result);
 }
 
+/**
+ * @route GET /api/v1/properties/:id
+ * @access Public
+ */
 export async function getPropertyById(req: Request, res: Response) {
   const id = getIdParam(req);
   const property = await PropertyService.getById(id);
   res.json(property);
 }
 
+/**
+ * @route POST /api/v1/properties
+ * @access Private
+ * @security Bearer token required + OWNER/ADMIN role.
+ */
 export async function createProperty(req: AuthenticatedRequest, res: Response) {
-  // TODO: Enforce host role authorization for property creation.
+  // TODO: enforce OWNER role for create path.
 
   const ownerId = req.user!.id;
 
-  // TODO: Add listing creation rate limiting per owner.
+  // TODO: add per-owner listing rate limit.
 
   const property = await PropertyService.create({ ...req.body, ownerId });
 
   res.status(201).json(property);
 }
 
+/**
+ * @route PATCH /api/v1/properties/:id
+ * @access Private
+ * @security Bearer token required + OWNER/ADMIN role.
+ */
 export async function updateProperty(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const ownerId = req.user!.id;
@@ -57,6 +70,11 @@ export async function updateProperty(req: AuthenticatedRequest, res: Response) {
   res.json(property);
 }
 
+/**
+ * @route DELETE /api/v1/properties/:id
+ * @access Private
+ * @security Bearer token required + OWNER/ADMIN role.
+ */
 export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const ownerId = req.user!.id;
@@ -64,6 +82,11 @@ export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
   res.status(204).send();
 }
 
+/**
+ * @route POST /api/v1/properties/:id/activate
+ * @access Private
+ * @security Bearer token required + OWNER/ADMIN role.
+ */
 export async function activateProperty(
   req: AuthenticatedRequest,
   res: Response,
@@ -74,6 +97,11 @@ export async function activateProperty(
   res.json(property);
 }
 
+/**
+ * @route POST /api/v1/properties/:id/deactivate
+ * @access Private
+ * @security Bearer token required + OWNER/ADMIN role.
+ */
 export async function deactivateProperty(
   req: AuthenticatedRequest,
   res: Response,

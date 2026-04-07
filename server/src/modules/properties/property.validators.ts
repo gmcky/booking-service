@@ -11,8 +11,7 @@ export const createPropertySchema = z.object({
   pricePerNight: z.number().positive(),
   maxGuests: z.number().int().positive(),
   amenities: z.array(z.nativeEnum(Amenity)).max(20).default([]),
-  // Accepts temporary upload paths or presigned keys; final URLs are persisted
-  // asynchronously by the image processing worker.
+  // Accept temp upload paths; worker resolves final URLs asynchronously.
   rawImagePaths: z.array(z.string()).max(10).default([]),
 });
 
@@ -25,14 +24,14 @@ export const updatePropertySchema = z.object({
   pricePerNight: z.number().positive().optional(),
   maxGuests: z.number().int().positive().optional(),
   amenities: z.array(z.nativeEnum(Amenity)).max(20).optional(),
-  // Final CDN URLs for already-processed images.
+  // Expects finalized CDN URLs only.
   images: z.array(z.string().url()).max(10).optional(),
 });
 
 export const propertyQuerySchema = z.object({
   city: z.string().optional(),
   type: z.nativeEnum(PropertyType).optional(),
-  // Supports both ?amenities=WIFI,PARKING and repeated amenities query params.
+  // Accepts CSV and repeated query params for amenities.
   amenities: z
     .preprocess(
       (val) => (typeof val === "string" ? val.split(",") : val),

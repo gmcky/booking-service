@@ -25,15 +25,9 @@ import type {
   PropertyFilters,
 } from "./property.types.js";
 
-/**
- * Core business logic for property listings.
- *
- * Architecture roadmap:
- * - Cache: Redis cache-aside for search and property lookups.
- * - Queue: BullMQ for background image processing and notifications.
- * - Database: optional PostGIS migration for geospatial queries.
- */
+/** Listing lifecycle service with cache-aside and async queue side-effects. */
 export class PropertyService {
+  /** Public search flow: filter/sort/paginate with short-lived cache. */
   static async getAll(params: PaginationParams, filters: PropertyFilters) {
     const { skip, take } = calculatePagination(params.page, params.limit);
 
@@ -89,6 +83,7 @@ export class PropertyService {
     return result;
   }
 
+  /** Read flow: returns listing + owner/recent reviews with hot-key cache. */
   static async getById(id: string) {
     const cacheKey = `property:${id}`;
     const cached = await cacheGet(cacheKey);
@@ -119,11 +114,11 @@ export class PropertyService {
     return property;
   }
 
+  /** Create flow: persist listing first, then fan out async jobs. */
   static async create(data: CreatePropertyInput) {
     const { rawImagePaths, ...propertyData } = data;
 
-    // Persist listing data immediately; image processing is asynchronous.
-    // TODO: Add configurable moderation workflow for new listings.
+    // TODO: add configurable listing moderation.
     const property = await prisma.property.create({
       data: {
         ...propertyData,
@@ -136,7 +131,7 @@ export class PropertyService {
       },
     });
 
-    // Offload image processing to background workers to keep API latency low.
+    // Image work is async to avoid request-path latency spikes.
     if (rawImagePaths.length > 0) {
       await imageQueue.add("process-images", {
         propertyId: property.id,
@@ -144,7 +139,7 @@ export class PropertyService {
       });
     }
 
-    // Send host notification asynchronously via email worker.
+    // Notification enqueue is fire-and-forget.
     await emailQueue.add("property-created-host", {
       ownerEmail: property.owner.email!,
       ownerFirstName: property.owner.firstName,
@@ -157,6 +152,7 @@ export class PropertyService {
     return property;
   }
 
+  /** Update flow: ownership-guarded patch with orphan-image cleanup. */
   static async update(id: string, ownerId: string, data: UpdatePropertyInput) {
     const current = await this.verifyOwnership(id, ownerId);
 
@@ -165,8 +161,7 @@ export class PropertyService {
       data: omitUndefined(data),
     });
 
-    // Cleanup is triggered only when images are explicitly provided by caller.
-    // An empty array intentionally marks all previous images as orphaned.
+    // `images: []` is explicit orphaning intent; trigger cleanup.
     if (data.images !== undefined) {
       const incoming = new Set(data.images);
       const orphaned = current.images.filter((p) => !incoming.has(p));
@@ -185,6 +180,7 @@ export class PropertyService {
     return updated;
   }
 
+  /** Delete flow: ownership check + best-effort image unlink queueing. */
   static async delete(id: string, ownerId: string) {
     const property = await this.verifyOwnership(id, ownerId);
 
@@ -201,6 +197,7 @@ export class PropertyService {
     ]);
   }
 
+  /** Toggle listing visibility and invalidate read/search caches. */
   static async setActive(id: string, ownerId: string, isActive: boolean) {
     await this.verifyOwnership(id, ownerId);
 
@@ -217,6 +214,7 @@ export class PropertyService {
     return updated;
   }
 
+  /** Ownership guard used by all mutating listing operations. */
   private static async verifyOwnership(propertyId: string, ownerId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },

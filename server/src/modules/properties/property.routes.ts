@@ -11,7 +11,6 @@ import {
 
 export const propertyRouter: IRouter = Router();
 
-// Public routes
 propertyRouter.get(
   "/",
   validate(propertyQuerySchema, "query"),
@@ -20,7 +19,6 @@ propertyRouter.get(
 
 propertyRouter.get("/:id", asyncHandler(propertyController.getPropertyById));
 
-// Protected routes - Owner only
 propertyRouter.use(authenticate);
 propertyRouter.use(authorize("OWNER", "ADMIN"));
 
