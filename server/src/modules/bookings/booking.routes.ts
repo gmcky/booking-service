@@ -18,7 +18,7 @@ bookingRouter.post(
   asyncHandler(bookingController.checkAvailability),
 );
 
-// Transitional route until blocked-dates moves under /properties.
+// TODO: move blocked-dates route under /properties.
 bookingRouter.get(
   "/:propertyId/blocked-dates",
   asyncHandler(bookingController.getBlockedDates),

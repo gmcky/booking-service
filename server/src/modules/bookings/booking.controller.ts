@@ -4,6 +4,11 @@ import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { BookingService } from "./booking.service.js";
 import { logger } from "../../shared/lib/logger.js";
 
+/**
+ * @route GET /api/v1/bookings
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function getUserBookings(
   req: AuthenticatedRequest,
   res: Response,
@@ -16,6 +21,11 @@ export async function getUserBookings(
   res.json(result);
 }
 
+/**
+ * @route GET /api/v1/bookings/:id
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function getBookingById(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
@@ -24,6 +34,11 @@ export async function getBookingById(req: AuthenticatedRequest, res: Response) {
   res.json(booking);
 }
 
+/**
+ * @route POST /api/v1/bookings
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function createBooking(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
 
@@ -53,6 +68,11 @@ export async function createBooking(req: AuthenticatedRequest, res: Response) {
   res.status(201).json(booking);
 }
 
+/**
+ * @route PATCH /api/v1/bookings/:id/status
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function updateBookingStatus(
   req: AuthenticatedRequest,
   res: Response,
@@ -70,6 +90,11 @@ export async function updateBookingStatus(
   res.json(booking);
 }
 
+/**
+ * @route DELETE /api/v1/bookings/:id
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
@@ -78,6 +103,11 @@ export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
   res.json(result);
 }
 
+/**
+ * @route PATCH /api/v1/bookings/:id/dates
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function updateBookingDates(
   req: AuthenticatedRequest,
   res: Response,
@@ -94,6 +124,10 @@ export async function updateBookingDates(
   res.json(booking);
 }
 
+/**
+ * @route POST /api/v1/bookings/check-availability
+ * @access Public
+ */
 export async function checkAvailability(req: Request, res: Response) {
   const { propertyId, checkIn, checkOut } = req.body;
 
@@ -106,6 +140,10 @@ export async function checkAvailability(req: Request, res: Response) {
   res.json({ available: isAvailable });
 }
 
+/**
+ * @route GET /api/v1/bookings/:propertyId/blocked-dates
+ * @access Public
+ */
 export async function getBlockedDates(req: Request, res: Response) {
   const propertyId = getIdParam(req, "propertyId");
   const result = await BookingService.getBlockedDates(propertyId);

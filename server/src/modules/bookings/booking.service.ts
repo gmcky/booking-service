@@ -61,6 +61,7 @@ export class BookingService {
     return createPaginatedResponse(bookings, total, params);
   }
 
+  /** Access gate: owner/host/admin can read booking + payment snapshot. */
   static async getById(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -94,6 +95,7 @@ export class BookingService {
     return booking;
   }
 
+  /** Create flow: enforce policy guards and serialize overlap check + insert. */
   static async create(data: CreateBookingInput) {
     const { propertyId, userId, checkIn, checkOut, guests } = data;
 
@@ -167,10 +169,11 @@ export class BookingService {
       ),
     );
 
-    // TODO: replace with public DTO to avoid leaking internal linkage fields.
+    // TODO: return public booking DTO.
     return booking;
   }
 
+  /** Status FSM: host/admin-only forward transitions; cancellation is separate path. */
   static async updateStatus(
     id: string,
     userId: string,
@@ -214,6 +217,7 @@ export class BookingService {
     });
   }
 
+  /** Single cancellation path with idempotency + refund-policy snapshot. */
   static async cancel(id: string, userId: string, userRole: string) {
     // Centralize cancellation path; keeps policy + side effects consistent.
     const booking = await prisma.booking.findUnique({
@@ -261,7 +265,7 @@ export class BookingService {
       "Cancellation policy applied",
     );
 
-    // TODO: delegate refund execution to PaymentService once provider flow is wired.
+    // TODO: delegate refund execution to PaymentService.
 
     const cancelled = await prisma.booking.update({
       where: { id },
@@ -295,6 +299,7 @@ export class BookingService {
     };
   }
 
+  /** Reschedule flow: role guard + self-excluded overlap check in serializable tx. */
   static async updateDates(
     id: string,
     userId: string,
@@ -367,6 +372,7 @@ export class BookingService {
     );
   }
 
+  /** Aggregates future unavailable ranges from bookings + manual blocks. */
   static async getBlockedDates(propertyId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -399,6 +405,7 @@ export class BookingService {
     return { bookedRanges, blockedRanges };
   }
 
+  /** Overlap predicate for booking and blocked-date windows. */
   static async checkAvailability(
     propertyId: string,
     checkIn: Date,
