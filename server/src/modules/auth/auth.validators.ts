@@ -1,6 +1,6 @@
 import { z } from "zod";
 import zxcvbn from "zxcvbn";
-import { parsePhoneNumberWithError, PhoneNumber } from "libphonenumber-js";
+import { parsePhoneNumberWithError } from "libphonenumber-js";
 
 export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -47,21 +47,4 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-// TODO: Add validation schemas for other auth endpoints
-// export const passwordResetRequestSchema = z.object({
-//   email: z.string().email()
-// });
-//
-// export const passwordResetSchema = z.object({
-//   token: z.string().min(32),
-//   newPassword: z.string().min(12) // Same strong password rules
-// });
-//
-// export const changePasswordSchema = z.object({
-//   currentPassword: z.string(),
-//   newPassword: z.string().min(12),
-//   confirmPassword: z.string()
-// }).refine((data) => data.newPassword === data.confirmPassword, {
-//   message: "Passwords don't match",
-//   path: ['confirmPassword']
-// });
+// TODO: add reset/change-password schemas.
