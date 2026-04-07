@@ -5,9 +5,9 @@ import { PaymentService } from "./payment.service.js";
 import type { RequestRefundInput, RejectRefundInput } from "./payment.types.js";
 
 /**
- * Create payment record using the legacy payment flow.
  * @route POST /api/v1/payments
  * @access Private
+ * @security Bearer token required.
  * @body { bookingId, currency? }
  */
 export async function createPayment(req: AuthenticatedRequest, res: Response) {
@@ -16,6 +16,11 @@ export async function createPayment(req: AuthenticatedRequest, res: Response) {
   res.status(201).json(payment);
 }
 
+/**
+ * @route GET /api/v1/payments/:id
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
@@ -24,9 +29,9 @@ export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * Process payment manually for testing or operational intervention.
  * @route POST /api/v1/payments/:id/process
  * @access Private
+ * @security Bearer token required.
  * @deprecated Use webhook for production
  */
 export async function processPayment(req: AuthenticatedRequest, res: Response) {
@@ -36,6 +41,11 @@ export async function processPayment(req: AuthenticatedRequest, res: Response) {
   res.json(payment);
 }
 
+/**
+ * @route POST /api/v1/payments/:id/refund
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function requestRefund(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
@@ -44,6 +54,11 @@ export async function requestRefund(req: AuthenticatedRequest, res: Response) {
   res.json(payment);
 }
 
+/**
+ * @route POST /api/v1/payments/:id/refund/approve
+ * @access Private
+ * @security Bearer token required + ADMIN role.
+ */
 export async function approveRefund(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const adminId = req.user!.id;
@@ -51,6 +66,11 @@ export async function approveRefund(req: AuthenticatedRequest, res: Response) {
   res.json(payment);
 }
 
+/**
+ * @route POST /api/v1/payments/:id/refund/reject
+ * @access Private
+ * @security Bearer token required + ADMIN role.
+ */
 export async function rejectRefund(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const adminId = req.user!.id;
@@ -60,11 +80,9 @@ export async function rejectRefund(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * Create a Stripe PaymentIntent and return the client_secret to the frontend.
- * Card data collection and confirmation are handled by Stripe.js/Elements.
- *
  * @route POST /api/v1/payments/intent
  * @access Private (authenticated user)
+ * @security Bearer token required.
  * @body { bookingId: string (UUID) }
  * @returns { clientSecret: string }
  */
@@ -78,11 +96,9 @@ export async function createPaymentIntent(
 }
 
 /**
- * Stripe webhook handler.
- * Payment status transitions to SUCCESS must be performed via verified webhooks.
- *
  * @route POST /api/v1/payments/webhook
  * @access Public (no JWT), protected by Stripe signature verification
+ * @security Stripe signature verification required.
  * This route requires the raw request body (Buffer), not parsed JSON.
  */
 export async function handleWebhook(req: express.Request, res: Response) {
@@ -98,11 +114,9 @@ export async function handleWebhook(req: express.Request, res: Response) {
 }
 
 /**
- * Manually enqueue payout lifecycle execution (complete/mature/disburse pass).
- * Useful for operational checks without waiting for startup/repeat scheduling.
- *
  * @route POST /api/v1/payments/payout-lifecycle/run-now
  * @access Private (admin)
+ * @security Bearer token required + ADMIN role.
  */
 export async function runPayoutLifecycleNow(
   _req: AuthenticatedRequest,

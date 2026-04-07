@@ -9,6 +9,7 @@ import type {
 } from "./payment.types.js";
 
 export class PaymentIntentService {
+  /** Stripe intent flow: validate booking ownership/state, then upsert pending payment stub. */
   static async createIntent(data: CreatePaymentIntentInput, userId: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: data.bookingId },
@@ -97,8 +98,9 @@ export class PaymentIntentService {
     return { clientSecret: paymentIntent.client_secret };
   }
 
+  /** Legacy fallback flow for direct payment record creation. */
   static async create(data: CreatePaymentInput, userId: string) {
-    // TODO: Enforce PENDING booking status before payment creation.
+    // TODO: enforce PENDING booking status guard.
     if (data.provider !== "STRIPE") {
       throw new AppError(400, `Unsupported payment provider: ${data.provider}`);
     }
@@ -120,8 +122,8 @@ export class PaymentIntentService {
       throw new AppError(409, "Payment already exists for this booking");
     }
 
-    // TODO: Replace temporary record creation with Stripe PaymentIntent flow.
-    // TODO: Persist provider intent identifier for webhook reconciliation.
+    // TODO: replace legacy create with PaymentIntent-first flow.
+    // TODO: persist provider intent id for webhook reconciliation.
     return prisma.payment.create({
       data: {
         bookingId: data.bookingId,
@@ -133,6 +135,7 @@ export class PaymentIntentService {
     });
   }
 
+  /** Read path for payment details scoped to booking owner. */
   static async getById(id: string, userId: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -157,6 +160,7 @@ export class PaymentIntentService {
     return paymentWithoutMetadata;
   }
 
+  /** Manual override path; intended only for test/ops intervention. */
   static async process(id: string, userId: string) {
     const payment = await this.getById(id, userId);
 
@@ -164,11 +168,10 @@ export class PaymentIntentService {
       throw new AppError(400, "Payment already processed");
     }
 
-    // WARNING: This endpoint is intended for testing/manual intervention.
-    // Production payment finalization must be handled by verified webhooks.
-    // TODO: Verify provider payment state before marking payment as SUCCESS.
-    // TODO: Update payment and booking state atomically in one transaction.
-    // TODO: Enqueue booking confirmation notification after successful processing.
+    // Bypasses provider-state checks; keep this path out of normal prod flow.
+    // TODO: verify provider state before marking SUCCESS.
+    // TODO: update payment+booking atomically.
+    // TODO: enqueue booking-confirmation notification.
 
     return prisma.payment.update({
       where: { id },

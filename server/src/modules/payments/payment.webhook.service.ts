@@ -16,6 +16,7 @@ import {
 } from "./payment.helpers.js";
 
 export class PaymentWebhookService {
+  /** Verifies webhook signature, deduplicates events, then dispatches handlers. */
   static async handleStripeWebhook(event: string | Buffer, signature: string) {
     let stripeEvent: Stripe.Event;
     try {
@@ -89,6 +90,7 @@ export class PaymentWebhookService {
     return { success: true };
   }
 
+  /** Success sync: upsert payment state and confirm booking in one transaction. */
   private static async handlePaymentSuccess(
     paymentIntent: Stripe.PaymentIntent,
   ) {
@@ -222,6 +224,7 @@ export class PaymentWebhookService {
     );
   }
 
+  /** Failure sync: mark payment as FAILED and persist provider payload. */
   private static async handlePaymentFailed(
     paymentIntent: Stripe.PaymentIntent,
   ) {
@@ -269,6 +272,7 @@ export class PaymentWebhookService {
     );
   }
 
+  /** Refund sync from provider event; updates payment/booking and notifies host. */
   private static async handleChargeRefunded(charge: Stripe.Charge) {
     const paymentIntentRaw = charge?.payment_intent;
     const paymentIntentId =

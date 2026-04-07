@@ -15,6 +15,7 @@ import {
 } from "./payment.helpers.js";
 
 export class PaymentRefundService {
+  /** Refund request flow with policy gate and optional auto-approval path. */
   static async requestRefund(id: string, userId: string, reason?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -89,7 +90,7 @@ export class PaymentRefundService {
       );
     }
 
-    // Snapshot taken before updateMany - safe because updateMany only touches status.
+    // Safe snapshot: following update only mutates status.
     const existingMetadata = getMetadataObject(payment.metadata);
     const existingAudit = getAuditObject(existingMetadata);
     const existingStripePayload = getStripePayloadObject(existingMetadata);
@@ -97,8 +98,7 @@ export class PaymentRefundService {
       (Number(payment.amount) * Number(policy.refundPercent)) / 100;
     const refundRequestedAt = new Date().toISOString();
 
-    // TODO: Implement refund abuse prevention based on user refund history.
-    // If user exceeds automatic-refund thresholds, force admin review instead.
+    // TODO: add refund-abuse guard from user history.
     if (policy.isAutoApprove) {
       if (!payment.transactionId) {
         throw new AppError(400, "Missing payment transaction id");
@@ -269,6 +269,7 @@ export class PaymentRefundService {
     return updatedPayment;
   }
 
+  /** Admin approval flow with idempotent state transition and provider refund call. */
   static async approveRefund(id: string, adminId: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -468,6 +469,7 @@ export class PaymentRefundService {
     return updatedPayment;
   }
 
+  /** Admin rejection flow that restores payment to SUCCESS state. */
   static async rejectRefund(id: string, adminId: string, reason?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -504,7 +506,7 @@ export class PaymentRefundService {
     const updatedPayment = await prisma.payment.update({
       where: { id },
       data: {
-        // Refund was rejected by admin, so the original successful payment remains active.
+        // Rejection keeps captured payment active.
         status: "SUCCESS",
         metadata: {
           ...existingMetadata,

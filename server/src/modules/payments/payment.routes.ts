@@ -12,15 +12,12 @@ import {
 
 export const paymentRouter: IRouter = Router();
 
-// Webhook route must run before authenticated JSON routes because Stripe
-// signature verification requires the raw request body.
+// Must be first: Stripe signature check requires raw body, before JSON/auth middleware.
 paymentRouter.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   asyncHandler(paymentController.handleWebhook),
 );
-
-// Routes below require authentication.
 paymentRouter.use(authenticate);
 
 paymentRouter.post(
