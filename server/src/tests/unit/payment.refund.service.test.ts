@@ -474,3 +474,74 @@ describe("PaymentRefundService.requestRefund", () => {
     ).rejects.toBeInstanceOf(AppError);
   });
 });
+
+describe("PaymentRefundService.approveRefund", () => {
+  beforeEach(() => {
+    mockReset(mockPrisma);
+    vi.clearAllMocks();
+  });
+
+  it("recovers REFUND_PROCESSING payments by replaying Stripe idempotent refund and finalizing DB", async () => {
+    const processingPayment = buildPayment({
+      status: "REFUND_PROCESSING",
+      metadata: {
+        audit: {
+          refundRequest: {
+            refundAmount: 150,
+          },
+        },
+      },
+    });
+    const refundedPayment = buildPayment({ status: "REFUNDED" });
+
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(processingPayment)
+      .mockResolvedValueOnce(refundedPayment);
+    (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_recovery_1" } as any);
+
+    const result = await PaymentRefundService.approveRefund("payment-1", "admin-1");
+
+    expect(result.status).toBe("REFUNDED");
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_intent: "pi_test_123",
+      }),
+      expect.objectContaining({
+        idempotencyKey: "refund_payment-1",
+      }),
+    );
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { in: ["REFUND_REQUESTED", "REFUND_PROCESSING"] },
+        }),
+        data: expect.objectContaining({ status: "REFUNDED" }),
+      }),
+    );
+    expect(mockEmailQueue.add).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not send duplicate emails when refund was finalized concurrently", async () => {
+    const requestedPayment = buildPayment({ status: "REFUND_REQUESTED" });
+    const refundedPayment = buildPayment({ status: "REFUNDED" });
+
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(requestedPayment)
+      .mockResolvedValueOnce(refundedPayment);
+    (mockPrisma.payment.updateMany as any)
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_race_1" } as any);
+
+    const result = await PaymentRefundService.approveRefund("payment-1", "admin-1");
+
+    expect(result.status).toBe("REFUNDED");
+    expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
+    expect(mockEmailQueue.add).not.toHaveBeenCalled();
+  });
+});

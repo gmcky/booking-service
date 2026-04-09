@@ -303,14 +303,14 @@ export class PaymentRefundService {
       throw new AppError(404, "Payment not found");
     }
 
-    if (
-      payment.status === "REFUND_PROCESSING" ||
-      payment.status === "REFUNDED"
-    ) {
+    if (payment.status === "REFUNDED") {
       return payment;
     }
 
-    if (payment.status !== "REFUND_REQUESTED") {
+    if (
+      payment.status !== "REFUND_REQUESTED" &&
+      payment.status !== "REFUND_PROCESSING"
+    ) {
       throw new AppError(400, "Payment is not waiting for refund approval");
     }
 
@@ -352,30 +352,31 @@ export class PaymentRefundService {
           )
         : 100;
 
-    const movedToProcessing = await prisma.payment.updateMany({
-      where: {
-        id,
-        status: "REFUND_REQUESTED",
-      },
-      data: {
-        status: "REFUND_PROCESSING",
-      },
-    });
+    // Step 1: move to processing once; if already processing, continue recovery path.
+    if (payment.status === "REFUND_REQUESTED") {
+      const movedToProcessing = await prisma.payment.updateMany({
+        where: {
+          id,
+          status: "REFUND_REQUESTED",
+        },
+        data: {
+          status: "REFUND_PROCESSING",
+        },
+      });
 
-    if (movedToProcessing.count === 0) {
-      const latestPayment = await prisma.payment.findUnique({ where: { id } });
-      if (!latestPayment) {
-        throw new AppError(404, "Payment not found");
+      if (movedToProcessing.count === 0) {
+        const latestPayment = await prisma.payment.findUnique({ where: { id } });
+        if (!latestPayment) {
+          throw new AppError(404, "Payment not found");
+        }
+
+        if (latestPayment.status !== "REFUND_PROCESSING") {
+          if (latestPayment.status === "REFUNDED") {
+            return latestPayment;
+          }
+          throw new AppError(400, "Payment is not waiting for refund approval");
+        }
       }
-
-      if (
-        latestPayment.status === "REFUND_PROCESSING" ||
-        latestPayment.status === "REFUNDED"
-      ) {
-        return latestPayment;
-      }
-
-      throw new AppError(400, "Payment is not waiting for refund approval");
     }
 
     // TODO: add compensation/outbox for Stripe-success + DB-failure window.
@@ -404,11 +405,14 @@ export class PaymentRefundService {
       throw new AppError(502, "Payment provider error during refund");
     }
 
-    const updatedPayment = await prisma.$transaction(async (tx) => {
+    const finalized = await prisma.$transaction(async (tx) => {
       const stripeRefundPayload = toInputJsonObject(stripeRefund);
 
-      const updatedPayment = await tx.payment.update({
-        where: { id },
+      const updatedPayment = await tx.payment.updateMany({
+        where: {
+          id,
+          status: { in: ["REFUND_REQUESTED", "REFUND_PROCESSING"] },
+        },
         data: {
           status: "REFUNDED",
           metadata: {
@@ -431,7 +435,7 @@ export class PaymentRefundService {
         },
       });
 
-      await tx.booking.update({
+      const booking = await tx.booking.update({
         where: { id: payment.bookingId },
         data: {
           status: "CANCELLED",
@@ -439,36 +443,47 @@ export class PaymentRefundService {
         },
       });
 
-      return updatedPayment;
+      const currentPayment = await tx.payment.findUnique({ where: { id } });
+      if (!currentPayment) {
+        throw new AppError(404, "Payment not found");
+      }
+
+      return {
+        payment: currentPayment,
+        newlyFinalized: updatedPayment.count > 0,
+        booking,
+      };
     });
 
-    await emailQueue.add("refund-processed-guest", {
-      paymentId: updatedPayment.id,
-      bookingId: updatedPayment.bookingId,
-      guestEmail: payment.booking.user.email,
-      guestFirstName: payment.booking.user.firstName,
-      propertyTitle: payment.booking.property.title,
-      isApproved: true,
-      reason: null,
-    });
+    if (finalized.newlyFinalized) {
+      await emailQueue.add("refund-processed-guest", {
+        paymentId: finalized.payment.id,
+        bookingId: finalized.payment.bookingId,
+        guestEmail: payment.booking.user.email,
+        guestFirstName: payment.booking.user.firstName,
+        propertyTitle: payment.booking.property.title,
+        isApproved: true,
+        reason: null,
+      });
 
-    await emailQueue.add("refund-processed-host", {
-      paymentId: updatedPayment.id,
-      bookingId: updatedPayment.bookingId,
-      hostEmail: payment.booking.property.owner.email,
-      hostFirstName: payment.booking.property.owner.firstName,
-      propertyTitle: payment.booking.property.title,
-      guestFirstName: payment.booking.user.firstName,
-      guestLastName: payment.booking.user.lastName,
-      checkIn: formatDate(payment.booking.checkIn),
-      checkOut: formatDate(payment.booking.checkOut),
-      refundPercent,
-      refundedAmount: refundAmount,
-      totalAmount: Number(payment.amount),
-      currency: payment.currency,
-    });
+      await emailQueue.add("refund-processed-host", {
+        paymentId: finalized.payment.id,
+        bookingId: finalized.payment.bookingId,
+        hostEmail: payment.booking.property.owner.email,
+        hostFirstName: payment.booking.property.owner.firstName,
+        propertyTitle: payment.booking.property.title,
+        guestFirstName: payment.booking.user.firstName,
+        guestLastName: payment.booking.user.lastName,
+        checkIn: formatDate(payment.booking.checkIn),
+        checkOut: formatDate(payment.booking.checkOut),
+        refundPercent,
+        refundedAmount: refundAmount,
+        totalAmount: Number(payment.amount),
+        currency: payment.currency,
+      });
+    }
 
-    return updatedPayment;
+    return finalized.payment;
   }
 
   /** Admin rejection flow that restores payment to SUCCESS state. */

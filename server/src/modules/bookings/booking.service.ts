@@ -1,6 +1,7 @@
 import { prisma } from "../../shared/lib/prisma.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
+import { stripe } from "../../shared/lib/stripe.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import {
   calculatePagination,
@@ -21,6 +22,10 @@ import { getBookingRole } from "./booking.helpers.js";
 import {
   calculateRefundPolicy,
   REFUND_POLICY,
+  getAuditObject,
+  getMetadataObject,
+  getStripePayloadObject,
+  toInputJsonObject,
 } from "../payments/payment.helpers.js";
 import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
 
@@ -222,7 +227,7 @@ export class BookingService {
     // Centralize cancellation path; keeps policy + side effects consistent.
     const booking = await prisma.booking.findUnique({
       where: { id },
-      include: { property: true },
+      include: { property: true, payment: true },
     });
 
     if (!booking) {
@@ -267,14 +272,23 @@ export class BookingService {
 
     // TODO: execute Stripe refund via PaymentService (not just status updates).
 
-    const cancelled = await prisma.booking.update({
-      where: { id },
-      data: {
-        status: "CANCELLED",
-        payoutStatus: "CANCELLED",
-      },
-      include: { property: true },
-    });
+    const cancelled =
+      refundPercent > 0 && booking.payment?.status === "SUCCESS"
+        ? await this.cancelPaidBookingWithRefund(
+            booking,
+            userId,
+            role,
+            refundPercent,
+            refundAmount,
+          )
+        : await prisma.booking.update({
+            where: { id },
+            data: {
+              status: "CANCELLED",
+              payoutStatus: "CANCELLED",
+            },
+            include: { property: true },
+          });
 
     // Notify original guest regardless of canceller role.
     this.enqueueCancellationEmails(cancelled, booking.userId).catch((err) =>
@@ -297,6 +311,156 @@ export class BookingService {
         },
       },
     };
+  }
+
+  /** Paid-booking cancellation: issue provider refund first, then finalize DB state. */
+  private static async cancelPaidBookingWithRefund(
+    booking: {
+      id: string;
+      userId: string;
+      checkIn: Date;
+      checkOut: Date;
+      payoutStatus: BookingStatus | "PENDING" | "READY" | "PAID_OUT";
+      payment: {
+        id: string;
+        bookingId: string;
+        amount: Prisma.Decimal;
+        currency: string;
+        status: string;
+        transactionId: string | null;
+        metadata: Prisma.JsonValue | null;
+      } | null;
+      property: { title: string; ownerId: string };
+    },
+    cancelledByUserId: string,
+    cancelledByRole: string,
+    refundPercent: number,
+    refundAmount: number,
+  ) {
+    const payment = booking.payment;
+    if (!payment || payment.status !== "SUCCESS") {
+      throw new AppError(400, "Booking is not eligible for direct refund");
+    }
+
+    if (booking.payoutStatus === "PAID_OUT") {
+      throw new AppError(
+        400,
+        "Cannot cancel booking with refund after host payout was disbursed",
+      );
+    }
+
+    if (!payment.transactionId) {
+      throw new AppError(400, "Missing payment transaction id");
+    }
+
+    const existingMetadata = getMetadataObject(payment.metadata);
+    const existingAudit = getAuditObject(existingMetadata);
+    const existingStripePayload = getStripePayloadObject(existingMetadata);
+
+    const movedToProcessing = await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: "SUCCESS",
+      },
+      data: {
+        status: "REFUND_PROCESSING",
+      },
+    });
+
+    let shouldCallStripe = movedToProcessing.count > 0;
+    if (!shouldCallStripe) {
+      const latestPayment = await prisma.payment.findUnique({
+        where: { id: payment.id },
+        select: { status: true },
+      });
+
+      if (!latestPayment) {
+        throw new AppError(404, "Payment not found");
+      }
+
+      if (latestPayment.status === "REFUNDED") {
+        shouldCallStripe = false;
+      } else if (latestPayment.status === "REFUND_PROCESSING") {
+        // Recovery path after unknown result/timeouts: replay same idempotency key.
+        shouldCallStripe = true;
+      } else {
+        throw new AppError(400, "Payment is not eligible for direct refund");
+      }
+    }
+
+    let stripeRefund: Awaited<ReturnType<typeof stripe.refunds.create>> | null =
+      null;
+
+    if (shouldCallStripe) {
+      try {
+        stripeRefund = await stripe.refunds.create(
+          {
+            payment_intent: payment.transactionId,
+            amount: Math.round(refundAmount * 100),
+            metadata: {
+              paymentId: payment.id,
+              bookingId: booking.id,
+              cancellationByUserId: cancelledByUserId,
+              cancellationByRole: cancelledByRole,
+              refundPercent: String(refundPercent),
+            },
+          },
+          {
+            idempotencyKey: `booking_cancel_refund_${payment.id}`,
+          },
+        );
+      } catch (error) {
+        logger.error(
+          { error, bookingId: booking.id, paymentId: payment.id },
+          "Failed to create Stripe refund during booking cancellation",
+        );
+        throw new AppError(502, "Payment provider error during cancellation");
+      }
+    }
+
+    const cancelledBooking = await prisma.$transaction(async (tx) => {
+      await tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: { in: ["SUCCESS", "REFUND_PROCESSING"] },
+        },
+        data: {
+          status: "REFUNDED",
+          metadata: {
+            ...existingMetadata,
+            audit: {
+              ...existingAudit,
+              bookingCancellationRefund: {
+                refundedAt: new Date().toISOString(),
+                cancelledBy: cancelledByUserId,
+                cancelledByRole,
+                refundPercent,
+                refundAmount,
+              },
+            },
+            stripePayload: {
+              ...existingStripePayload,
+              ...(stripeRefund
+                ? {
+                    bookingCancellationRefund: toInputJsonObject(stripeRefund),
+                  }
+                : {}),
+            },
+          },
+        },
+      });
+
+      return tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: "CANCELLED",
+          payoutStatus: "CANCELLED",
+        },
+        include: { property: true },
+      });
+    });
+
+    return cancelledBooking;
   }
 
   /** Reschedule flow: role guard + self-excluded overlap check in serializable tx. */
