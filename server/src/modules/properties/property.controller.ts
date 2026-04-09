@@ -44,10 +44,10 @@ export async function getPropertyById(req: Request, res: Response) {
 /**
  * @route POST /api/v1/properties
  * @access Private
- * @security Bearer token required + OWNER/ADMIN role.
+ * @security Bearer token required. Any authenticated user can create a property; ownerId is set from req.user.id.
  */
 export async function createProperty(req: AuthenticatedRequest, res: Response) {
-  // TODO: enforce OWNER role for create path.
+  // Any authenticated user becomes the owner of the created property via ownerId.
 
   const ownerId = req.user!.id;
 
@@ -61,7 +61,7 @@ export async function createProperty(req: AuthenticatedRequest, res: Response) {
 /**
  * @route PATCH /api/v1/properties/:id
  * @access Private
- * @security Bearer token required + OWNER/ADMIN role.
+ * @security Bearer token required. Ownership is verified per-resource.
  */
 export async function updateProperty(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
@@ -73,7 +73,7 @@ export async function updateProperty(req: AuthenticatedRequest, res: Response) {
 /**
  * @route DELETE /api/v1/properties/:id
  * @access Private
- * @security Bearer token required + OWNER/ADMIN role.
+ * @security Bearer token required. Ownership is verified per-resource.
  */
 export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
@@ -85,7 +85,7 @@ export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
 /**
  * @route POST /api/v1/properties/:id/activate
  * @access Private
- * @security Bearer token required + OWNER/ADMIN role.
+ * @security Bearer token required. Ownership is verified per-resource.
  */
 export async function activateProperty(
   req: AuthenticatedRequest,
@@ -100,7 +100,7 @@ export async function activateProperty(
 /**
  * @route POST /api/v1/properties/:id/deactivate
  * @access Private
- * @security Bearer token required + OWNER/ADMIN role.
+ * @security Bearer token required. Ownership is verified per-resource.
  */
 export async function deactivateProperty(
   req: AuthenticatedRequest,

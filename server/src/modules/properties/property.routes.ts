@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { authenticate, authorize } from "../../shared/middlewares/auth.js";
+import { authenticate } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as propertyController from "./property.controller.js";
@@ -20,7 +20,6 @@ propertyRouter.get(
 propertyRouter.get("/:id", asyncHandler(propertyController.getPropertyById));
 
 propertyRouter.use(authenticate);
-propertyRouter.use(authorize("OWNER", "ADMIN"));
 
 propertyRouter.post(
   "/",

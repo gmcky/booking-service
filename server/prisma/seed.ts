@@ -15,7 +15,7 @@ const users = [
     firstName: "Alex",
     lastName: "Kovalenko",
     phoneNumber: "+380501234567",
-    role: Role.OWNER,
+    role: Role.USER,
     password: "Own3r_P@ss_2026!",
   },
   {
@@ -23,7 +23,7 @@ const users = [
     firstName: "Oleh",
     lastName: "Sirko",
     phoneNumber: "+380509998877",
-    role: Role.OWNER,
+    role: Role.USER,
     password: "0wn3r2_S3cr3t#",
   },
   {
@@ -701,7 +701,7 @@ async function main() {
   }
 
   const regularUserIds = users
-    .filter((user) => user.role === Role.USER)
+    .filter((user) => user.role === Role.USER && user.email !== "admin@demo.com")
     .map((user) => createdUsers[user.email]!.id);
 
   type BookingScenario = {

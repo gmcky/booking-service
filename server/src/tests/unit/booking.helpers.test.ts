@@ -10,7 +10,7 @@ describe("getBookingRole", () => {
   };
 
   it("returns HOST when user is property owner", () => {
-    expect(getBookingRole(booking, "owner-1", "OWNER")).toBe("HOST");
+    expect(getBookingRole(booking, "owner-1", "USER")).toBe("HOST");
   });
 
   it("returns GUEST when user is booking creator", () => {

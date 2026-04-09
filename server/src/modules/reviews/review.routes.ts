@@ -40,7 +40,6 @@ reviewRouter.patch(
 
 reviewRouter.patch(
   "/:id/reply",
-  authorize("OWNER"),
   validate(replyToReviewSchema),
   asyncHandler(reviewController.replyToReview),
 );
