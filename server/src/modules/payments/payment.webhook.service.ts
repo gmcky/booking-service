@@ -16,6 +16,7 @@ import {
 } from "./payment.helpers.js";
 
 export class PaymentWebhookService {
+  // TODO: add unit tests for payment_intent.succeeded/payment_failed/charge.refunded handlers.
   /** Verifies webhook signature, deduplicates events, then dispatches handlers. */
   static async handleStripeWebhook(event: string | Buffer, signature: string) {
     let stripeEvent: Stripe.Event;

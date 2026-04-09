@@ -378,6 +378,8 @@ export class PaymentRefundService {
       throw new AppError(400, "Payment is not waiting for refund approval");
     }
 
+    // TODO: add compensation/outbox for Stripe-success + DB-failure window.
+    // TODO: align approveRefund transition semantics with requestRefund flow.
     let stripeRefund;
     try {
       stripeRefund = await stripe.refunds.create(

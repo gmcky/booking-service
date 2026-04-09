@@ -40,6 +40,7 @@ paymentRouter.post(
 
 paymentRouter.get("/:id", asyncHandler(paymentController.getPaymentById));
 
+// TODO: remove this route in prod or gate behind ADMIN + ops flag.
 paymentRouter.post(
   "/:id/process",
   asyncHandler(paymentController.processPayment),

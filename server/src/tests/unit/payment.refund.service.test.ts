@@ -27,6 +27,8 @@ import { emailQueue } from "../../shared/queues/email.queue.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { PaymentRefundService } from "../../modules/payments/payment.refund.service.js";
 
+// TODO: add unit coverage for PaymentRefundService.approveRefund/rejectRefund.
+
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
 const mockStripe = stripe as unknown as {
   refunds: { create: ReturnType<typeof vi.fn> };

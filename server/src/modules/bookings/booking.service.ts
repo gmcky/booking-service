@@ -265,7 +265,7 @@ export class BookingService {
       "Cancellation policy applied",
     );
 
-    // TODO: delegate refund execution to PaymentService.
+    // TODO: execute Stripe refund via PaymentService (not just status updates).
 
     const cancelled = await prisma.booking.update({
       where: { id },

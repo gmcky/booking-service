@@ -168,6 +168,7 @@ export class PaymentIntentService {
       throw new AppError(400, "Payment already processed");
     }
 
+    // TODO: restrict this override to ADMIN-only execution path.
     // Bypasses provider-state checks; keep this path out of normal prod flow.
     // TODO: verify provider state before marking SUCCESS.
     // TODO: update payment+booking atomically.
