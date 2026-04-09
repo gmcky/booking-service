@@ -161,15 +161,26 @@ export class PaymentIntentService {
   }
 
   /** Manual override path; intended only for test/ops intervention. */
-  static async process(id: string, userId: string) {
-    const payment = await this.getById(id, userId);
+  static async process(id: string, userId: string, userRole: string) {
+    if (userRole !== "ADMIN") {
+      throw new AppError(403, "Not authorized");
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!payment) {
+      throw new AppError(404, "Payment not found");
+    }
 
     if (payment.status !== "PENDING") {
       throw new AppError(400, "Payment already processed");
     }
 
-    // TODO: restrict this override to ADMIN-only execution path.
     // Bypasses provider-state checks; keep this path out of normal prod flow.
+    logger.warn({ paymentId: id, userId }, "Manual payment process override used");
     // TODO: verify provider state before marking SUCCESS.
     // TODO: update payment+booking atomically.
     // TODO: enqueue booking-confirmation notification.

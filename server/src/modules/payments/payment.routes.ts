@@ -40,9 +40,10 @@ paymentRouter.post(
 
 paymentRouter.get("/:id", asyncHandler(paymentController.getPaymentById));
 
-// TODO: remove this route in prod or gate behind ADMIN + ops flag.
+// Manual override endpoint: ADMIN-only because it bypasses provider-state checks.
 paymentRouter.post(
   "/:id/process",
+  authorize("ADMIN"),
   asyncHandler(paymentController.processPayment),
 );
 

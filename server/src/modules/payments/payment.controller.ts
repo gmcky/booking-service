@@ -30,14 +30,15 @@ export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
 
 /**
  * @route POST /api/v1/payments/:id/process
- * @access Private
- * @security Bearer token required.
+ * @access Private (admin)
+ * @security Bearer token required + ADMIN role.
  * @deprecated Use webhook for production
  */
 export async function processPayment(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
-  const userId = req.user!.id;
-  const payment = await PaymentService.process(id, userId);
+  const requesterId = req.user!.id;
+  const requesterRole = req.user!.role;
+  const payment = await PaymentService.process(id, requesterId, requesterRole);
   res.json(payment);
 }
 
