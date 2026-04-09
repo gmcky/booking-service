@@ -39,6 +39,7 @@ export async function cacheDel(...keys: string[]): Promise<void> {
 
 /** Pattern invalidation via SCAN to avoid blocking Redis with KEYS. */
 export async function cacheInvalidatePattern(pattern: string): Promise<void> {
+  // TODO: add max-iteration/time budget guard for stuck cursor loops.
   let cursor = "0";
   do {
     const [nextCursor, keys] = await cacheClient.scan(

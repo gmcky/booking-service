@@ -38,6 +38,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, "../..");
 
+// TODO: add booking/payment integration suites (happy-path + failure-path).
+
 beforeAll(async () => {
   if (globalThis.__integrationPostgresContainer) return;
 

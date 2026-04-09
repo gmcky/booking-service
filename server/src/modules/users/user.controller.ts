@@ -97,6 +97,7 @@ export async function deleteCurrentUser(
   req: AuthenticatedRequest,
   res: Response,
 ) {
+  // TODO: require explicit delete confirmation (password or one-time token).
   // TODO: SECURITY - User can only delete their own account
   const userId = req.user!.id;
 
@@ -118,6 +119,7 @@ export async function deleteCurrentUser(
 
   await UserService.delete(userId);
 
+  // TODO: invalidate all active sessions/tokens before returning 204.
   // TODO: Clear auth cookies/tokens
   // res.clearCookie('refreshToken');
 
@@ -134,6 +136,7 @@ export async function deleteCurrentUser(
  * @body { currentPassword: string, newPassword: string }
  */
 export async function changePassword(req: AuthenticatedRequest, res: Response) {
+  // TODO: implement endpoint before exposing it on public routes (now returns 501).
   // TODO: Implement password change controller
   // CRITICAL: This must be a separate endpoint, NOT part of updateProfile
   // Reason: Password changes should always require current password

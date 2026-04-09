@@ -90,6 +90,7 @@ async function processImages(job: Job<ImageProcessingJob>): Promise<void> {
     logger.debug({ propertyId, id, output: relativePath }, "Image converted");
   }
 
+  // TODO: append/merge with existing images to avoid concurrent upload overwrite race.
   // Persist optimised WebP paths to the property record.
   await prisma.property.update({
     where: { id: propertyId },

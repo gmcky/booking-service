@@ -117,6 +117,7 @@ export class UserService {
     //   data.avatarUrl = avatarUrl;
     // }
 
+    // TODO: reject direct email updates unless verification/pendingEmail flow is active.
     // TODO: Handle email change with verification
     // Email changes should require:
     // 1. Send verification email to NEW email address
@@ -240,6 +241,7 @@ export class UserService {
   }
 
   static async delete(id: string) {
+    // TODO: replace hard delete with transactional soft-delete/cleanup flow.
     // TODO: Implement soft delete vs hard delete
     // Soft delete is preferred for:
     // - Maintaining referential integrity (bookings, reviews, etc.)
