@@ -131,3 +131,5 @@ worker.on("failed", (job, error) => {
     "Image job failed",
   );
 });
+
+logger.info("Image worker started");
