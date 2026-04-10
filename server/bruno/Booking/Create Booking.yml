@@ -11,11 +11,9 @@ http:
     data: |-
       {
         "propertyId": "{{propertyId}}",
-        "checkIn": "2026-04-10T14:00:00.000Z",
-        "checkOut": "2026-04-15T12:00:00.000Z",
-        "guests": 2,
-        "specialRequests": "Late check-in if possible, arriving on evening flight.",
-        "arrivalTime": "21:30"
+        "checkIn": "2026-06-18T14:00:00.000Z",
+        "checkOut": "2026-06-23T12:00:00.000Z",
+        "guests": 2
       }
   auth: inherit
 
