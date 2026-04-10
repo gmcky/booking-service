@@ -3,6 +3,10 @@ import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { UserService } from "./user.service.js";
 import { logger } from "../../shared/lib/logger.js";
+import type {
+  RequestEmailChangeInput,
+  ConfirmEmailChangeInput,
+} from "./user.types.js";
 
 // TODO: Add multer middleware for avatar upload
 // import multer from 'multer';
@@ -118,15 +122,47 @@ export async function deleteCurrentUser(
   // }
 
   await UserService.delete(userId);
-
-  // TODO: invalidate all active sessions/tokens before returning 204.
-  // TODO: Clear auth cookies/tokens
-  // res.clearCookie('refreshToken');
-
-  // TODO: Log account deletion
-  // logger.info({ userId }, 'User account deleted');
-
   res.status(204).send();
+}
+
+/**
+ * Step 1: Request an email change.
+ * Sends a 6-digit OTP to the NEW email address.
+ * @route POST /api/v1/users/me/email/request-change
+ * @access Private
+ * @body { newEmail: string }
+ */
+export async function requestEmailChange(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const userId = req.user!.id;
+  const { newEmail } = req.body as RequestEmailChangeInput;
+
+  await UserService.requestEmailChange(userId, newEmail);
+
+  res.json({
+    message:
+      "A verification code has been sent to your new email address. It expires in 15 minutes.",
+  });
+}
+
+/**
+ * Step 2: Confirm the email change using the OTP.
+ * @route POST /api/v1/users/me/email/confirm-change
+ * @access Private
+ * @body { otp: string }
+ */
+export async function confirmEmailChange(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const userId = req.user!.id;
+  const { otp } = req.body as ConfirmEmailChangeInput;
+
+  await UserService.confirmEmailChange(userId, otp);
+
+  res.json({ message: "Email address updated successfully." });
 }
 
 /**

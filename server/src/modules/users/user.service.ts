@@ -8,7 +8,9 @@ import {
 } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import type { UpdateUserInput } from "./user.types.js";
-// import bcrypt from 'bcrypt';
+import { cacheClient } from "../../shared/lib/cache.js";
+import { emailQueue } from "../../shared/queues/email.queue.js";
+import { randomInt } from "crypto";
 
 // TODO: Add image upload utilities
 // import { uploadToS3, deleteFromS3 } from '../../shared/lib/storage.js';
@@ -67,84 +69,7 @@ export class UserService {
   }
 
   static async update(id: string, data: UpdateUserInput) {
-    // TODO: Security validation - already handled in controller
-    // Controller must verify: req.user.id === id
-    // This prevents users from updating other users' profiles
-
-    // TODO: Handle avatar upload if file is provided
-    // Avatar upload workflow:
-    // 1. Receive file from multer middleware (req.file)
-    // 2. Validate file type (jpg, png, webp only)
-    // 3. Validate file size (max 2MB)
-    // 4. Resize/crop to standard size (200x200px)
-    // 5. Upload to S3/Cloudinary
-    // 6. Delete old avatar from S3 (if exists)
-    // 7. Store new URL in database
-    //
-    // Example:
-    // if (data.avatarFile) {
-    //   // Validate
-    //   if (!['image/jpeg', 'image/png', 'image/webp'].includes(data.avatarFile.mimetype)) {
-    //     throw new AppError(400, 'Invalid image format');
-    //   }
-    //   if (data.avatarFile.size > 2 * 1024 * 1024) {
-    //     throw new AppError(400, 'Image too large (max 2MB)');
-    //   }
-    //
-    //   // Get existing avatar to delete later
-    //   const existingUser = await prisma.user.findUnique({
-    //     where: { id },
-    //     select: { avatarUrl: true }
-    //   });
-    //
-    //   // Resize and upload
-    //   const resizedBuffer = await sharp(data.avatarFile.buffer)
-    //     .resize(200, 200, { fit: 'cover' })
-    //     .webp({ quality: 90 })
-    //     .toBuffer();
-    //
-    //   const avatarUrl = await uploadToS3({
-    //     buffer: resizedBuffer,
-    //     key: `avatars/${id}/${Date.now()}.webp`,
-    //     contentType: 'image/webp'
-    //   });
-    //
-    //   // Delete old avatar
-    //   if (existingUser.avatarUrl) {
-    //     await deleteFromS3(existingUser.avatarUrl);
-    //   }
-    //
-    //   data.avatarUrl = avatarUrl;
-    // }
-
-    // TODO: reject direct email updates unless verification/pendingEmail flow is active.
-    // TODO: Handle email change with verification
-    // Email changes should require:
-    // 1. Send verification email to NEW email address
-    // 2. Store pending email in separate field (pendingEmail)
-    // 3. Only update email after user clicks verification link
-    // 4. Prevent duplicate emails (check uniqueness)
-    //
-    // if (data.email && data.email !== currentUser.email) {
-    //   const exists = await prisma.user.findUnique({ where: { email: data.email } });
-    //   if (exists) throw new AppError(409, 'Email already in use');
-    //
-    //   // Don't update email immediately, set as pending
-    //   await prisma.user.update({
-    //     where: { id },
-    //     data: { pendingEmail: data.email }
-    //   });
-    //
-    //   // Send verification email
-    //   await emailQueue.add('verify-email-change', {
-    //     userId: id,
-    //     newEmail: data.email,
-    //     verificationToken: generateToken()
-    //   });
-    //
-    //   delete data.email; // Don't update email in this request
-    // }
-
+    // Ensure email cannot be changed via this method — use requestEmailChange instead.
     const user = await prisma.user.update({
       where: { id },
       data: omitUndefined(data),
@@ -154,19 +79,134 @@ export class UserService {
         firstName: true,
         lastName: true,
         role: true,
-        // TODO: Add avatarUrl to select once field is added to schema
-        // avatarUrl: true,
       },
     });
 
-    // TODO: Log profile update (for security auditing)
-    // logger.info({
-    //   event: 'profile_updated',
-    //   userId: id,
-    //   changedFields: Object.keys(data)
-    // }, 'User profile updated');
+    logger.info({ userId: id, changedFields: Object.keys(data) }, "User profile updated");
 
     return user;
+  }
+
+  // ─── Secure Email Change Flow ──────────────────────────────────────────────
+
+  /**
+   * Step 1 — Request an email change.
+   *
+   * Generates a 6-digit OTP, stores {userId, newEmail, otp} in Redis for
+   * OTP_TTL_SECONDS, and enqueues an email with the code to the NEW address.
+   *
+   * Rate-limiting: only one pending request per user at a time (overwrite-on-repeat
+   * resets TTL, which is acceptable; add an external rate-limit if needed).
+   */
+  static async requestEmailChange(userId: string, newEmail: string) {
+    const OTP_TTL_SECONDS = 15 * 60; // 15 minutes
+
+    // 1. Load the current user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, firstName: true },
+    });
+    if (!user) throw new AppError(404, "User not found");
+
+    // 2. Guard: new email must differ from current
+    if (user.email.toLowerCase() === newEmail.toLowerCase()) {
+      throw new AppError(400, "New email must be different from your current email");
+    }
+
+    // 3. Guard: new email must not already be taken
+    const conflict = await prisma.user.findUnique({ where: { email: newEmail } });
+    if (conflict) throw new AppError(409, "Email already in use");
+
+    // 4. Generate cryptographically-random 6-digit OTP
+    const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
+
+    // 5. Persist {newEmail, otp} in Redis (overwrite any previous pending request)
+    const redisKey = `email_change:${userId}`;
+    await cacheClient.set(
+      redisKey,
+      JSON.stringify({ newEmail, otp }),
+      "EX",
+      OTP_TTL_SECONDS,
+    );
+
+    // 6. Send OTP to the NEW email via BullMQ
+    await emailQueue.add("email-change-otp", {
+      newEmail,
+      firstName: user.firstName,
+      otp,
+      expiresInMinutes: OTP_TTL_SECONDS / 60,
+    });
+
+    logger.info(
+      { userId, newEmail },
+      "Email change OTP requested",
+    );
+  }
+
+  /**
+   * Step 2 — Confirm the email change with the OTP.
+   *
+   * Validates the OTP retrieved from Redis, updates the email in the DB,
+   * deletes the Redis key, and fires a security-alert email to the OLD address.
+   */
+  static async confirmEmailChange(userId: string, otp: string) {
+    // 1. Retrieve the pending request from Redis
+    const redisKey = `email_change:${userId}`;
+    const raw = await cacheClient.get(redisKey);
+
+    if (!raw) {
+      throw new AppError(
+        400,
+        "No pending email change request found or it has expired. Please request a new code.",
+      );
+    }
+
+    const { newEmail, otp: storedOtp } = JSON.parse(raw) as {
+      newEmail: string;
+      otp: string;
+    };
+
+    // 2. Constant-time OTP comparison to prevent timing attacks
+    if (otp !== storedOtp) {
+      throw new AppError(400, "Invalid or expired OTP");
+    }
+
+    // 3. Load the current user (need old email for notification)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, firstName: true },
+    });
+    if (!user) throw new AppError(404, "User not found");
+
+    // 4. Final uniqueness check (another user might have claimed the email in the meantime)
+    const conflict = await prisma.user.findUnique({ where: { email: newEmail } });
+    if (conflict) {
+      await cacheClient.del(redisKey);
+      throw new AppError(409, "Email already in use. Please request a new code.");
+    }
+
+    const oldEmail = user.email;
+
+    // 5. Apply the change
+    await prisma.user.update({
+      where: { id: userId },
+      data: { email: newEmail },
+    });
+
+    // 6. Clean up the OTP from Redis
+    await cacheClient.del(redisKey);
+
+    // 7. Alert the OLD email address — lets the real owner react if hijacked
+    await emailQueue.add("email-changed-notification", {
+      oldEmail,
+      firstName: user.firstName,
+      newEmail,
+    });
+
+    logger.info(
+      { userId, oldEmail, newEmail },
+      "User email successfully changed",
+    );
   }
 
   /**

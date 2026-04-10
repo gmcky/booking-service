@@ -24,6 +24,8 @@ import type {
   RefundRequestedAdminJob,
   RefundProcessedGuestJob,
   RefundProcessedHostJob,
+  EmailChangeOtpJob,
+  EmailChangedNotificationJob,
 } from "../shared/queues/email.queue.js";
 
 const transporter = nodemailer.createTransport({
@@ -453,6 +455,64 @@ async function sendRefundProcessedHost(
   });
 }
 
+async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.newEmail,
+    subject: `Your email change verification code — ${data.otp}`,
+    text: [
+      `Hi ${data.firstName},`,
+      "",
+      `You requested to change your account email to this address.`,
+      "",
+      `Your verification code is: ${data.otp}`,
+      "",
+      `This code expires in ${data.expiresInMinutes} minutes.`,
+      "",
+      "If you did not request this change, you can safely ignore this email.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.firstName},</p>
+      <p>You requested to change your account email to this address.</p>
+      <p style="font-size:28px;font-weight:bold;letter-spacing:6px;text-align:center;padding:16px 0">${data.otp}</p>
+      <p style="color:#888;font-size:12px;text-align:center">Expires in ${data.expiresInMinutes} minutes</p>
+      <p>If you did not request this change, you can safely ignore this email.</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendEmailChangedNotification(
+  data: EmailChangedNotificationJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.oldEmail,
+    subject: `⚠️ Your account email has been changed`,
+    text: [
+      `Hi ${data.firstName},`,
+      "",
+      `The email address on your Booking Service account was successfully changed to: ${data.newEmail}`,
+      "",
+      "If you made this change, no further action is needed.",
+      "",
+      "If you did NOT request this change, your account may be compromised.",
+      "Please contact our support team immediately.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.firstName},</p>
+      <p>The email address on your Booking Service account was successfully changed to: <strong>${data.newEmail}</strong></p>
+      <p>If you made this change, no further action is needed.</p>
+      <p style="color:#c0392b"><strong>If you did NOT request this change, your account may be compromised. Please contact our support team immediately.</strong></p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 async function processEmail(
   job: Job<EmailJobData["data"], void, EmailJobName>,
 ): Promise<void> {
@@ -494,6 +554,14 @@ async function processEmail(
       break;
     case "refund-processed-host":
       await sendRefundProcessedHost(job.data as RefundProcessedHostJob);
+      break;
+    case "email-change-otp":
+      await sendEmailChangeOtp(job.data as EmailChangeOtpJob);
+      break;
+    case "email-changed-notification":
+      await sendEmailChangedNotification(
+        job.data as EmailChangedNotificationJob,
+      );
       break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");

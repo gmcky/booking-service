@@ -13,7 +13,9 @@ export type EmailJobName =
   | "payment-success-host"
   | "refund-requested-admin"
   | "refund-processed-guest"
-  | "refund-processed-host";
+  | "refund-processed-host"
+  | "email-change-otp"
+  | "email-changed-notification";
 
 export interface PropertyCreatedHostJob {
   ownerEmail: string;
@@ -157,6 +159,24 @@ export interface RefundProcessedHostJob {
   currency: string;
 }
 
+export interface EmailChangeOtpJob {
+  /** The new email that the user wants to switch to */
+  newEmail: string;
+  firstName: string;
+  /** 6-digit OTP code */
+  otp: string;
+  /** Minutes until the OTP expires */
+  expiresInMinutes: number;
+}
+
+export interface EmailChangedNotificationJob {
+  /** The old (current) email — notify the real owner */
+  oldEmail: string;
+  firstName: string;
+  /** The new email that was confirmed */
+  newEmail: string;
+}
+
 export type EmailJobData =
   | { name: "property-created-host"; data: PropertyCreatedHostJob }
   | { name: "booking-created-guest"; data: BookingCreatedGuestJob }
@@ -169,7 +189,9 @@ export type EmailJobData =
   | { name: "payment-success-host"; data: PaymentSuccessHostJob }
   | { name: "refund-requested-admin"; data: RefundRequestedAdminJob }
   | { name: "refund-processed-guest"; data: RefundProcessedGuestJob }
-  | { name: "refund-processed-host"; data: RefundProcessedHostJob };
+  | { name: "refund-processed-host"; data: RefundProcessedHostJob }
+  | { name: "email-change-otp"; data: EmailChangeOtpJob }
+  | { name: "email-changed-notification"; data: EmailChangedNotificationJob };
 
 export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>(
   "email",
