@@ -43,7 +43,7 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
-    "clean": "rm -rf dist",
+    "clean": "rimraf dist",
     "prebuild": "pnpm clean && pnpm typecheck"
   },
   "keywords": [],
