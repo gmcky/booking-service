@@ -39,8 +39,6 @@
     "docker:prod:down": "docker compose down",
     "docker:clean": "docker compose down -v && docker system prune -f",
     "stripe": "stripe listen --forward-to localhost:3000/api/v1/payments/webhook",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "clean": "rimraf dist",
