@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import { cleanEnv, str, port, url, num, bool } from "envalid";
 
-dotenv.config({ quiet: process.env.NODE_ENV === "test" });
+dotenv.config({ quiet: process.env.DOTENV_LOGS !== "true" });
 
 export const env = cleanEnv(process.env, {
   NODE_ENV: str({
