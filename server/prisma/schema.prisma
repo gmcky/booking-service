@@ -10,7 +10,13 @@ model User {
   id            String         @id @default(uuid())
   email         String         @unique
   phoneNumber   String?        @unique
-  passwordHash  String
+  dateOfBirth   DateTime?      @db.Date
+  bio           String?        @db.VarChar(500)
+  avatarUrl     String?
+  passwordHash  String?
+  isDeleted     Boolean        @default(false)
+  isSuspended   Boolean        @default(false)
+  deletedAt     DateTime?
   firstName     String
   lastName      String
   role          Role           @default(USER)
