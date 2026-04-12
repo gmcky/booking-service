@@ -28,6 +28,7 @@ import {
   toInputJsonObject,
 } from "../payments/payment.helpers.js";
 import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
+import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -173,6 +174,8 @@ export class BookingService {
         "Failed to enqueue booking-created emails",
       ),
     );
+
+    await invalidateUserStatsCache(userId, booking.property.ownerId);
 
     // TODO: return public booking DTO.
     return booking;
@@ -614,12 +617,12 @@ export class BookingService {
     userId: string,
   ) {
     const [guest, host] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
+      prisma.user.findFirst({
+        where: { id: userId, isDeleted: false },
         select: { email: true, firstName: true, lastName: true },
       }),
-      prisma.user.findUnique({
-        where: { id: booking.property.ownerId },
+      prisma.user.findFirst({
+        where: { id: booking.property.ownerId, isDeleted: false },
         select: { email: true, firstName: true },
       }),
     ]);
@@ -692,12 +695,12 @@ export class BookingService {
     userId: string,
   ) {
     const [guest, host] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
+      prisma.user.findFirst({
+        where: { id: userId, isDeleted: false },
         select: { email: true, firstName: true, lastName: true },
       }),
-      prisma.user.findUnique({
-        where: { id: booking.property.ownerId },
+      prisma.user.findFirst({
+        where: { id: booking.property.ownerId, isDeleted: false },
         select: { email: true, firstName: true },
       }),
     ]);

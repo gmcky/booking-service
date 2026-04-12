@@ -30,6 +30,7 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const existingUser = await prisma.user.findFirst({
       where: {
+        isDeleted: false,
         OR: [
           { email: data.email.toLowerCase() },
           ...(data.phoneNumber ? [{ phoneNumber: data.phoneNumber }] : []),
@@ -148,18 +149,29 @@ export class AuthService {
     // Short-circuit before bcrypt: cheaper path + consistent failure behavior.
     await this.checkLockout(email, meta);
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+        isDeleted: false,
+      },
     });
 
     // Same 401 payload for absent user / bad password; blocks enum signal.
-    if (!user) {
+    if (!user || !user.passwordHash) {
       logger.warn(
         { email, ip: meta?.ip, userAgent: meta?.userAgent },
         "Login failed: user not found",
       );
       await this.recordFailedAttempt(email, meta);
       throw new AppError(401, "Invalid credentials");
+    }
+
+    if (user.isSuspended) {
+      logger.warn(
+        { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Login blocked: account is suspended",
+      );
+      throw new AppError(403, "Account is suspended");
     }
 
     const isValidPassword = await bcrypt.compare(
@@ -381,6 +393,17 @@ export class AuthService {
       throw new AppError(401, "Invalid refresh token");
     }
 
+    if (storedToken.user.isDeleted || storedToken.user.isSuspended) {
+      await prisma.refreshToken.deleteMany({
+        where: { userId: storedToken.userId },
+      });
+      logger.warn(
+        { userId: storedToken.userId, jti, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Refresh token rejected: user is disabled",
+      );
+      throw new AppError(401, "Invalid refresh token");
+    }
+
     // Defensive cleanup for stale DB rows that outlived JWT expiry.
     if (storedToken.expiresAt < new Date()) {
       await prisma.refreshToken.delete({ where: { id: storedToken.id } });
@@ -479,14 +502,21 @@ export class AuthService {
       throw new AppError(401, "Invalid token structure");
     }
 
-    // Access tokens are stateless; immediate revoke requires blacklist.
+    const user = await prisma.user.findFirst({
+      where: { id: userId, isDeleted: false, isSuspended: false },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      throw new AppError(401, "Invalid token");
+    }
 
     logger.debug(
       { userId, endpoint: "verifyAccessToken" },
       "Access token verified",
     );
 
-    return { id: userId, email, role };
+    return { id: user.id, email: user.email, role: user.role };
   }
 
   private static async generateAccessToken(
