@@ -1,29 +1,77 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { authenticate, authorize } from "../../shared/middlewares/auth.js";
+import { AppError } from "../../shared/middlewares/error.handler.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
-import * as userController from "./user.controller.js";
+import {
+  getCurrentUser,
+  getCurrentUserStats,
+  updateCurrentUser,
+  deleteAvatar,
+  deleteCurrentUser,
+  changePassword,
+  requestEmailChange,
+  confirmEmailChange,
+  getAllUsers,
+  getUserById,
+  suspendUser,
+  restoreUser,
+} from "./user.controller.js";
 import {
   updateUserSchema,
+  deleteCurrentUserSchema,
+  changePasswordSchema,
+  getUsersQuerySchema,
   requestEmailChangeSchema,
   confirmEmailChangeSchema,
 } from "./user.validators.js";
 
 export const userRouter: IRouter = Router();
 
-// All routes require authentication
-userRouter.use(authenticate);
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+    files: 1,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      cb(new AppError(400, "Only image files are allowed"));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
 
 // ─── Current user profile ──────────────────────────────────────────────────────
-userRouter.get("/me", asyncHandler(userController.getCurrentUser));
+userRouter.get("/me", authenticate, asyncHandler(getCurrentUser));
+userRouter.get("/me/stats", authenticate, asyncHandler(getCurrentUserStats));
 
 userRouter.patch(
   "/me",
+  authenticate,
+  avatarUpload.single("avatar"),
   validate(updateUserSchema),
-  asyncHandler(userController.updateCurrentUser),
+  asyncHandler(updateCurrentUser),
 );
 
-userRouter.delete("/me", asyncHandler(userController.deleteCurrentUser));
+userRouter.delete("/me/avatar", authenticate, asyncHandler(deleteAvatar));
+
+userRouter.delete(
+  "/me",
+  authenticate,
+  validate(deleteCurrentUserSchema),
+  asyncHandler(deleteCurrentUser),
+);
+
+userRouter.post(
+  "/me/change-password",
+  authenticate,
+  validate(changePasswordSchema),
+  asyncHandler(changePassword),
+);
 
 // ─── Secure email change (two-step OTP flow) ───────────────────────────────────
 /**
@@ -33,8 +81,9 @@ userRouter.delete("/me", asyncHandler(userController.deleteCurrentUser));
  */
 userRouter.post(
   "/me/email/request-change",
+  authenticate,
   validate(requestEmailChangeSchema),
-  asyncHandler(userController.requestEmailChange),
+  asyncHandler(requestEmailChange),
 );
 
 /**
@@ -44,19 +93,33 @@ userRouter.post(
  */
 userRouter.post(
   "/me/email/confirm-change",
+  authenticate,
   validate(confirmEmailChangeSchema),
-  asyncHandler(userController.confirmEmailChange),
+  asyncHandler(confirmEmailChange),
 );
 
 // ─── Admin only ────────────────────────────────────────────────────────────────
 userRouter.get(
   "/",
+  authenticate,
   authorize("ADMIN"),
-  asyncHandler(userController.getAllUsers),
+  validate(getUsersQuerySchema, "query"),
+  asyncHandler(getAllUsers),
 );
 
-userRouter.get(
-  "/:id",
+userRouter.patch(
+  "/:id/suspend",
+  authenticate,
   authorize("ADMIN"),
-  asyncHandler(userController.getUserById),
+  asyncHandler(suspendUser),
 );
+
+userRouter.patch(
+  "/:id/restore",
+  authenticate,
+  authorize("ADMIN"),
+  asyncHandler(restoreUser),
+);
+
+// ─── Public profile ───────────────────────────────────────────────────────────
+userRouter.get("/:id", asyncHandler(getUserById));

@@ -1,12 +1,25 @@
-import type { Request, Response } from "express";
+import type { Request, Response, CookieOptions } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { UserService } from "./user.service.js";
 import { logger } from "../../shared/lib/logger.js";
+import { env } from "../../config/env.js";
 import type {
+  UpdateUserInput,
+  DeleteCurrentUserInput,
+  ChangePasswordInput,
+  GetUsersQueryInput,
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
 } from "./user.types.js";
+
+const REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+const REFRESH_TOKEN_CLEAR_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: env.NODE_ENV === "production",
+  sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+  path: `/api/${env.API_VERSION}/auth`,
+};
 
 // TODO: Add multer middleware for avatar upload
 // import multer from 'multer';
@@ -38,8 +51,17 @@ import type {
 
 export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
-  const user = await UserService.getById(userId);
+  const user = await UserService.getById(userId, { mode: "self" });
   res.json(user);
+}
+
+export async function getCurrentUserStats(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const userId = req.user!.id;
+  const stats = await UserService.getUserStats(userId);
+  res.json(stats);
 }
 
 /**
@@ -69,18 +91,13 @@ export async function updateCurrentUser(
   // - role (security risk!)
   // - password (use separate endpoint)
 
-  // TODO: Handle avatar upload if file is provided
-  // Avatar comes from multer middleware as req.file
-  //
-  // let updateData = { ...req.body };
-  //
-  // if (req.file) {
-  //   // File is now in memory buffer (req.file.buffer)
-  //   // Pass to service for processing (resize, upload to S3)
-  //   updateData.avatarFile = req.file;
-  // }
+  const user = await UserService.update(userId, req.body as UpdateUserInput);
 
-  const user = await UserService.update(userId, req.body);
+  if (req.file) {
+    const avatarUrl = await UserService.uploadAvatar(userId, req.file);
+    res.json({ ...user, avatarUrl });
+    return;
+  }
 
   // TODO: Log profile update
   // logger.info({
@@ -121,7 +138,15 @@ export async function deleteCurrentUser(
   //   throw new AppError(401, 'Invalid password');
   // }
 
-  await UserService.delete(userId);
+  const { password } = req.body as DeleteCurrentUserInput;
+
+  await UserService.delete(userId, password);
+  res.status(204).send();
+}
+
+export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
+  const userId = req.user!.id;
+  await UserService.deleteAvatar(userId);
   res.status(204).send();
 }
 
@@ -172,35 +197,18 @@ export async function confirmEmailChange(
  * @body { currentPassword: string, newPassword: string }
  */
 export async function changePassword(req: AuthenticatedRequest, res: Response) {
-  // TODO: implement endpoint before exposing it on public routes (now returns 501).
-  // TODO: Implement password change controller
-  // CRITICAL: This must be a separate endpoint, NOT part of updateProfile
-  // Reason: Password changes should always require current password
-  //
-  // Workflow:
-  // 1. Validate request body with Zod
-  //    - currentPassword: string, required
-  //    - newPassword: string, min 12 chars, complex requirements
-  //    - confirmPassword: string, must match newPassword
-  //
-  // 2. Call UserService.changePassword()
-  //
-  // 3. Return success message (tokens are invalidated, user must login again)
-  //
-  // const userId = req.user!.id;
-  // const { currentPassword, newPassword } = req.body;
-  //
-  // await UserService.changePassword(userId, currentPassword, newPassword);
-  //
-  // // Clear refresh token cookie (force re-login)
-  // res.clearCookie('refreshToken');
-  //
-  // res.json({
-  //   success: true,
-  //   message: 'Password changed successfully. Please login again.'
-  // });
+  const userId = req.user!.id;
+  const { currentPassword, newPassword } = req.body as ChangePasswordInput;
 
-  res.status(501).json({ message: "Not implemented" });
+  await UserService.changePassword(userId, currentPassword, newPassword);
+
+  // Force client re-authentication after all refresh sessions are revoked.
+  res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, REFRESH_TOKEN_CLEAR_OPTIONS);
+
+  res.json({
+    success: true,
+    message: "Password changed successfully. Please login again.",
+  });
 }
 
 /**
@@ -209,23 +217,17 @@ export async function changePassword(req: AuthenticatedRequest, res: Response) {
  * @access Private (Admin)
  */
 export async function getAllUsers(req: Request, res: Response) {
-  // TODO: Add authorization check - only ADMIN can list all users
-  // Apply authorize('ADMIN') middleware to route
-  //
-  // if (req.user?.role !== 'ADMIN') {
-  //   throw new AppError(403, 'Admin access required');
-  // }
+  const query = req.query as unknown as GetUsersQueryInput;
 
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
-
-  // TODO: Add filtering options for admins
-  // - Filter by role (USER, HOST, ADMIN)
-  // - Filter by registration date range
-  // - Search by email or name
-  // - Filter by account status (active, deleted, suspended)
-
-  const result = await UserService.getAll({ page, limit });
+  const result = await UserService.getAll({
+    page: query.page,
+    limit: query.limit,
+    role: query.role,
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
+    search: query.search,
+    isDeleted: query.isDeleted,
+  });
   res.json(result);
 }
 
@@ -237,41 +239,20 @@ export async function getAllUsers(req: Request, res: Response) {
 export async function getUserById(req: Request, res: Response) {
   const id = getIdParam(req);
 
-  // TODO: Return limited public info (not email, not personal details)
-  // Public profile should show:
-  // - firstName, lastName (or display name)
-  // - Avatar URL
-  // - Member since date
-  // - Number of properties (if host)
-  // - Average rating
-  // - Bio/description (add to schema)
-  //
-  // Should NOT show:
-  // - Email (privacy)
-  // - Phone number (privacy)
-  // - Role (security)
-  // - Last login (security)
-
-  const user = await UserService.getById(id);
+  const user = await UserService.getById(id, { mode: "public" });
   res.json(user);
 }
 
-// TODO: Add endpoint for getting user statistics
-// export async function getUserStats(req: AuthenticatedRequest, res: Response) {
-//   const userId = req.user!.id;
-//   const stats = await UserService.getUserStats(userId);
-//   res.json(stats);
-// }
+export async function suspendUser(req: Request, res: Response) {
+  const id = getIdParam(req);
+  const user = await UserService.suspend(id);
+  res.json(user);
+}
 
-// TODO: Add endpoint for uploading/deleting avatar separately
-// export async function uploadAvatar(req: AuthenticatedRequest, res: Response) {
-//   const userId = req.user!.id;
-//   const avatarUrl = await UserService.uploadAvatar(userId, req.file);
-//   res.json({ avatarUrl });
-// }
-//
-// export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
-//   const userId = req.user!.id;
-//   await UserService.deleteAvatar(userId);
-//   res.status(204).send();
-// }
+export async function restoreUser(req: Request, res: Response) {
+  const id = getIdParam(req);
+  const user = await UserService.restore(id);
+  res.json(user);
+}
+
+// TODO: Add dedicated upload avatar endpoint if needed
