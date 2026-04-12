@@ -243,7 +243,7 @@ export class PaymentRefundService {
     });
 
     const admins = await prisma.user.findMany({
-      where: { role: "ADMIN" },
+      where: { role: "ADMIN", isDeleted: false },
       select: { email: true, firstName: true },
     });
 

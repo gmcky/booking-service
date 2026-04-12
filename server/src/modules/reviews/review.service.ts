@@ -23,6 +23,7 @@ import type {
   ReviewQueryInput,
   UpdateReviewInput,
 } from "./review.types.js";
+import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 
 const REVIEW_CREATE_WINDOW_DAYS = 30;
 const REVIEW_EDIT_WINDOW_DAYS = 7;
@@ -106,6 +107,7 @@ export class ReviewService {
             title: true,
             owner: {
               select: {
+                id: true,
                 email: true,
                 firstName: true,
               },
@@ -162,6 +164,10 @@ export class ReviewService {
       });
 
       await this.invalidateReviewCaches(completedBooking.propertyId);
+      await invalidateUserStatsCache(
+        userId,
+        completedBooking.property.owner.id,
+      );
       await this.enqueueReviewReceivedHostEmail(
         review,
         completedBooking.property.title,
@@ -414,8 +420,8 @@ export class ReviewService {
 
       try {
         const [reporter, admins] = await Promise.all([
-          prisma.user.findUnique({
-            where: { id: reporterId },
+          prisma.user.findFirst({
+            where: { id: reporterId, isDeleted: false },
             select: {
               firstName: true,
               lastName: true,
@@ -425,6 +431,7 @@ export class ReviewService {
           prisma.user.findMany({
             where: {
               role: "ADMIN",
+              isDeleted: false,
             },
             select: {
               email: true,
