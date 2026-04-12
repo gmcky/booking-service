@@ -11,7 +11,7 @@
     "start": "node dist/server.js",
     "build": "tsc --noEmit false",
     "typecheck": "tsc --noEmit",
-    "workers": "concurrently \"pnpm worker:image\" \"pnpm worker:email\" \"pnpm worker:cleanup\" \"pnpm worker:payout\"",
+    "workers": "concurrently --raw \"tsx --env-file=.env src/workers/image.worker.ts\" \"tsx --env-file=.env src/workers/email.worker.ts\" \"tsx --env-file=.env src/workers/cleanup.worker.ts\" \"tsx --env-file=.env src/workers/payout.worker.ts\"",
     "worker:image": "tsx --env-file=.env src/workers/image.worker.ts",
     "worker:email": "tsx --env-file=.env src/workers/email.worker.ts",
     "worker:cleanup": "tsx --env-file=.env src/workers/cleanup.worker.ts",
