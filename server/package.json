@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "setup": "node scripts/setup.mjs",
-    "dev": "tsx watch --env-file=.env src/server.ts",
+    "dev": "tsx watch --exclude bruno/** --env-file=.env src/server.ts",
     "dev:full": "pnpm infra:up && pnpm dev",
     "start": "node dist/server.js",
     "build": "tsc --noEmit false",

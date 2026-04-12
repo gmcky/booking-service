@@ -17,6 +17,17 @@ http:
       }
   auth: inherit
 
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody();
+
+        if (res.status === 201 && data?.id) {
+          bru.setEnvVar("bookingId", data.id);
+          bru.setVar("bookingId", data.id);
+        }
+
 settings:
   encodeUrl: true
   timeout: 0
