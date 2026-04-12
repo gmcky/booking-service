@@ -48,6 +48,10 @@ export const env = cleanEnv(process.env, {
   SMTP_PASSWORD: str({ default: "" }),
   EMAIL_FROM: str({ default: "noreply@booking-service.local" }),
 
+  // S3 (avatar storage)
+  AWS_REGION: str({ default: "us-east-1" }),
+  S3_BUCKET: str({ default: "" }),
+
   // Stripe
   STRIPE_SECRET_KEY: str({ default: "" }),
   STRIPE_WEBHOOK_SECRET: str({ default: "" }),

@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
+import { MulterError } from "multer";
 import { ZodError } from "zod";
 import { logger } from "../lib/logger.js";
 
@@ -34,6 +35,17 @@ export function errorHandler(
     return res.status(400).json({
       error: "Validation failed",
       details: err.issues,
+    });
+  }
+
+  if (err instanceof MulterError) {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "File is too large. Maximum size is 2MB."
+        : err.message;
+
+    return res.status(400).json({
+      error: message,
     });
   }
 
