@@ -15,7 +15,9 @@ export type EmailJobName =
   | "refund-processed-guest"
   | "refund-processed-host"
   | "email-change-otp"
-  | "email-changed-notification";
+  | "email-changed-notification"
+  | "password-changed-notification"
+  | "account-deleted-notification";
 
 export interface PropertyCreatedHostJob {
   ownerEmail: string;
@@ -177,6 +179,18 @@ export interface EmailChangedNotificationJob {
   newEmail: string;
 }
 
+export interface PasswordChangedNotificationJob {
+  email: string;
+  firstName: string;
+  changedAtIso: string;
+}
+
+export interface AccountDeletedNotificationJob {
+  email: string;
+  firstName: string;
+  deletedAtIso: string;
+}
+
 export type EmailJobData =
   | { name: "property-created-host"; data: PropertyCreatedHostJob }
   | { name: "booking-created-guest"; data: BookingCreatedGuestJob }
@@ -191,7 +205,15 @@ export type EmailJobData =
   | { name: "refund-processed-guest"; data: RefundProcessedGuestJob }
   | { name: "refund-processed-host"; data: RefundProcessedHostJob }
   | { name: "email-change-otp"; data: EmailChangeOtpJob }
-  | { name: "email-changed-notification"; data: EmailChangedNotificationJob };
+  | { name: "email-changed-notification"; data: EmailChangedNotificationJob }
+  | {
+      name: "password-changed-notification";
+      data: PasswordChangedNotificationJob;
+    }
+  | {
+      name: "account-deleted-notification";
+      data: AccountDeletedNotificationJob;
+    };
 
 export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>(
   "email",

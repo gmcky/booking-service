@@ -26,6 +26,8 @@ import type {
   RefundProcessedHostJob,
   EmailChangeOtpJob,
   EmailChangedNotificationJob,
+  PasswordChangedNotificationJob,
+  AccountDeletedNotificationJob,
 } from "../shared/queues/email.queue.js";
 
 const transporter = nodemailer.createTransport({
@@ -513,6 +515,62 @@ async function sendEmailChangedNotification(
   });
 }
 
+async function sendPasswordChangedNotification(
+  data: PasswordChangedNotificationJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.email,
+    subject: "Your password was changed",
+    text: [
+      `Hi ${data.firstName},`,
+      "",
+      "Your Booking Service account password was changed successfully.",
+      `Changed at: ${data.changedAtIso}`,
+      "",
+      "If you made this change, no further action is needed.",
+      "If you did NOT change your password, secure your account immediately.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.firstName},</p>
+      <p>Your Booking Service account password was changed successfully.</p>
+      <p style="color:#666">Changed at: ${data.changedAtIso}</p>
+      <p>If you made this change, no further action is needed.</p>
+      <p style="color:#c0392b"><strong>If you did NOT change your password, secure your account immediately.</strong></p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendAccountDeletedNotification(
+  data: AccountDeletedNotificationJob,
+): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.email,
+    subject: "Your account was deleted",
+    text: [
+      `Hi ${data.firstName},`,
+      "",
+      "Your Booking Service account has been deleted.",
+      `Deleted at: ${data.deletedAtIso}`,
+      "",
+      "If you did not initiate this action, please contact support immediately.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.firstName},</p>
+      <p>Your Booking Service account has been deleted.</p>
+      <p style="color:#666">Deleted at: ${data.deletedAtIso}</p>
+      <p style="color:#c0392b"><strong>If you did not initiate this action, please contact support immediately.</strong></p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 async function processEmail(
   job: Job<EmailJobData["data"], void, EmailJobName>,
 ): Promise<void> {
@@ -561,6 +619,16 @@ async function processEmail(
     case "email-changed-notification":
       await sendEmailChangedNotification(
         job.data as EmailChangedNotificationJob,
+      );
+      break;
+    case "password-changed-notification":
+      await sendPasswordChangedNotification(
+        job.data as PasswordChangedNotificationJob,
+      );
+      break;
+    case "account-deleted-notification":
+      await sendAccountDeletedNotification(
+        job.data as AccountDeletedNotificationJob,
       );
       break;
     default:
