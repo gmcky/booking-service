@@ -1,7 +1,7 @@
 info:
   name: My Bookings
   type: http
-  seq: 4
+  seq: 5
 
 http:
   method: GET
