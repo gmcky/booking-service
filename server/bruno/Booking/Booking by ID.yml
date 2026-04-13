@@ -1,0 +1,32 @@
+info:
+  name: Booking by ID
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{baseUrl}}/bookings/{{bookingId}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody();
+
+        if (res.status === 200 && data?.id) {
+          bru.setEnvVar("bookingId", data.id);
+          bru.setVar("bookingId", data.id);
+        }
+
+        if (res.status === 200 && data?.payment?.id) {
+          bru.setEnvVar("paymentId", data.payment.id);
+          bru.setVar("paymentId", data.payment.id);
+          console.log("Saved paymentId:", data.payment.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
