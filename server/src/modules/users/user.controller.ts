@@ -2,7 +2,6 @@ import type { Request, Response, CookieOptions } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { UserService } from "./user.service.js";
-import { logger } from "../../shared/lib/logger.js";
 import { env } from "../../config/env.js";
 import type {
   UpdateUserInput,
@@ -21,32 +20,10 @@ const REFRESH_TOKEN_CLEAR_OPTIONS: CookieOptions = {
   path: `/api/${env.API_VERSION}/auth`,
 };
 
-// TODO: Add multer middleware for avatar upload
-// import multer from 'multer';
-// import { AppError } from '../../shared/middlewares/error.handler.js';
-//
-// const upload = multer({
-//   storage: multer.memoryStorage(), // Store in memory for processing
-//   limits: {
-//     fileSize: 2 * 1024 * 1024, // 2MB max
-//     files: 1 // Only 1 file per request
-//   },
-//   fileFilter: (req, file, cb) => {
-//     // Only accept images
-//     if (!file.mimetype.startsWith('image/')) {
-//       return cb(new AppError(400, 'Only image files allowed'));
-//     }
-//     cb(null, true);
-//   }
-// });
-//
-// // Apply to route:
-// // router.patch('/me', authenticate, upload.single('avatar'), updateCurrentUser)
-
 /**
- * Get current authenticated user's profile
  * @route GET /api/v1/users/me
  * @access Private
+ * @security Bearer token required.
  */
 
 export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
@@ -55,6 +32,11 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
   res.json(user);
 }
 
+/**
+ * @route GET /api/v1/users/me/stats
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function getCurrentUserStats(
   req: AuthenticatedRequest,
   res: Response,
@@ -65,31 +47,17 @@ export async function getCurrentUserStats(
 }
 
 /**
- * Update current user's profile
  * @route PATCH /api/v1/users/me
  * @access Private
+ * @security Bearer token required.
  * @body { firstName?, lastName?, avatar? }
  */
 export async function updateCurrentUser(
   req: AuthenticatedRequest,
   res: Response,
 ) {
-  // TODO: CRITICAL SECURITY CHECK - User can only update their own profile
-  // This is handled by using req.user.id (from JWT) directly
-  // NEVER use req.params.id or req.body.id for authorization!
+  // Auth anchor: self-update routes derive subject from JWT only.
   const userId = req.user!.id;
-
-  // TODO: Validate request body with Zod schema
-  // Schema should allow optional fields:
-  // - firstName: string, min 1 char
-  // - lastName: string, min 1 char
-  // - phoneNumber: regex validation
-  // - dateOfBirth: date, must be >18 years old
-  //
-  // DO NOT allow updating:
-  // - email (requires verification flow)
-  // - role (security risk!)
-  // - password (use separate endpoint)
 
   const user = await UserService.update(userId, req.body as UpdateUserInput);
 
@@ -99,44 +67,20 @@ export async function updateCurrentUser(
     return;
   }
 
-  // TODO: Log profile update
-  // logger.info({
-  //   userId,
-  //   changedFields: Object.keys(req.body),
-  //   hasAvatar: !!req.file
-  // }, 'User profile updated');
-
   res.json(user);
 }
 
+// TODO: Enforce step-up confirmation token for account deletion.
 /**
- * Delete current user's account
  * @route DELETE /api/v1/users/me
  * @access Private
+ * @security Bearer token required.
  */
 export async function deleteCurrentUser(
   req: AuthenticatedRequest,
   res: Response,
 ) {
-  // TODO: require explicit delete confirmation (password or one-time token).
-  // TODO: SECURITY - User can only delete their own account
   const userId = req.user!.id;
-
-  // TODO: Add confirmation requirement
-  // Require user to provide password or confirmation token
-  // This prevents accidental deletions
-  //
-  // const { password } = req.body;
-  // if (!password) {
-  //   throw new AppError(400, 'Password confirmation required');
-  // }
-  //
-  // // Verify password
-  // const user = await prisma.user.findUnique({ where: { id: userId } });
-  // const isValid = await bcrypt.compare(password, user.passwordHash);
-  // if (!isValid) {
-  //   throw new AppError(401, 'Invalid password');
-  // }
 
   const { password } = req.body as DeleteCurrentUserInput;
 
@@ -144,6 +88,11 @@ export async function deleteCurrentUser(
   res.status(204).send();
 }
 
+/**
+ * @route DELETE /api/v1/users/me/avatar
+ * @access Private
+ * @security Bearer token required.
+ */
 export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   await UserService.deleteAvatar(userId);
@@ -151,10 +100,9 @@ export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * Step 1: Request an email change.
- * Sends a 6-digit OTP to the NEW email address.
  * @route POST /api/v1/users/me/email/request-change
  * @access Private
+ * @security Bearer token required.
  * @body { newEmail: string }
  */
 export async function requestEmailChange(
@@ -173,9 +121,9 @@ export async function requestEmailChange(
 }
 
 /**
- * Step 2: Confirm the email change using the OTP.
  * @route POST /api/v1/users/me/email/confirm-change
  * @access Private
+ * @security Bearer token required.
  * @body { otp: string }
  */
 export async function confirmEmailChange(
@@ -191,9 +139,9 @@ export async function confirmEmailChange(
 }
 
 /**
- * Change current user's password
  * @route POST /api/v1/users/me/change-password
  * @access Private
+ * @security Bearer token required.
  * @body { currentPassword: string, newPassword: string }
  */
 export async function changePassword(req: AuthenticatedRequest, res: Response) {
@@ -202,7 +150,7 @@ export async function changePassword(req: AuthenticatedRequest, res: Response) {
 
   await UserService.changePassword(userId, currentPassword, newPassword);
 
-  // Force client re-authentication after all refresh sessions are revoked.
+  // Refresh sessions are revoked in service; clear cookie to avoid phantom refresh attempts.
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, REFRESH_TOKEN_CLEAR_OPTIONS);
 
   res.json({
@@ -212,9 +160,9 @@ export async function changePassword(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * Get all users (Admin only)
  * @route GET /api/v1/users?page=1&limit=10
  * @access Private (Admin)
+ * @security Bearer token required + ADMIN role.
  */
 export async function getAllUsers(req: Request, res: Response) {
   const query = req.query as unknown as GetUsersQueryInput;
@@ -232,7 +180,6 @@ export async function getAllUsers(req: Request, res: Response) {
 }
 
 /**
- * Get user by ID (Public - for viewing host profiles)
  * @route GET /api/v1/users/:id
  * @access Public
  */
@@ -243,16 +190,24 @@ export async function getUserById(req: Request, res: Response) {
   res.json(user);
 }
 
+/**
+ * @route PATCH /api/v1/users/:id/suspend
+ * @access Private (Admin)
+ * @security Bearer token required + ADMIN role.
+ */
 export async function suspendUser(req: Request, res: Response) {
   const id = getIdParam(req);
   const user = await UserService.suspend(id);
   res.json(user);
 }
 
+/**
+ * @route PATCH /api/v1/users/:id/restore
+ * @access Private (Admin)
+ * @security Bearer token required + ADMIN role.
+ */
 export async function restoreUser(req: Request, res: Response) {
   const id = getIdParam(req);
   const user = await UserService.restore(id);
   res.json(user);
 }
-
-// TODO: Add dedicated upload avatar endpoint if needed

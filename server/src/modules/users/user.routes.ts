@@ -45,7 +45,6 @@ const avatarUpload = multer({
   },
 });
 
-// ─── Current user profile ──────────────────────────────────────────────────────
 userRouter.get("/me", authenticate, asyncHandler(getCurrentUser));
 userRouter.get("/me/stats", authenticate, asyncHandler(getCurrentUserStats));
 
@@ -73,12 +72,7 @@ userRouter.post(
   asyncHandler(changePassword),
 );
 
-// ─── Secure email change (two-step OTP flow) ───────────────────────────────────
-/**
- * Step 1 — Send OTP to the new email address.
- * POST /api/v1/users/me/email/request-change
- * Body: { newEmail: string }
- */
+// Two-step challenge prevents blind email takeover on profile mutation.
 userRouter.post(
   "/me/email/request-change",
   authenticate,
@@ -86,11 +80,6 @@ userRouter.post(
   asyncHandler(requestEmailChange),
 );
 
-/**
- * Step 2 — Confirm the change with the OTP.
- * POST /api/v1/users/me/email/confirm-change
- * Body: { otp: string }
- */
 userRouter.post(
   "/me/email/confirm-change",
   authenticate,
@@ -98,7 +87,6 @@ userRouter.post(
   asyncHandler(confirmEmailChange),
 );
 
-// ─── Admin only ────────────────────────────────────────────────────────────────
 userRouter.get(
   "/",
   authenticate,
@@ -121,5 +109,4 @@ userRouter.patch(
   asyncHandler(restoreUser),
 );
 
-// ─── Public profile ───────────────────────────────────────────────────────────
 userRouter.get("/:id", asyncHandler(getUserById));

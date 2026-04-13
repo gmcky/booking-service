@@ -32,16 +32,7 @@ type AdminListParams = PaginationParams & {
   isDeleted?: boolean;
 };
 
-/**
- * UserService - Manages user profiles and account settings
- *
- * SECURITY PRIORITIES:
- * 1. Users can only modify their own data (enforce userId matching)
- * 2. Password changes require current password verification
- * 3. Avatar uploads: validate file type, size, optimize before storage
- * 4. Email changes require verification (send confirmation email)
- * 5. Account deletion: soft delete vs hard delete decision
- */
+/** User profile, account lifecycle, and admin moderation operations. */
 export class UserService {
   static async getById(
     id: string,
@@ -189,7 +180,7 @@ export class UserService {
       bio,
     });
 
-    // Ensure only explicitly-whitelisted fields can be updated.
+    // Whitelist patchable fields; email/role/password mutate via dedicated flows.
     const user = await prisma.user.update({
       where: { id },
       data: updateData,
@@ -373,43 +364,29 @@ export class UserService {
     return updated;
   }
 
-  // ─── Secure Email Change Flow ──────────────────────────────────────────────
-
-  /**
-   * Step 1 — Request an email change.
-   *
-   * Generates a 6-digit OTP, stores {userId, newEmail, otp} in Redis for
-   * OTP_TTL_SECONDS, and enqueues an email with the code to the NEW address.
-   *
-   * Rate-limiting: only one pending request per user at a time (overwrite-on-repeat
-   * resets TTL, which is acceptable; add an external rate-limit if needed).
-   */
+  /** Queues OTP challenge for destination email and stores it in Redis. */
   static async requestEmailChange(userId: string, newEmail: string) {
-    const OTP_TTL_SECONDS = 15 * 60; // 15 minutes
+    const OTP_TTL_SECONDS = 15 * 60;
 
-    // 1. Load the current user
     const user = await prisma.user.findFirst({
       where: { id: userId, isDeleted: false },
       select: { id: true, email: true, firstName: true },
     });
     if (!user) throw new AppError(404, "User not found");
 
-    // 2. Guard: new email must differ from current
     if (user.email.toLowerCase() === newEmail.toLowerCase()) {
       throw new AppError(400, "New email must be different from your current email");
     }
 
-    // 3. Guard: new email must not already be taken
     const conflict = await prisma.user.findFirst({
       where: { email: newEmail, isDeleted: false },
       select: { id: true },
     });
     if (conflict) throw new AppError(409, "Email already in use");
 
-    // 4. Generate cryptographically-random 6-digit OTP
     const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
 
-    // 5. Persist {newEmail, otp} in Redis (overwrite any previous pending request)
+    // Single active challenge per user; repeat requests rotate OTP and TTL.
     const redisKey = `email_change:${userId}`;
     await cacheClient.set(
       redisKey,
@@ -418,7 +395,6 @@ export class UserService {
       OTP_TTL_SECONDS,
     );
 
-    // 6. Send OTP to the NEW email via BullMQ
     await emailQueue.add("email-change-otp", {
       newEmail,
       firstName: user.firstName,
@@ -432,14 +408,8 @@ export class UserService {
     );
   }
 
-  /**
-   * Step 2 — Confirm the email change with the OTP.
-   *
-   * Validates the OTP retrieved from Redis, updates the email in the DB,
-   * deletes the Redis key, and fires a security-alert email to the OLD address.
-   */
+  /** Applies verified email change and notifies previous mailbox. */
   static async confirmEmailChange(userId: string, otp: string) {
-    // 1. Retrieve the pending request from Redis
     const redisKey = `email_change:${userId}`;
     const raw = await cacheClient.get(redisKey);
 
@@ -455,19 +425,17 @@ export class UserService {
       otp: string;
     };
 
-    // 2. Constant-time OTP comparison to prevent timing attacks
     if (otp !== storedOtp) {
       throw new AppError(400, "Invalid or expired OTP");
     }
 
-    // 3. Load the current user (need old email for notification)
     const user = await prisma.user.findFirst({
       where: { id: userId, isDeleted: false },
       select: { id: true, email: true, firstName: true },
     });
     if (!user) throw new AppError(404, "User not found");
 
-    // 4. Final uniqueness check (another user might have claimed the email in the meantime)
+    // Re-check uniqueness to close race between OTP issuance and confirmation.
     const conflict = await prisma.user.findFirst({
       where: { email: newEmail, isDeleted: false },
       select: { id: true },
@@ -479,16 +447,14 @@ export class UserService {
 
     const oldEmail = user.email;
 
-    // 5. Apply the change
     await prisma.user.update({
       where: { id: userId },
       data: { email: newEmail },
     });
 
-    // 6. Clean up the OTP from Redis
     await cacheClient.del(redisKey);
 
-    // 7. Alert the OLD email address — lets the real owner react if hijacked
+    // Security signal for potential account takeover.
     await emailQueue.add("email-changed-notification", {
       oldEmail,
       firstName: user.firstName,
@@ -501,10 +467,7 @@ export class UserService {
     );
   }
 
-  /**
-   * Change user password
-   * CRITICAL: Must verify current password before allowing change
-   */
+  /** Rotates password and revokes all refresh sessions. */
   static async changePassword(
     userId: string,
     currentPassword: string,
@@ -556,61 +519,8 @@ export class UserService {
     return { success: true, message: "Password changed. Please login again." };
   }
 
+  // TODO: Move account deletion to a dedicated transactional closure workflow.
   static async delete(id: string, password: string) {
-    // TODO: replace hard delete with transactional soft-delete/cleanup flow.
-    // TODO: Implement soft delete vs hard delete
-    // Soft delete is preferred for:
-    // - Maintaining referential integrity (bookings, reviews, etc.)
-    // - Compliance (GDPR allows keeping transaction records)
-    // - Ability to restore accounts
-    //
-    // Option 1: Soft Delete (Recommended)
-    // await prisma.user.update({
-    //   where: { id },
-    //   data: {
-    //     isDeleted: true,
-    //     deletedAt: new Date(),
-    //     email: `deleted_${id}@deleted.local`, // Free up email for re-registration
-    //     passwordHash: null // Remove sensitive data
-    //   }
-    // });
-    //
-    // Option 2: Hard Delete (Cascade delete all related data)
-    // Note: This will delete bookings, reviews, payments, properties!
-    // Only use if explicitly required by business rules
-
-    // TODO: Handle cleanup tasks before deletion
-    // 1. Cancel all pending/confirmed bookings
-    // 2. Delete user's properties (or transfer ownership?)
-    // 3. Delete avatar from S3
-    // 4. Invalidate all refresh tokens
-    // 5. Send account deletion confirmation email
-    //
-    // const user = await prisma.user.findUnique({
-    //   where: { id },
-    //   include: {
-    //     bookings: { where: { status: { in: ['PENDING', 'CONFIRMED'] } } },
-    //     properties: true,
-    //     _count: { select: { bookings: true, reviews: true } }
-    //   }
-    // });
-    //
-    // if (user.bookings.length > 0) {
-    //   throw new AppError(400, 'Cannot delete account with active bookings');
-    // }
-    //
-    // if (user.properties.length > 0) {
-    //   throw new AppError(400, 'Please delete all your properties first');
-    // }
-    //
-    // // Delete avatar from cloud storage
-    // if (user.avatarUrl) {
-    //   await deleteFromS3(user.avatarUrl);
-    // }
-    //
-    // // Invalidate refresh tokens
-    // await prisma.refreshToken.deleteMany({ where: { userId: id } });
-
     const user = await prisma.user.findFirst({
       where: { id, isDeleted: false },
       select: {
@@ -698,16 +608,10 @@ export class UserService {
 
     logger.info({ userId: id }, "User account soft-deleted");
 
-    // TODO: Log account deletion (compliance requirement)
-    // logger.info({ userId: id, timestamp: new Date() }, 'User account deleted');
-
-    // TODO: Send confirmation email
-    // await emailQueue.add('account-deleted', { userId: id });
+    // TODO: Emit immutable compliance audit event for account deletion.
   }
 
-  /**
-   * Get user statistics (for profile page)
-   */
+  /** Aggregates guest/host KPIs and caches the snapshot. */
   static async getUserStats(userId: string) {
     const cacheKey = getUserStatsCacheKey(userId);
     const cached = await cacheGet<{
