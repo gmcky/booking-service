@@ -30,6 +30,18 @@ http:
       }
   auth: inherit
 
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody();
+
+        if (res.status === 201 && data?.id) {
+          bru.setEnvVar("propertyId", data.id);
+          bru.setEnvVar("testProperty", data.id);
+          bru.setVar("propertyId", data.id);
+        }
+
 settings:
   encodeUrl: true
   timeout: 0
