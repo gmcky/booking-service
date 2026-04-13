@@ -1,7 +1,7 @@
 info:
   name: Logout
   type: http
-  seq: 4
+  seq: 5
 
 http:
   method: POST
@@ -12,8 +12,11 @@ runtime:
   scripts:
     - type: after-response
       code: |-
-        if (res.status === 204) {
+        if (res.status === 200) {
           bru.setEnvVar("jwt_token", ""); 
+          bru.setEnvVar("bookingId", "");
+          bru.setEnvVar("paymentId", "");
+          bru.setEnvVar("reviewId", "");
         }
 
 settings:

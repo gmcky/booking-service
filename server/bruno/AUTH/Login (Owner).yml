@@ -20,7 +20,10 @@ runtime:
     - type: after-response
       code: |-
         if (res.status === 200) {
-          bru.setEnvVar("jwt_token", res.body.accessToken); 
+          bru.setEnvVar("jwt_token", res.body.accessToken);
+          bru.setEnvVar("bookingId", "");
+          bru.setEnvVar("paymentId", "");
+          bru.setEnvVar("reviewId", "");
         }
 
 settings:
