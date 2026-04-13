@@ -17,6 +17,12 @@ propertyRouter.get(
   asyncHandler(propertyController.getProperties),
 );
 
+propertyRouter.get(
+  "/my",
+  authenticate,
+  asyncHandler(propertyController.getMyProperties),
+);
+
 propertyRouter.get("/:id", asyncHandler(propertyController.getPropertyById));
 
 propertyRouter.use(authenticate);

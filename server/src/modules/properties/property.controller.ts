@@ -32,6 +32,19 @@ export async function getProperties(req: Request, res: Response) {
 }
 
 /**
+ * @route GET /api/v1/properties/my
+ * @access Private
+ * @security Bearer token required.
+ */
+export async function getMyProperties(req: AuthenticatedRequest, res: Response) {
+  const ownerId = req.user!.id;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const result = await PropertyService.getMyProperties(ownerId, { page, limit });
+  res.json(result);
+}
+
+/**
  * @route GET /api/v1/properties/:id
  * @access Public
  */

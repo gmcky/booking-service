@@ -83,6 +83,22 @@ export class PropertyService {
     return result;
   }
 
+  static async getMyProperties(ownerId: string, params: PaginationParams) {
+    const { skip, take } = calculatePagination(params.page, params.limit);
+
+    const [properties, total] = await Promise.all([
+      prisma.property.findMany({
+        where: { ownerId },
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.property.count({ where: { ownerId } }),
+    ]);
+
+    return createPaginatedResponse(properties, total, params);
+  }
+
   /** Read flow: returns listing + owner/recent reviews with hot-key cache. */
   static async getById(id: string) {
     const cacheKey = `property:${id}`;
