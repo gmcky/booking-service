@@ -8,6 +8,17 @@ http:
   url: "{{baseUrl}}/payments/{{paymentId}}"
   auth: inherit
 
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody();
+
+        if (res.status === 200 && data?.id) {
+          bru.setEnvVar("paymentId", data.id);
+          bru.setVar("paymentId", data.id);
+        }
+
 settings:
   encodeUrl: true
   timeout: 0
