@@ -162,7 +162,7 @@ describe("ReviewService", () => {
       status: "PENDING",
     } as any);
 
-    mockPrisma.user.findUnique.mockResolvedValue({
+    (mockPrisma.user.findFirst as any).mockResolvedValue({
       firstName: "Ira",
       lastName: "Reporter",
       email: "ira@example.com",
@@ -201,7 +201,7 @@ describe("ReviewService", () => {
       status: "PENDING",
     } as any);
 
-    mockPrisma.user.findUnique.mockResolvedValue({
+    (mockPrisma.user.findFirst as any).mockResolvedValue({
       firstName: "Ira",
       lastName: "Reporter",
       email: "ira@example.com",
