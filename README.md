@@ -1,418 +1,136 @@
-# 🏨 Booking Service API
+# Booking Service
 
-A production-ready hotel/property booking system built with modern Node.js stack. This project demonstrates real-world backend development skills including concurrent transaction handling, JWT authentication, asynchronous task processing, and deployment best practices.
+Backend for a property booking platform (Airbnb-like). Built with Node.js, TypeScript, PostgreSQL, Redis.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+This is a portfolio project. The goal is to solve real backend problems — not just CRUD, but concurrency, payment processing, async jobs, and proper auth — in a way that's easy to read and reason about.
 
-## 🎯 Project Overview
+## What's interesting here
 
-This is a **portfolio project** designed to showcase enterprise-level backend development skills. Unlike simple CRUD applications, this service solves real business problems:
+- **Double-booking prevention** — Serializable transaction isolation level on booking creation. Two users booking the same dates at the same time won't both succeed.
+- **JWT with rotation and reuse detection** — refresh tokens are hashed, tracked by jti, and if a stolen token is reused, all sessions for that user get invalidated.
+- **Stripe payment flow** — PaymentIntent creation, webhook handling with signature verification, idempotent event processing (no double charges on webhook retries).
+- **Background workers** — email, image resizing, payouts, cleanup — all via BullMQ with retry and exponential backoff. App stays fast, heavy work happens async.
+- **Brute-force protection** — login attempts tracked in Redis, account locks after 5 failures for 15 minutes.
 
-- **Race condition handling**: Prevents double-booking through database transactions and row-level locking
-- **Complex date logic**: Manages booking availability with overlapping date range checks
-- **Asynchronous processing**: Handles email notifications and heavy operations in background queues
-- **Production deployment**: Live API with HTTPS, CI/CD, and monitoring
+## Tech stack
 
-## ✨ Key Features
+| Layer | Tech |
+|-------|------|
+| Runtime | Node.js 20, TypeScript 5.9 (strict, ESM) |
+| Framework | Express 5 |
+| Database | PostgreSQL 16, Prisma 7 |
+| Cache & Queues | Redis 7, BullMQ |
+| Auth | JWT via jose, bcrypt |
+| Payments | Stripe (PaymentIntent + webhooks) |
+| Validation | Zod 4 |
+| Images | Sharp (resize, webp conversion) |
+| Storage | AWS S3 |
+| Email | Nodemailer via BullMQ worker |
+| Logging | Pino (structured JSON) |
+| Testing | Vitest, Testcontainers, Supertest |
+| Infra | Docker, Docker Compose (dev + prod) |
 
-### Core Functionality
+## Getting started
 
-- 🔐 **JWT Authentication** with Access & Refresh tokens
-- 🏠 **Property Management** (hotels, apartments, meeting rooms)
-- 📅 **Booking System** with conflict prevention
-- 🔍 **Advanced Search** with filters (dates, price, amenities, capacity)
-- 📧 **Email Notifications** via background jobs
-- 🚀 **RESTful API** with OpenAPI/Swagger documentation
-
-### Technical Highlights
-
-- ⚡ **ACID Transactions** with PostgreSQL isolation levels
-- 🔒 **Race Condition Protection** using `SELECT ... FOR UPDATE`
-- 📦 **Job Queue System** with BullMQ + Redis
-- 🛡️ **Request Validation** using Zod schemas
-- 📊 **Structured Logging** with Pino (JSON format)
-- 🐳 **Dockerized** development and production environments
-- ✅ **Comprehensive Testing** (Unit + Integration)
-
-## 🛠️ Tech Stack
-
-### Backend Core
-
-- **Runtime**: Node.js 20 LTS
-- **Language**: TypeScript 5+
-- **Framework**: Express.js
-- **Database**: PostgreSQL 16
-- **ORM**: Prisma
-- **Cache & Queue**: Redis 7
-
-### Libraries & Tools
-
-- **Authentication**: jose (JWT), bcrypt
-- **Validation**: Zod
-- **Logging**: Pino
-- **Configuration**: dotenv, envalid
-- **Background Jobs**: BullMQ
-- **Security**: Helmet
-- **Documentation**: Swagger UI Express
-- **Testing**: Jest, Supertest
-
-### Infrastructure
-
-- **Containerization**: Docker + Docker Compose
-- **Web Server**: Nginx (reverse proxy)
-- **SSL/TLS**: Let's Encrypt
-- **CI/CD**: GitHub Actions
-- **Hosting**: VPS (Hetzner/DigitalOcean)
-
-## 📋 Prerequisites
-
-- Node.js 20+ and pnpm 8+
-- Docker and Docker Compose
-- PostgreSQL 16 (or use Docker)
-- Redis 7 (or use Docker)
-
-### Installing pnpm
+Prerequisites: Node.js 20+, pnpm, Docker.
 
 ```bash
-npm install -g pnpm
-# or on Windows with winget
-winget install -e --id pnpm.pnpm
-```
-
-## 🚀 Quick Start
-
-### Option 1: Hybrid Mode (RECOMMENDED) ⚡
-
-**Fastest way to develop - Infrastructure in Docker, app runs locally**
-
-```bash
-# Navigate to server directory
 cd server
-
-# Install dependencies
 pnpm install
-
-# Start infrastructure (Postgres + Redis)
-pnpm infra:up
-
-# Run database migrations
-pnpm prisma:migrate
-
-# (Optional) Seed with test data
-pnpm db:seed
-
-# Start app with hot-reload
-pnpm dev
+pnpm infra:up          # starts Postgres + Redis in Docker
+pnpm db:migrate        # applies migrations
+pnpm dev               # app on http://localhost:3000
 ```
 
-API available at: `http://localhost:3000`  
-Swagger docs: `http://localhost:3000/api-docs`
+Swagger docs available at `/api-docs` when running.
 
----
-
-### Option 2: Full Docker (For Testing)
-
+To run workers (email, images, etc.):
 ```bash
-cd server
+pnpm workers
+```
 
-# Start everything in Docker
+### Other ways to run
+
+**Full Docker** (app + infra):
+```bash
 pnpm docker:dev
-
-# Run migrations inside container
-docker exec booking-api pnpm prisma:migrate
 ```
 
----
-
-### Option 3: Manual Setup (Without Docker)
-
+**Production build**:
 ```bash
-# 1. Install PostgreSQL and Redis locally
-# 2. Create database
-createdb booking_db
-
-# 3. Install dependencies
-cd server
-pnpm install
-
-# 4. Configure .env
-cp .env.example .env
-# Edit DATABASE_URL and REDIS_HOST
-
-# 5. Run migrations
-pnpm prisma:migrate
-
-# 6. Start app
-pnpm dev
+pnpm docker:prod
 ```
 
----
-
-📖 **Detailed guide**: See [server/docs/QUICK-START.md](./server/docs/QUICK-START.md)
-
-## 📋 Available Commands
-
-### Development
-
-```bash
-pnpm dev              # Start with hot-reload
-pnpm dev:full         # Start infra + app
-pnpm build            # Build for production
-pnpm start            # Run production build
-```
-
-### Infrastructure
-
-```bash
-pnpm infra:up         # Start Postgres + Redis
-pnpm infra:down       # Stop infrastructure
-pnpm infra:logs       # View logs
-pnpm infra:clean      # Remove everything
-```
-
-### Database
-
-```bash
-pnpm prisma:migrate   # Apply migrations
-pnpm prisma:studio    # Open Prisma Studio GUI
-pnpm prisma:generate  # Generate Prisma Client
-pnpm db:seed          # Seed test data
-```
-
-### Docker
-
-```bash
-pnpm docker:dev       # Full Docker dev
-pnpm docker:prod      # Production Docker
-```
-
-## �️ Database Schema
-
-The system uses PostgreSQL with the following entity relationships:
-
-<!-- ERD diagram will be added here -->
-
-**Key Design Decisions:**
-
-- **UUID primary keys** for better distribution and security
-- **Composite indexes** on `(propertyId, checkIn, checkOut)` for fast availability checks
-- **Soft delete** via `isActive` flag on properties
-- **Cascade delete** on refresh tokens when user is deleted
-- **Decimal type** for money to avoid floating-point precision issues
-- **Average rating calculation** through aggregation or cached fields
-- **Payment idempotency** for safe transaction processing
-- **Blocked dates** for owner-controlled availability
-
-**Main Tables:**
-
-- **Users** - Authentication and user management (USER, ADMIN, OWNER roles)
-- **Properties** - Hotels, apartments, houses with average rating & review count
-- **Bookings** - Reservation management with race condition protection
-- **Reviews** - Rating (1-5) and feedback system with user comments
-- **Payments** - Transaction tracking (STRIPE, PAYPAL, CASH providers)
-- **BlockedDates** - Owner-managed unavailability periods (maintenance, personal use)
-- **RefreshTokens** - JWT token rotation for secure authentication
-
-## �📁 Project Structure
+## Project structure
 
 ```
-booking-service/
+server/
 ├── src/
-│   ├── config/          # Configuration and environment validation
-│   ├── controllers/     # Request handlers
-│   ├── services/        # Business logic
-│   ├── repositories/    # Database access layer
-│   ├── middlewares/     # Express middlewares (auth, validation, error handling)
-│   ├── validators/      # Zod schemas
-│   ├── queues/          # BullMQ job definitions
-│   ├── types/           # TypeScript type definitions
-│   ├── utils/           # Utility functions
-│   ├── routes/          # API routes
-│   └── app.ts           # Express app setup
+│   ├── modules/           # feature modules, each with controller/service/routes/validators
+│   │   ├── auth/          # register, login, refresh, logout
+│   │   ├── users/         # profiles, avatars, password change, soft delete
+│   │   ├── properties/    # CRUD, search filters, image pipeline
+│   │   ├── bookings/      # availability, reservations, date management
+│   │   ├── payments/      # Stripe integration, webhooks, refunds
+│   │   └── reviews/       # ratings, host replies, moderation
+│   ├── shared/
+│   │   ├── lib/           # prisma, redis, stripe, logger clients
+│   │   ├── middlewares/   # auth, validation, error handling
+│   │   ├── queues/        # BullMQ queue definitions
+│   │   └── utils/         # date helpers, pagination
+│   └── workers/           # BullMQ workers (email, image, cleanup, payout)
 ├── prisma/
-│   ├── schema.prisma    # Database schema
-│   └── migrations/      # Database migrations
-├── tests/               # Jest tests
-├── docker-compose.yml   # Local development setup
-├── Dockerfile           # Production container
-└── package.json
+│   ├── schema.prisma      # 7 models + 2 helper tables
+│   └── migrations/
+├── bruno/                 # API test collection
+└── docker-compose*.yml    # infra / dev / prod configs
 ```
 
-## 🔑 Environment Variables
+## API overview
 
-Create a `.env` file based on `.env.example`:
+All endpoints under `/api/v1`. Auth via Bearer token (access) + HttpOnly cookie (refresh).
 
-```env
-# Application
-NODE_ENV=development
-PORT=3000
-API_VERSION=v1
+**Auth** — register, login, logout, refresh (with rotation)
 
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/booking_db
+**Properties** — list with filters (city, dates, guests, amenities, price range), CRUD, image upload
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
+**Bookings** — create (with availability check), reschedule, cancel, status transitions, blocked dates
 
-# JWT
-JWT_ACCESS_SECRET=your-secret-key
-JWT_REFRESH_SECRET=your-refresh-secret-key
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
+**Payments** — Stripe PaymentIntent, webhook processing, refund request/approve/reject flow
 
-# Email (for background jobs)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-password
-```
+**Reviews** — create (only after completed booking), host replies, reporting
 
-## 📚 API Documentation
+**Users** — profile, avatar upload, password change, email change (OTP), account deletion
 
-### Authentication
-
-- `POST /api/v1/auth/register` - Register new user
-- `POST /api/v1/auth/login` - Login and get tokens
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `POST /api/v1/auth/logout` - Logout (invalidate refresh token)
-
-### Properties
-
-- `GET /api/v1/properties` - List properties with filters
-- `GET /api/v1/properties/:id` - Get property details
-- `POST /api/v1/properties` - Create property (admin only)
-- `PATCH /api/v1/properties/:id` - Update property (admin only)
-- `DELETE /api/v1/properties/:id` - Delete property (admin only)
-
-### Bookings
-
-- `GET /api/v1/bookings` - List user's bookings
-- `GET /api/v1/bookings/:id` - Get booking details
-- `POST /api/v1/bookings` - Create booking
-- `PATCH /api/v1/bookings/:id/cancel` - Cancel booking
-
-### Advanced Search Example
+## Testing
 
 ```bash
-GET /api/v1/properties?city=Moscow&guests=4&checkIn=2026-06-01&checkOut=2026-06-05&amenities=wifi,parking&maxPrice=5000
+pnpm test              # all tests
+pnpm test:unit         # unit only
+pnpm test:integration  # uses Testcontainers (needs Docker)
+pnpm test:coverage     # with coverage report
 ```
 
-Full interactive documentation available at `/api-docs` when server is running.
+Unit tests cover booking logic, payment helpers, date utilities, validation.
+Integration tests use real Postgres via Testcontainers — no mocked database for integration scenarios.
 
-## 🧪 Testing
+## Environment
 
-```bash
-# Run all tests
-pnpm test
+Copy `.env.example` to `.env`. Key variables:
 
-# Run tests in watch mode
-pnpm test:watch
+- `DATABASE_URL` — Postgres connection string
+- `REDIS_HOST`, `REDIS_PORT` — Redis for cache, queues, rate limiting
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` — signing keys
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe API
+- `SMTP_*` — email sending
+- `S3_BUCKET`, `AWS_REGION` — image storage
 
-# Run tests with coverage
-pnpm test:coverage
+## Status
 
-# Run integration tests
-pnpm test:integration
-```
+Backend is feature-complete. Frontend not started. No CI/CD pipeline yet.
 
-## 🏗️ Development
+See `stack.md` for rationale behind tech choices.
 
-```bash
-# Start development server with hot reload
-pnpm dev
+## License
 
-# Build for production
-pnpm build
-
-# Start production server
-pnpm start
-
-# Run linter
-pnpm lint
-
-# Format code
-pnpm format
-
-# Generate Prisma Client
-pnpm prisma:generate
-
-# Create new migration
-pnpm migrate:dev
-```
-
-## 🐳 Docker Deployment
-
-### Development
-
-```bash
-docker-compose up
-```
-
-### Production
-
-```bash
-docker build -t booking-service:latest .
-docker run -p 3000:3000 --env-file .env booking-service:latest
-```
-
-## 🚀 Production Deployment
-
-### Manual Deployment
-
-1. Provision a VPS (Hetzner, DigitalOcean, etc.)
-2. Install Docker and Docker Compose
-3. Set up Nginx as reverse proxy
-4. Configure SSL with Let's Encrypt
-5. Set up environment variables
-6. Run `docker-compose -f docker-compose.prod.yml up -d`
-
-### CI/CD with GitHub Actions
-
-Push to `main` branch triggers automatic deployment:
-
-- Runs tests
-- Builds Docker image
-- Deploys to production server
-- Runs database migrations
-
-## 🔒 Security Features
-
-- Password hashing with bcrypt (12 rounds)
-- JWT with short-lived access tokens (15 min)
-- Refresh token rotation
-- HTTP security headers (Helmet)
-- SQL injection prevention (Prisma parameterized queries)
-- Rate limiting
-- CORS configuration
-- Input validation with Zod
-
-## 📈 Performance Optimizations
-
-- Redis caching for frequently accessed data
-- Database indexing on search columns
-- Connection pooling
-- Efficient query design (N+1 prevention)
-- Background job processing (BullMQ)
-- Response compression
-
-## 🎓 What This Project Demonstrates
-
-### For Interviewers
-
-This project shows proficiency in:
-
-1. **Database Design**: Complex relationships, proper indexing, transaction management
-2. **Concurrency Handling**: Race condition prevention, optimistic/pessimistic locking
-3. **Authentication**: Industry-standard JWT implementation with refresh tokens
-4. **Asynchronous Processing**: Background jobs for non-blocking operations
-5. **API Design**: RESTful principles, proper status codes, error handling
-6. **Testing**: Unit and integration test coverage
-7. **DevOps**: Docker, CI/CD, production deployment
-8. **Code Quality**: TypeScript, linting, proper architecture
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT
