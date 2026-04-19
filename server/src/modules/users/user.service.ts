@@ -15,7 +15,6 @@ import { randomInt, randomUUID } from "crypto";
 import bcrypt from "bcrypt";
 import sharp from "sharp";
 import { deleteFromS3, uploadToS3 } from "../../shared/lib/storage.js";
-import { calculateNights } from "../../shared/utils/date.helpers.js";
 import {
   getUserStatsCacheKey,
   invalidateUserStatsCache,
@@ -643,18 +642,28 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
-    const [completedBookings, guestRatingAggregate, hostRatingAggregate, listingsCount] =
+    const [completedBookingsCount, completedNightsRows, guestRatingAggregate, hostRatingAggregate, listingsCount] =
       await Promise.all([
-        prisma.booking.findMany({
+        prisma.booking.count({
           where: {
             userId,
             status: "COMPLETED",
           },
-          select: {
-            checkIn: true,
-            checkOut: true,
-          },
         }),
+        prisma.$queryRaw<Array<{ completedNights: bigint }>>`
+          SELECT COALESCE(
+            SUM(
+              GREATEST(
+                0,
+                CEIL(EXTRACT(EPOCH FROM ("checkOut" - "checkIn")) / 86400.0)
+              )
+            ),
+            0
+          )::bigint AS "completedNights"
+          FROM "bookings"
+          WHERE "userId" = ${userId}
+            AND "status" = 'COMPLETED'
+        `,
         prisma.review.aggregate({
           where: { userId },
           _avg: { rating: true },
@@ -672,14 +681,10 @@ export class UserService {
         }),
       ]);
 
-    const completedNights = completedBookings.reduce(
-      (sum, booking) =>
-        sum + Math.max(0, calculateNights(booking.checkIn, booking.checkOut)),
-      0,
-    );
+    const completedNights = Number(completedNightsRows[0]?.completedNights ?? 0n);
 
     const stats = {
-      completedBookingsCount: completedBookings.length,
+      completedBookingsCount,
       completedNights,
       averageRatingAsGuest:
         guestRatingAggregate._avg.rating !== null
