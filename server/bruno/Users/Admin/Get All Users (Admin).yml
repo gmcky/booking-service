@@ -1,0 +1,9 @@
+info:
+  name: Get All Users (Admin)
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{baseUrl}}/users?page=1&limit=10"
+  auth: inherit

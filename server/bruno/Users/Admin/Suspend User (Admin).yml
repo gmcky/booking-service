@@ -1,0 +1,9 @@
+info:
+  name: Suspend User (Admin)
+  type: http
+  seq: 10
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/users/1/suspend"
+  auth: inherit

@@ -1,0 +1,15 @@
+info:
+  name: Delete Current User
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/users/me"
+  auth: inherit
+  body: json
+
+body:json:
+  {
+    "password": "Password123!"
+  }

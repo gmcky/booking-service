@@ -1,0 +1,15 @@
+info:
+  name: Confirm Email Change
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{baseUrl}}/users/me/email/confirm-change"
+  auth: inherit
+  body: json
+
+body:json:
+  {
+    "otp": "123456"
+  }

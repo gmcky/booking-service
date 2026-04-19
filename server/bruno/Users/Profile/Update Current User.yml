@@ -1,0 +1,18 @@
+info:
+  name: Update Current User
+  type: http
+  seq: 2
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/users/me"
+  auth: inherit
+  body: json
+
+body:json:
+  {
+    "firstName": "UpdatedFirstName",
+    "lastName": "UpdatedLastName",
+    "phoneNumber": "+1234567890",
+    "bio": "This is an updated bio"
+  }

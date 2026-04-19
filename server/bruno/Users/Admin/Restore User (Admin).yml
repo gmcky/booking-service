@@ -1,0 +1,9 @@
+info:
+  name: Restore User (Admin)
+  type: http
+  seq: 11
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/users/1/restore"
+  auth: inherit

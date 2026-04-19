@@ -1,0 +1,15 @@
+info:
+  name: Request Email Change
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{baseUrl}}/users/me/email/request-change"
+  auth: inherit
+  body: json
+
+body:json:
+  {
+    "newEmail": "newemail@example.com"
+  }

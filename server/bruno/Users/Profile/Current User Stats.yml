@@ -1,0 +1,9 @@
+info:
+  name: Current User Stats
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/users/me/stats"
+  auth: inherit
