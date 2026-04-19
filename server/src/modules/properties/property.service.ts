@@ -109,7 +109,7 @@ export class PropertyService {
       where: { id },
       include: {
         owner: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true },
         },
         reviews: {
           take: 5,
