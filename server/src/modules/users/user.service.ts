@@ -279,12 +279,19 @@ export class UserService {
       return;
     }
 
-    await deleteFromS3(user.avatarUrl);
-
     await prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: null },
     });
+
+    try {
+      await deleteFromS3(user.avatarUrl);
+    } catch (error) {
+      logger.warn(
+        { userId, avatarUrl: user.avatarUrl, error },
+        "Failed to delete avatar from S3 after DB update",
+      );
+    }
 
     logger.info({ userId }, "User avatar deleted");
   }
@@ -571,17 +578,6 @@ export class UserService {
       );
     }
 
-    if (user.avatarUrl) {
-      try {
-        await deleteFromS3(user.avatarUrl);
-      } catch (error) {
-        logger.warn(
-          { userId: id, avatarUrl: user.avatarUrl, error },
-          "Failed to delete avatar from S3; continuing with soft delete",
-        );
-      }
-    }
-
     const deletedAt = new Date();
 
     await prisma.$transaction([
@@ -593,10 +589,22 @@ export class UserService {
           email: `deleted_${id}@deleted.local`,
           passwordHash: null,
           phoneNumber: null,
+          avatarUrl: null,
         },
       }),
       prisma.refreshToken.deleteMany({ where: { userId: id } }),
     ]);
+
+    if (user.avatarUrl) {
+      try {
+        await deleteFromS3(user.avatarUrl);
+      } catch (error) {
+        logger.warn(
+          { userId: id, avatarUrl: user.avatarUrl, error },
+          "Failed to delete avatar from S3 after soft delete",
+        );
+      }
+    }
 
     await emailQueue.add("account-deleted-notification", {
       email: user.email,
