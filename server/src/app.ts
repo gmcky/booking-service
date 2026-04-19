@@ -8,7 +8,7 @@ import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import { createRequire } from "module";
-import { logger } from "./shared/lib/logger.js";
+import { logger, LOG_REDACT_PATHS } from "./shared/lib/logger.js";
 import rateLimit from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 import { cacheClient } from "./shared/lib/cache.js";
@@ -107,10 +107,8 @@ export function createApp(): Application {
     app.use(
       pinoHttp({
         logger,
-        // Redact sensitive values so they never appear in log output.
-        // Authorization header carries the access token; set-cookie carries the refresh token.
         redact: {
-          paths: ["req.headers.authorization", 'res.headers["set-cookie"]'],
+          paths: [...LOG_REDACT_PATHS],
           censor: "[REDACTED]",
         },
         autoLogging: {
