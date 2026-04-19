@@ -1,7 +1,7 @@
 info:
   name: Current User
   type: http
-  seq: 6
+  seq: 1
 
 http:
   method: GET
