@@ -25,6 +25,11 @@ import type {
   PropertyFilters,
 } from "./property.types.js";
 
+type PropertyViewer = {
+  id: string;
+  role: string;
+};
+
 /** Listing lifecycle service with cache-aside and async queue side-effects. */
 export class PropertyService {
   /** Public search flow: filter/sort/paginate with short-lived cache. */
@@ -99,8 +104,8 @@ export class PropertyService {
     return createPaginatedResponse(properties, total, params);
   }
 
-  /** Read flow: returns listing + owner/recent reviews with hot-key cache. */
-  static async getById(id: string) {
+  /** Read flow: public view is cached; inactive listings are visible only to owner/admin. */
+  static async getById(id: string, viewer?: PropertyViewer) {
     const cacheKey = `property:${id}`;
     const cached = await cacheGet(cacheKey);
     if (cached) return cached;
@@ -122,11 +127,22 @@ export class PropertyService {
       },
     });
 
-    if (!property || !property.isActive) {
+    if (!property) {
       throw new AppError(404, "Property not found");
     }
 
-    await cacheSet(cacheKey, property, 60 * 60);
+    const canViewInactive =
+      viewer?.role === "ADMIN" || viewer?.id === property.ownerId;
+
+    if (!property.isActive && !canViewInactive) {
+      throw new AppError(404, "Property not found");
+    }
+
+    // Cache only publicly visible state to avoid leaking owner/admin-only access.
+    if (property.isActive) {
+      await cacheSet(cacheKey, property, 60 * 60);
+    }
+
     return property;
   }
 

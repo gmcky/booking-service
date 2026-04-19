@@ -50,7 +50,15 @@ export async function getMyProperties(req: AuthenticatedRequest, res: Response) 
  */
 export async function getPropertyById(req: Request, res: Response) {
   const id = getIdParam(req);
-  const property = await PropertyService.getById(id);
+  const property = await PropertyService.getById(
+    id,
+    req.user
+      ? {
+          id: req.user.id,
+          role: req.user.role,
+        }
+      : undefined,
+  );
   res.json(property);
 }
 
