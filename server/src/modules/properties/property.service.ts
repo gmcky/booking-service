@@ -122,7 +122,7 @@ export class PropertyService {
       },
     });
 
-    if (!property) {
+    if (!property || !property.isActive) {
       throw new AppError(404, "Property not found");
     }
 
@@ -196,16 +196,28 @@ export class PropertyService {
     return updated;
   }
 
-  /** Delete flow: ownership check + best-effort image unlink queueing. */
+  /** Delete flow: ownership check + soft-delete by deactivation. */
   static async delete(id: string, ownerId: string) {
-    const property = await this.verifyOwnership(id, ownerId);
+    await this.verifyOwnership(id, ownerId);
 
-    await prisma.property.delete({ where: { id } });
+    const activeBookingsCount = await prisma.booking.count({
+      where: {
+        propertyId: id,
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+    });
 
-    if (property.images.length > 0) {
-      const jobName: CleanupJobName = "unlink-property-images";
-      await cleanupQueue.add(jobName, { paths: property.images });
+    if (activeBookingsCount > 0) {
+      throw new AppError(
+        400,
+        "Cannot delete property with active bookings. Cancel them first.",
+      );
     }
+
+    await prisma.property.update({
+      where: { id },
+      data: { isActive: false },
+    });
 
     await Promise.all([
       cacheDel(`property:${id}`),
