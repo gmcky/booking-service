@@ -392,14 +392,18 @@ export class UserService {
 
     const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
 
-    // Single active challenge per user; repeat requests rotate OTP and TTL.
+    // Single active challenge per user; repeat requests rotate OTP, TTL, and attempt counter.
     const redisKey = `email_change:${userId}`;
-    await cacheClient.set(
-      redisKey,
-      JSON.stringify({ newEmail, otp }),
-      "EX",
-      OTP_TTL_SECONDS,
-    );
+    const attemptsKey = `email_change_attempts:${userId}`;
+    await Promise.all([
+      cacheClient.set(
+        redisKey,
+        JSON.stringify({ newEmail, otp }),
+        "EX",
+        OTP_TTL_SECONDS,
+      ),
+      cacheClient.del(attemptsKey),
+    ]);
 
     await emailQueue.add("email-change-otp", {
       newEmail,
@@ -416,7 +420,9 @@ export class UserService {
 
   /** Applies verified email change and notifies previous mailbox. */
   static async confirmEmailChange(userId: string, otp: string) {
+    const OTP_MAX_ATTEMPTS = 5;
     const redisKey = `email_change:${userId}`;
+    const attemptsKey = `email_change_attempts:${userId}`;
     const raw = await cacheClient.get(redisKey);
 
     if (!raw) {
@@ -432,6 +438,19 @@ export class UserService {
     };
 
     if (otp !== storedOtp) {
+      const attempts = await cacheClient.incr(attemptsKey);
+      if (attempts === 1) {
+        // Align expiry with the OTP key so the counter doesn't outlive the challenge.
+        const ttl = await cacheClient.ttl(redisKey);
+        if (ttl > 0) await cacheClient.expire(attemptsKey, ttl);
+      }
+      if (attempts >= OTP_MAX_ATTEMPTS) {
+        await cacheClient.del(redisKey, attemptsKey);
+        throw new AppError(
+          429,
+          "Too many incorrect attempts. Please request a new code.",
+        );
+      }
       throw new AppError(400, "Invalid or expired OTP");
     }
 
