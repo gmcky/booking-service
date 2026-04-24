@@ -5,7 +5,7 @@ import { PropertyService } from "./property.service.js";
 import type { PropertyQueryInput } from "./property.types.js";
 
 /**
- * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4&amenities=WIFI,PARKING&sort=price_asc
+ * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4&amenities=WIFI,PARKING&sort=price_asc&checkIn=2025-06-01&checkOut=2025-06-07
  * @access Public
  */
 export async function getProperties(req: Request, res: Response) {
@@ -19,13 +19,15 @@ export async function getProperties(req: Request, res: Response) {
     maxPrice,
     maxGuests,
     sort,
+    checkIn,
+    checkOut,
   } = req.query as unknown as PropertyQueryInput;
 
   // TODO: add controller cache-aside if service cache is removed.
 
   const result = await PropertyService.getAll(
     { page, limit },
-    { city, type, amenities, minPrice, maxPrice, maxGuests, sort },
+    { city, type, amenities, minPrice, maxPrice, maxGuests, sort, checkIn, checkOut },
   );
 
   res.json(result);
