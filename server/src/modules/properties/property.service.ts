@@ -1,4 +1,5 @@
 import { prisma } from "../../shared/lib/prisma.js";
+import { BookingStatus } from "@prisma/client";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import {
@@ -59,6 +60,29 @@ export class PropertyService {
       ...(filters.maxGuests !== undefined && {
         maxGuests: { gte: filters.maxGuests },
       }),
+      // Search is advisory — actual booking creation re-checks under Serializable tx.
+      ...(filters.checkIn &&
+        filters.checkOut && {
+          NOT: [
+            {
+              bookings: {
+                some: {
+                  status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+                  checkIn: { lt: filters.checkOut },
+                  checkOut: { gt: filters.checkIn },
+                },
+              },
+            },
+            {
+              blockedDates: {
+                some: {
+                  startDate: { lt: filters.checkOut },
+                  endDate: { gt: filters.checkIn },
+                },
+              },
+            },
+          ],
+        }),
     };
 
     const sortMap = {
