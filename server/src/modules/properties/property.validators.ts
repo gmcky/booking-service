@@ -28,20 +28,41 @@ export const updatePropertySchema = z.object({
   images: z.array(z.string().url()).max(10).optional(),
 });
 
-export const propertyQuerySchema = z.object({
-  city: z.string().optional(),
-  type: z.nativeEnum(PropertyType).optional(),
-  // Accepts CSV and repeated query params for amenities.
-  amenities: z
-    .preprocess(
-      (val) => (typeof val === "string" ? val.split(",") : val),
-      z.array(z.nativeEnum(Amenity)).optional(),
-    )
-    .optional(),
-  minPrice: z.coerce.number().positive().optional(),
-  maxPrice: z.coerce.number().positive().optional(),
-  maxGuests: z.coerce.number().int().positive().optional(),
-  sort: z.enum(["price_asc", "price_desc", "newest"]).default("newest"),
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(10),
-});
+export const propertyQuerySchema = z
+  .object({
+    city: z.string().optional(),
+    type: z.nativeEnum(PropertyType).optional(),
+    // Accepts CSV and repeated query params for amenities.
+    amenities: z
+      .preprocess(
+        (val) => (typeof val === "string" ? val.split(",") : val),
+        z.array(z.nativeEnum(Amenity)).optional(),
+      )
+      .optional(),
+    minPrice: z.coerce.number().positive().optional(),
+    maxPrice: z.coerce.number().positive().optional(),
+    maxGuests: z.coerce.number().int().positive().optional(),
+    sort: z.enum(["price_asc", "price_desc", "newest"]).default("newest"),
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(10),
+    checkIn: z.coerce.date().optional(),
+    checkOut: z.coerce.date().optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasIn = val.checkIn !== undefined;
+    const hasOut = val.checkOut !== undefined;
+    if (hasIn !== hasOut) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "checkIn and checkOut must both be provided or both omitted",
+        path: hasIn ? ["checkOut"] : ["checkIn"],
+      });
+    }
+    if (hasIn && hasOut && val.checkIn! >= val.checkOut!) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "checkIn must be before checkOut",
+        path: ["checkIn"],
+      });
+    }
+  });

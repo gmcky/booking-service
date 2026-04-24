@@ -22,4 +22,6 @@ export interface PropertyFilters {
   maxPrice?: number;
   maxGuests?: number;
   sort?: "price_asc" | "price_desc" | "newest";
+  checkIn?: Date;
+  checkOut?: Date;
 }
