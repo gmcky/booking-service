@@ -21,17 +21,8 @@ export function errorHandler(
   res: Response,
   next: NextFunction,
 ) {
-  // Separate expected app errors from crash-class errors for cleaner alerting.
-  if (err instanceof AppError) {
-    logger.warn(
-      { statusCode: err.statusCode, message: err.message },
-      "Operational error",
-    );
-  } else {
-    logger.error(err);
-  }
-
   if (err instanceof ZodError) {
+    logger.warn({ issues: err.issues }, "Validation error");
     return res.status(400).json({
       error: "Validation failed",
       details: err.issues,
@@ -39,36 +30,32 @@ export function errorHandler(
   }
 
   if (err instanceof MulterError) {
+    logger.warn({ code: err.code }, "Multer error");
     const message =
       err.code === "LIMIT_FILE_SIZE"
         ? "File is too large. Maximum size is 2MB."
         : err.message;
-
-    return res.status(400).json({
-      error: message,
-    });
+    return res.status(400).json({ error: message });
   }
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    logger.warn({ code: err.code }, "Prisma known request error");
     if (err.code === "P2002") {
-      return res.status(409).json({
-        error: "Resource already exists",
-      });
+      return res.status(409).json({ error: "Resource already exists" });
     }
     if (err.code === "P2025") {
-      return res.status(404).json({
-        error: "Resource not found",
-      });
+      return res.status(404).json({ error: "Resource not found" });
     }
   }
 
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      error: err.message,
-    });
+    logger.warn(
+      { statusCode: err.statusCode, message: err.message },
+      "Operational error",
+    );
+    return res.status(err.statusCode).json({ error: err.message });
   }
 
-  return res.status(500).json({
-    error: "Internal server error",
-  });
+  logger.error(err, "Unhandled error");
+  return res.status(500).json({ error: "Internal server error" });
 }
