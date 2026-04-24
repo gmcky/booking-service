@@ -1,6 +1,6 @@
 import { z } from "zod";
 import zxcvbn from "zxcvbn";
-import { parsePhoneNumberWithError } from "libphonenumber-js";
+import { isValidPhoneNumber } from "libphonenumber-js/min";
 
 export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -29,12 +29,7 @@ export const registerSchema = z.object({
     .refine(
       (val) => {
         if (!val) return true;
-        try {
-          const phoneNumber = parsePhoneNumberWithError(val, "UA");
-          return phoneNumber.isValid();
-        } catch {
-          return false;
-        }
+        return isValidPhoneNumber(val);
       },
       {
         message: "Invalid phone number format",
