@@ -9,6 +9,10 @@ import type {
   AuthResponse,
   AuthTokens,
 } from "./auth.types.js";
+import {
+  getCachedAuthUser,
+  setCachedAuthUser,
+} from "./auth.cache.js";
 import bcrypt from "bcrypt";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "../../config/env.js";
@@ -502,6 +506,15 @@ export class AuthService {
       throw new AppError(401, "Invalid token structure");
     }
 
+    const cached = await getCachedAuthUser(userId);
+    if (cached) {
+      logger.debug(
+        { userId, endpoint: "verifyAccessToken" },
+        "Access token verified (cache hit)",
+      );
+      return cached;
+    }
+
     const user = await prisma.user.findFirst({
       where: { id: userId, isDeleted: false, isSuspended: false },
       select: { id: true, email: true, role: true },
@@ -510,6 +523,8 @@ export class AuthService {
     if (!user) {
       throw new AppError(401, "Invalid token");
     }
+
+    await setCachedAuthUser({ id: user.id, email: user.email, role: user.role });
 
     logger.debug(
       { userId, endpoint: "verifyAccessToken" },
