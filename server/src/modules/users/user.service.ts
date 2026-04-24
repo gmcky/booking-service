@@ -20,6 +20,7 @@ import {
   invalidateUserStatsCache,
   USER_STATS_CACHE_TTL_SECONDS,
 } from "./user.stats.cache.js";
+import { invalidateUserAuthCache } from "../auth/auth.cache.js";
 
 const AVATAR_MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 type UserViewMode = "self" | "public";
@@ -332,7 +333,10 @@ export class UserService {
       return updatedUser;
     });
 
-    await invalidateUserStatsCache(id);
+    await Promise.all([
+      invalidateUserStatsCache(id),
+      invalidateUserAuthCache(id),
+    ]);
 
     logger.info({ userId: id }, "User suspended by admin");
 
@@ -363,7 +367,10 @@ export class UserService {
       },
     });
 
-    await invalidateUserStatsCache(id);
+    await Promise.all([
+      invalidateUserStatsCache(id),
+      invalidateUserAuthCache(id),
+    ]);
 
     logger.info({ userId: id }, "User restored by admin");
 
@@ -630,7 +637,10 @@ export class UserService {
       deletedAtIso: deletedAt.toISOString(),
     });
 
-    await invalidateUserStatsCache(id);
+    await Promise.all([
+      invalidateUserStatsCache(id),
+      invalidateUserAuthCache(id),
+    ]);
 
     logger.info({ userId: id }, "User account soft-deleted");
 
