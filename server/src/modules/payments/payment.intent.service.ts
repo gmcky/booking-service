@@ -3,6 +3,8 @@ import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { env } from "../../config/env.js";
+import { emailQueue } from "../../shared/queues/email.queue.js";
+import { formatDate } from "./payment.helpers.js";
 import type {
   CreatePaymentInput,
   CreatePaymentIntentInput,
@@ -168,7 +170,7 @@ export class PaymentIntentService {
 
     const payment = await prisma.payment.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: { id: true, status: true, bookingId: true, amount: true, currency: true },
     });
 
     if (!payment) {
@@ -182,14 +184,64 @@ export class PaymentIntentService {
     // Bypasses provider-state checks; keep this path out of normal prod flow.
     logger.warn({ paymentId: id, userId }, "Manual payment process override used");
     // TODO: verify provider state before marking SUCCESS.
-    // TODO: update payment+booking atomically.
-    // TODO: enqueue booking-confirmation notification.
 
-    return prisma.payment.update({
-      where: { id },
-      data: {
-        status: "SUCCESS",
+    const updatedPayment = await prisma.$transaction(async (tx) => {
+      const p = await tx.payment.update({
+        where: { id },
+        data: { status: "SUCCESS" },
+      });
+
+      await tx.booking.update({
+        where: { id: payment.bookingId },
+        data: { status: "CONFIRMED" },
+      });
+
+      return p;
+    });
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: payment.bookingId },
+      include: {
+        user: { select: { email: true, firstName: true, lastName: true } },
+        property: {
+          select: {
+            title: true,
+            owner: { select: { email: true, firstName: true } },
+          },
+        },
       },
     });
+
+    if (booking) {
+      const amountPaid = Number(payment.amount);
+
+      await emailQueue.add("payment-success-guest", {
+        paymentId: id,
+        bookingId: booking.id,
+        guestEmail: booking.user.email,
+        guestFirstName: booking.user.firstName,
+        propertyTitle: booking.property.title,
+        checkIn: formatDate(booking.checkIn),
+        checkOut: formatDate(booking.checkOut),
+        amountPaid,
+        currency: payment.currency,
+      });
+
+      await emailQueue.add("payment-success-host", {
+        paymentId: id,
+        bookingId: booking.id,
+        hostEmail: booking.property.owner.email,
+        hostFirstName: booking.property.owner.firstName,
+        propertyTitle: booking.property.title,
+        guestFirstName: booking.user.firstName,
+        guestLastName: booking.user.lastName,
+        checkIn: formatDate(booking.checkIn),
+        checkOut: formatDate(booking.checkOut),
+        amountPaid,
+        currency: payment.currency,
+      });
+    }
+
+    return updatedPayment;
   }
 }
