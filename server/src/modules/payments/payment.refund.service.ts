@@ -144,7 +144,7 @@ export class PaymentRefundService {
             },
           },
           {
-            idempotencyKey: `refund_auto_${payment.id}`,
+            idempotencyKey: `refund_${payment.id}`,
           },
         );
       } catch (error) {
