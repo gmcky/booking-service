@@ -248,7 +248,7 @@ export class BookingService {
     }
 
     if (booking.status === "CANCELLED") {
-      return { booking }; // Idempotent cancel endpoint.
+      return { booking, cancellation: null }; // Idempotent cancel endpoint.
     }
 
     // Snapshot policy inputs for logs/response; avoids drift if constants change later.
