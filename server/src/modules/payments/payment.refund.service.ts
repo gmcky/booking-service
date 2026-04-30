@@ -408,6 +408,16 @@ export class PaymentRefundService {
     const finalized = await prisma.$transaction(async (tx) => {
       const stripeRefundPayload = toInputJsonObject(stripeRefund);
 
+      // Re-fetch inside tx so any audit entries written between initial fetch
+      // and this transaction are not overwritten by stale existingMetadata.
+      const latestPaymentState = await tx.payment.findUnique({
+        where: { id },
+        select: { metadata: true },
+      });
+      const freshMetadata = getMetadataObject(latestPaymentState?.metadata ?? null);
+      const freshAudit = getAuditObject(freshMetadata);
+      const freshStripePayload = getStripePayloadObject(freshMetadata);
+
       const updatedPayment = await tx.payment.updateMany({
         where: {
           id,
@@ -416,9 +426,9 @@ export class PaymentRefundService {
         data: {
           status: "REFUNDED",
           metadata: {
-            ...existingMetadata,
+            ...freshMetadata,
             audit: {
-              ...existingAudit,
+              ...freshAudit,
               refundApproval: {
                 approvedAt: new Date().toISOString(),
                 approvedBy: adminId,
@@ -428,7 +438,7 @@ export class PaymentRefundService {
               },
             },
             stripePayload: {
-              ...existingStripePayload,
+              ...freshStripePayload,
               approvedRefund: stripeRefundPayload,
             },
           },
