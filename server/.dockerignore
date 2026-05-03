@@ -83,7 +83,6 @@ prisma/migrations
 .prettierignore
 .eslintrc.js
 .eslintignore
-tsconfig.json
 nodemon.json
 
 # Package manager lock files (already copied explicitly)

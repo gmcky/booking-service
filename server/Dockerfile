@@ -17,8 +17,8 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Generate Prisma Client
-RUN pnpm prisma generate
+# Generate Prisma Client (dummy URL satisfies Prisma 7 env validation at generate time)
+RUN DATABASE_URL=postgresql://x:x@x:5432/x pnpm prisma generate
 
 # Build TypeScript
 RUN pnpm build
@@ -49,7 +49,7 @@ RUN pnpm install --prod --frozen-lockfile
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Change ownership to non-root user
 RUN chown -R nodejs:nodejs /app
