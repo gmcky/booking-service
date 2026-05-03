@@ -219,6 +219,13 @@ export class BookingService {
       );
     }
 
+    if (status === "COMPLETED" && booking.checkOut.getTime() > Date.now()) {
+      throw new AppError(
+        400,
+        "Cannot mark booking as completed before check-out time",
+      );
+    }
+
     return prisma.booking.update({
       where: { id },
       data: { status },
