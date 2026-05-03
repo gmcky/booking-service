@@ -300,7 +300,7 @@ describe("PaymentRefundService.requestRefund", () => {
         }),
       }),
       expect.objectContaining({
-        idempotencyKey: "refund_auto_payment-1",
+        idempotencyKey: "refund_payment-1",
       }),
     );
   });
@@ -496,6 +496,7 @@ describe("PaymentRefundService.approveRefund", () => {
 
     (mockPrisma.payment.findUnique as any)
       .mockResolvedValueOnce(processingPayment)
+      .mockResolvedValueOnce({ metadata: processingPayment.metadata })
       .mockResolvedValueOnce(refundedPayment);
     (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
@@ -530,6 +531,7 @@ describe("PaymentRefundService.approveRefund", () => {
 
     (mockPrisma.payment.findUnique as any)
       .mockResolvedValueOnce(requestedPayment)
+      .mockResolvedValueOnce({ metadata: requestedPayment.metadata })
       .mockResolvedValueOnce(refundedPayment);
     (mockPrisma.payment.updateMany as any)
       .mockResolvedValueOnce({ count: 1 })
@@ -543,5 +545,68 @@ describe("PaymentRefundService.approveRefund", () => {
     expect(result.status).toBe("REFUNDED");
     expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
     expect(mockEmailQueue.add).not.toHaveBeenCalled();
+  });
+
+  it("preserves latest audit metadata and appends refundApproval", async () => {
+    const requestedPayment = buildPayment({
+      status: "REFUND_REQUESTED",
+      metadata: {
+        audit: {
+          refundRequest: {
+            refundAmount: 150,
+            requestedBy: "user-1",
+          },
+        },
+      },
+    });
+    const latestMetadata = {
+      audit: {
+        refundRequest: {
+          refundAmount: 150,
+          requestedBy: "user-1",
+        },
+        moderationSnapshot: {
+          reviewerId: "admin-2",
+        },
+      },
+    };
+    const refundedPayment = buildPayment({
+      status: "REFUNDED",
+      metadata: latestMetadata,
+    });
+
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(requestedPayment)
+      .mockResolvedValueOnce({ metadata: latestMetadata })
+      .mockResolvedValueOnce(refundedPayment);
+    (mockPrisma.payment.updateMany as any)
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_audit_1" } as any);
+
+    await PaymentRefundService.approveRefund("payment-1", "admin-1");
+
+    expect(mockPrisma.payment.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            audit: expect.objectContaining({
+              refundRequest: expect.objectContaining({
+                refundAmount: 150,
+              }),
+              moderationSnapshot: expect.objectContaining({
+                reviewerId: "admin-2",
+              }),
+              refundApproval: expect.objectContaining({
+                approvedBy: "admin-1",
+                stripeRefundId: "re_audit_1",
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
   });
 });
