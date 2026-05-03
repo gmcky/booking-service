@@ -260,15 +260,15 @@ export class ReviewService {
     }
   }
 
-  /** Delete flow: owner-only delete with aggregate recompute. */
-  static async delete(id: string, userId: string) {
+  /** Delete flow: author/admin delete with aggregate recompute. */
+  static async delete(id: string, userId: string, userRole: string) {
     const review = await prisma.review.findUnique({ where: { id } });
 
     if (!review) {
       throw new AppError(404, "Review not found");
     }
 
-    if (review.userId !== userId) {
+    if (review.userId !== userId && userRole !== "ADMIN") {
       throw new AppError(403, "Not authorized to delete this review");
     }
 
@@ -284,6 +284,7 @@ export class ReviewService {
         event: "review_deleted",
         reviewId: id,
         userId,
+        userRole,
         propertyId: review.propertyId,
       },
       "Review deleted",

@@ -56,13 +56,14 @@ export async function updateReview(req: AuthenticatedRequest, res: Response) {
 
 /**
  * @route DELETE /api/v1/reviews/:id
- * @access Private
+ * @access Private (author or admin)
  * @security Bearer token required.
  */
 export async function deleteReview(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
-  await ReviewService.delete(id, userId);
+  const userRole = req.user!.role;
+  await ReviewService.delete(id, userId, userRole);
   res.status(204).send();
 }
 

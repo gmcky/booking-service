@@ -109,6 +109,53 @@ describe("ReviewService", () => {
     });
   });
 
+  it("allows admin to delete someone else's review", async () => {
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-1",
+      userId: "guest-1",
+      propertyId: "property-1",
+    } as any);
+    mockPrisma.review.aggregate.mockResolvedValue({
+      _avg: { rating: 4.5 },
+      _count: 2,
+    } as any);
+    mockPrisma.property.update.mockResolvedValue({ id: "property-1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) =>
+      cb(mockPrisma),
+    );
+
+    await ReviewService.delete("review-1", "admin-1", "ADMIN");
+
+    expect(mockPrisma.review.delete).toHaveBeenCalledWith({
+      where: { id: "review-1" },
+    });
+    expect(mockPrisma.property.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "property-1" },
+      }),
+    );
+    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith(
+      "reviews:property:property-1:*",
+    );
+  });
+
+  it("rejects review deletion from non-author non-admin user", async () => {
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-2",
+      userId: "guest-2",
+      propertyId: "property-2",
+    } as any);
+
+    await expect(
+      ReviewService.delete("review-2", "user-3", "USER"),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Not authorized to delete this review",
+    });
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("adds host reply once and invalidates review caches", async () => {
     (mockPrisma.review.findUnique as any)
       .mockResolvedValueOnce({
