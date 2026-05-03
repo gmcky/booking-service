@@ -59,12 +59,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: booking-redis
-    ports:
-      - "6379:6379"
+    entrypoint: ["/usr/local/bin/redis-entrypoint.sh"]
     volumes:
       - redis_data:/data
+      - ./docker/redis-entrypoint.sh:/usr/local/bin/redis-entrypoint.sh:ro
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -u redis://booking:$$REDIS_PASSWORD@localhost:6379 ping"]
       interval: 10s
       timeout: 3s
       retries: 5

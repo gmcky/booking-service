@@ -5,6 +5,7 @@ import { env } from "../../config/env.js";
 export const redisConnection: RedisOptions = {
   host: env.REDIS_HOST,
   port: env.REDIS_PORT,
+  username: env.REDIS_USERNAME || undefined,
   password: env.REDIS_PASSWORD || undefined,
   maxRetriesPerRequest: null,
 };
