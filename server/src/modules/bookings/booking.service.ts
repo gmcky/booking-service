@@ -32,6 +32,22 @@ import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 
 type TransactionClient = Prisma.TransactionClient;
 
+const BOOKING_PROPERTY_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  type: true,
+  city: true,
+  address: true,
+  images: true,
+  pricePerNight: true,
+  maxGuests: true,
+  amenities: true,
+  averageRating: true,
+  reviewCount: true,
+  ownerId: true,
+} as const;
+
 // Service-level FSM; block backward/skip transitions even if caller retries.
 const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
@@ -72,7 +88,7 @@ export class BookingService {
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: {
-        property: true,
+        property: { select: BOOKING_PROPERTY_SELECT },
         payment: {
           select: {
             id: true,
@@ -160,7 +176,7 @@ export class BookingService {
             totalPrice,
           },
           include: {
-            property: true,
+            property: { select: BOOKING_PROPERTY_SELECT },
           },
         });
       },
@@ -534,7 +550,7 @@ export class BookingService {
             guests: newGuests,
             totalPrice,
           },
-          include: { property: true },
+          include: { property: { select: BOOKING_PROPERTY_SELECT } },
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },

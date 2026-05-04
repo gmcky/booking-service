@@ -154,7 +154,7 @@ describe("PaymentRefundService.requestRefund", () => {
     vi.clearAllMocks();
   });
 
-  it("returns payment as-is when status is already REFUND_REQUESTED", async () => {
+  it("returns stripped payment (no metadata/booking) when status is already REFUND_REQUESTED", async () => {
     const payment = buildPayment({ status: "REFUND_REQUESTED" });
     mockPaymentFindUniqueResult(payment);
 
@@ -163,12 +163,14 @@ describe("PaymentRefundService.requestRefund", () => {
       "user-1",
     );
 
-    expect(result).toBe(payment);
+    expect(result).toMatchObject({ id: "payment-1", status: "REFUND_REQUESTED" });
+    expect(result).not.toHaveProperty("metadata");
+    expect(result).not.toHaveProperty("booking");
     expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
   });
 
-  it("returns payment as-is when status is already REFUND_PROCESSING", async () => {
+  it("returns stripped payment (no metadata/booking) when status is already REFUND_PROCESSING", async () => {
     const payment = buildPayment({ status: "REFUND_PROCESSING" });
     mockPaymentFindUniqueResult(payment);
 
@@ -177,7 +179,9 @@ describe("PaymentRefundService.requestRefund", () => {
       "user-1",
     );
 
-    expect(result).toBe(payment);
+    expect(result).toMatchObject({ id: "payment-1", status: "REFUND_PROCESSING" });
+    expect(result).not.toHaveProperty("metadata");
+    expect(result).not.toHaveProperty("booking");
     expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
   });

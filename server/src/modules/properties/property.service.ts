@@ -197,7 +197,7 @@ export class PropertyService {
 
     // Notification enqueue is fire-and-forget.
     await emailQueue.add("property-created-host", {
-      ownerEmail: property.owner.email!,
+      ownerEmail: property.owner.email,
       ownerFirstName: property.owner.firstName,
       propertyId: property.id,
       propertyTitle: property.title,
@@ -205,7 +205,8 @@ export class PropertyService {
 
     await cacheInvalidatePattern("properties:search:*");
 
-    return property;
+    const { owner: { email: _email, ...ownerWithoutEmail }, ...propertyWithoutOwner } = property;
+    return { ...propertyWithoutOwner, owner: ownerWithoutEmail };
   }
 
   /** Update flow: ownership-guarded patch with orphan-image cleanup. */

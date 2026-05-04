@@ -57,7 +57,8 @@ export class PaymentRefundService {
       payment.status === "REFUND_REQUESTED" ||
       payment.status === "REFUND_PROCESSING"
     ) {
-      return payment;
+      const { metadata: _m, booking: _b, ...paymentData } = payment;
+      return paymentData;
     }
 
     if (payment.status !== "SUCCESS") {
@@ -218,7 +219,8 @@ export class PaymentRefundService {
         currency: payment.currency,
       });
 
-      return refundedPayment;
+      const { metadata: _m, ...refundedPaymentData } = refundedPayment;
+      return refundedPaymentData;
     }
 
     const updatedPayment = await prisma.payment.update({
@@ -266,7 +268,8 @@ export class PaymentRefundService {
       ),
     );
 
-    return updatedPayment;
+    const { metadata: _m, ...updatedPaymentData } = updatedPayment;
+    return updatedPaymentData;
   }
 
   /** Admin approval flow with idempotent state transition and provider refund call. */
@@ -493,7 +496,8 @@ export class PaymentRefundService {
       });
     }
 
-    return finalized.payment;
+    const { metadata: _m, ...finalizedPaymentData } = finalized.payment;
+    return finalizedPaymentData;
   }
 
   /** Admin rejection flow that restores payment to SUCCESS state. */
@@ -559,6 +563,7 @@ export class PaymentRefundService {
       reason: reason ?? null,
     });
 
-    return updatedPayment;
+    const { metadata: _m, ...rejectedPaymentData } = updatedPayment;
+    return rejectedPaymentData;
   }
 }
