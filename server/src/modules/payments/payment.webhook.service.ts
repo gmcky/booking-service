@@ -16,7 +16,6 @@ import {
 } from "./payment.helpers.js";
 
 export class PaymentWebhookService {
-  // TODO: add unit tests for payment_intent.succeeded/payment_failed/charge.refunded handlers.
   /** Verifies webhook signature, deduplicates events, then dispatches handlers. */
   static async handleStripeWebhook(event: string | Buffer, signature: string) {
     let stripeEvent: Stripe.Event;
@@ -31,6 +30,46 @@ export class PaymentWebhookService {
       throw new AppError(400, "Invalid webhook signature");
     }
 
+    const alreadyProcessed = await prisma.processedStripeEvent.findUnique({
+      where: { eventId: stripeEvent.id },
+    });
+    if (alreadyProcessed) {
+      logger.info(
+        { stripeEventId: stripeEvent.id, eventType: stripeEvent.type },
+        "Duplicate Stripe webhook event skipped",
+      );
+      return { success: true };
+    }
+
+    // Handler runs before the dedup record is written. If the app crashes
+    // mid-handler the record is never inserted, so Stripe will retry and
+    // the handler will run again — correct. Handlers must be idempotent;
+    // email jobs carry a jobId so BullMQ deduplicates on concurrent delivery.
+    switch (stripeEvent.type) {
+      case "payment_intent.succeeded":
+        await this.handlePaymentSuccess(
+          stripeEvent.data.object as Stripe.PaymentIntent,
+          stripeEvent.id,
+        );
+        break;
+      case "payment_intent.payment_failed":
+        await this.handlePaymentFailed(
+          stripeEvent.data.object as Stripe.PaymentIntent,
+        );
+        break;
+      case "charge.refunded":
+        await this.handleChargeRefunded(
+          stripeEvent.data.object as Stripe.Charge,
+          stripeEvent.id,
+        );
+        break;
+      default:
+        logger.info(
+          { eventType: stripeEvent.type },
+          "Unhandled webhook event",
+        );
+    }
+
     try {
       await prisma.processedStripeEvent.create({
         data: {
@@ -43,49 +82,15 @@ export class PaymentWebhookService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        logger.info(
-          { stripeEventId: stripeEvent.id, eventType: stripeEvent.type },
-          "Duplicate Stripe webhook event skipped",
-        );
+        // Concurrent delivery: another request processed the same event.
+        // Handler already ran (idempotent), so this is safe to ignore.
         return { success: true };
       }
 
       logger.error(
         { error, stripeEventId: stripeEvent.id, eventType: stripeEvent.type },
-        "Failed to register Stripe webhook event",
+        "Failed to record processed Stripe event — handler succeeded but dedup record missing",
       );
-      throw new AppError(500, "Failed to process webhook");
-    }
-
-    try {
-      switch (stripeEvent.type) {
-        case "payment_intent.succeeded":
-          await this.handlePaymentSuccess(
-            stripeEvent.data.object as Stripe.PaymentIntent,
-          );
-          break;
-        case "payment_intent.payment_failed":
-          await this.handlePaymentFailed(
-            stripeEvent.data.object as Stripe.PaymentIntent,
-          );
-          break;
-        case "charge.refunded":
-          await this.handleChargeRefunded(
-            stripeEvent.data.object as Stripe.Charge,
-          );
-          break;
-        default:
-          logger.info(
-            { eventType: stripeEvent.type },
-            "Unhandled webhook event",
-          );
-      }
-    } catch (error) {
-      await prisma.processedStripeEvent.deleteMany({
-        where: { eventId: stripeEvent.id },
-      });
-
-      throw error;
     }
 
     return { success: true };
@@ -94,6 +99,7 @@ export class PaymentWebhookService {
   /** Success sync: upsert payment state and confirm booking in one transaction. */
   private static async handlePaymentSuccess(
     paymentIntent: Stripe.PaymentIntent,
+    eventId: string,
   ) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
@@ -192,31 +198,39 @@ export class PaymentWebhookService {
     });
 
     if (booking && updatedPaymentId) {
-      await emailQueue.add("payment-success-guest", {
-        paymentId: updatedPaymentId,
-        bookingId: booking.id,
-        guestEmail: booking.user.email,
-        guestFirstName: booking.user.firstName,
-        propertyTitle: booking.property.title,
-        checkIn: formatDate(booking.checkIn),
-        checkOut: formatDate(booking.checkOut),
-        amountPaid: amountInMainCurrency,
-        currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
-      });
+      await emailQueue.add(
+        "payment-success-guest",
+        {
+          paymentId: updatedPaymentId,
+          bookingId: booking.id,
+          guestEmail: booking.user.email,
+          guestFirstName: booking.user.firstName,
+          propertyTitle: booking.property.title,
+          checkIn: formatDate(booking.checkIn),
+          checkOut: formatDate(booking.checkOut),
+          amountPaid: amountInMainCurrency,
+          currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
+        },
+        { jobId: `payment-success-guest:${eventId}` },
+      );
 
-      await emailQueue.add("payment-success-host", {
-        paymentId: updatedPaymentId,
-        bookingId: booking.id,
-        hostEmail: booking.property.owner.email,
-        hostFirstName: booking.property.owner.firstName,
-        propertyTitle: booking.property.title,
-        guestFirstName: booking.user.firstName,
-        guestLastName: booking.user.lastName,
-        checkIn: formatDate(booking.checkIn),
-        checkOut: formatDate(booking.checkOut),
-        amountPaid: amountInMainCurrency,
-        currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
-      });
+      await emailQueue.add(
+        "payment-success-host",
+        {
+          paymentId: updatedPaymentId,
+          bookingId: booking.id,
+          hostEmail: booking.property.owner.email,
+          hostFirstName: booking.property.owner.firstName,
+          propertyTitle: booking.property.title,
+          guestFirstName: booking.user.firstName,
+          guestLastName: booking.user.lastName,
+          checkIn: formatDate(booking.checkIn),
+          checkOut: formatDate(booking.checkOut),
+          amountPaid: amountInMainCurrency,
+          currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
+        },
+        { jobId: `payment-success-host:${eventId}` },
+      );
     }
 
     logger.info(
@@ -274,7 +288,7 @@ export class PaymentWebhookService {
   }
 
   /** Refund sync from provider event; updates payment/booking and notifies host. */
-  private static async handleChargeRefunded(charge: Stripe.Charge) {
+  private static async handleChargeRefunded(charge: Stripe.Charge, eventId: string) {
     const paymentIntentRaw = charge?.payment_intent;
     const paymentIntentId =
       typeof paymentIntentRaw === "string"
@@ -385,21 +399,25 @@ export class PaymentWebhookService {
           )
         : 100;
 
-    await emailQueue.add("refund-processed-host", {
-      paymentId: payment.id,
-      bookingId: payment.bookingId,
-      hostEmail: payment.booking.property.owner.email,
-      hostFirstName: payment.booking.property.owner.firstName,
-      propertyTitle: payment.booking.property.title,
-      guestFirstName: payment.booking.user.firstName,
-      guestLastName: payment.booking.user.lastName,
-      checkIn: formatDate(payment.booking.checkIn),
-      checkOut: formatDate(payment.booking.checkOut),
-      refundPercent,
-      refundedAmount,
-      totalAmount,
-      currency: payment.currency,
-    });
+    await emailQueue.add(
+      "refund-processed-host",
+      {
+        paymentId: payment.id,
+        bookingId: payment.bookingId,
+        hostEmail: payment.booking.property.owner.email,
+        hostFirstName: payment.booking.property.owner.firstName,
+        propertyTitle: payment.booking.property.title,
+        guestFirstName: payment.booking.user.firstName,
+        guestLastName: payment.booking.user.lastName,
+        checkIn: formatDate(payment.booking.checkIn),
+        checkOut: formatDate(payment.booking.checkOut),
+        refundPercent,
+        refundedAmount,
+        totalAmount,
+        currency: payment.currency,
+      },
+      { jobId: `refund-processed-host:${eventId}` },
+    );
 
     logger.info(
       { paymentId: payment.id, bookingId: payment.bookingId, paymentIntentId },
