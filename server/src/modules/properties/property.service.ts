@@ -46,7 +46,7 @@ export class PropertyService {
       ...(filters.city && {
         city: { contains: filters.city, mode: "insensitive" as const },
       }),
-      ...(filters.type && { type: filters.type as any }),
+      ...(filters.type && { type: filters.type }),
       ...(filters.amenities?.length && {
         amenities: { hasEvery: filters.amenities },
       }),
