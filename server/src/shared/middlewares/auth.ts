@@ -60,8 +60,14 @@ export async function optionalAuth(
   if (token) {
     try {
       req.user = await AuthService.verifyAccessToken(token);
-    } catch {
-      // Invalid token downgrades to anonymous context.
+    } catch (error) {
+      // Invalid token downgrades to anonymous context. Header lets the client
+      // distinguish "no token sent" from "token sent but rejected".
+      res.setHeader("X-Auth-Warning", "token-invalid");
+      logger.debug(
+        { error, ip: req.ip, method: req.method, path: req.path },
+        "optionalAuth: invalid token downgraded to anonymous",
+      );
     }
   }
 
