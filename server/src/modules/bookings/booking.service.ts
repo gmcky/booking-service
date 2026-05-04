@@ -505,12 +505,7 @@ export class BookingService {
       throw new AppError(400, `Maximum stay is ${MAX_STAY_NIGHTS} nights`);
     }
 
-    const property = await prisma.property.findUnique({
-      where: { id: booking.propertyId },
-    });
-    if (!property) {
-      throw new AppError(404, "Property not found");
-    }
+    const property = booking.property;
 
     if (newGuests > property.maxGuests) {
       throw new AppError(400, `Maximum ${property.maxGuests} guests allowed`);
