@@ -29,6 +29,8 @@ import {
 } from "../payments/payment.helpers.js";
 import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
+import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
+import { setTimeout as sleep } from "timers/promises";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -444,47 +446,91 @@ export class BookingService {
       }
     }
 
-    const cancelledBooking = await prisma.$transaction(async (tx) => {
-      await tx.payment.updateMany({
-        where: {
-          id: payment.id,
-          status: { in: ["SUCCESS", "REFUND_PROCESSING"] },
-        },
-        data: {
-          status: "REFUNDED",
-          metadata: {
-            ...existingMetadata,
-            audit: {
-              ...existingAudit,
-              bookingCancellationRefund: {
-                refundedAt: new Date().toISOString(),
-                cancelledBy: cancelledByUserId,
-                cancelledByRole,
-                refundPercent,
-                refundAmount,
+    const finalizeRefundTx = () =>
+      prisma.$transaction(async (tx) => {
+        await tx.payment.updateMany({
+          where: {
+            id: payment.id,
+            status: { in: ["SUCCESS", "REFUND_PROCESSING"] },
+          },
+          data: {
+            status: "REFUNDED",
+            metadata: {
+              ...existingMetadata,
+              audit: {
+                ...existingAudit,
+                bookingCancellationRefund: {
+                  refundedAt: new Date().toISOString(),
+                  cancelledBy: cancelledByUserId,
+                  cancelledByRole,
+                  refundPercent,
+                  refundAmount,
+                },
+              },
+              stripePayload: {
+                ...existingStripePayload,
+                ...(stripeRefund
+                  ? {
+                      bookingCancellationRefund: toInputJsonObject(stripeRefund),
+                    }
+                  : {}),
               },
             },
-            stripePayload: {
-              ...existingStripePayload,
-              ...(stripeRefund
-                ? {
-                    bookingCancellationRefund: toInputJsonObject(stripeRefund),
-                  }
-                : {}),
-            },
           },
-        },
+        });
+
+        return tx.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: "CANCELLED",
+            payoutStatus: "CANCELLED",
+          },
+          include: { property: true },
+        });
       });
 
-      return tx.booking.update({
-        where: { id: booking.id },
-        data: {
-          status: "CANCELLED",
-          payoutStatus: "CANCELLED",
+    const MAX_FINALIZE_ATTEMPTS = 3;
+    let cancelledBooking: Awaited<ReturnType<typeof finalizeRefundTx>> | null = null;
+    let lastFinalizeError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_FINALIZE_ATTEMPTS; attempt++) {
+      try {
+        cancelledBooking = await finalizeRefundTx();
+        break;
+      } catch (err) {
+        lastFinalizeError = err;
+        logger.warn(
+          { err, bookingId: booking.id, paymentId: payment.id, attempt },
+          "Booking cancellation DB finalization failed — retrying",
+        );
+        if (attempt < MAX_FINALIZE_ATTEMPTS) await sleep(200 * attempt);
+      }
+    }
+
+    if (!cancelledBooking) {
+      // Stripe refund is confirmed; only the DB write failed. Safe to retry manually
+      // using the same idempotency key: booking_cancel_refund_${payment.id}.
+      void sendOpsAlert({
+        title: "Booking cancellation DB finalization failed after retries",
+        message:
+          "Stripe refund was issued but booking/payment DB state could not be finalized. Manual recovery required.",
+        context: {
+          bookingId: booking.id,
+          paymentId: payment.id,
+          stripeRefundId: stripeRefund?.id ?? null,
+          idempotencyKey: `booking_cancel_refund_${payment.id}`,
+          error: String(lastFinalizeError),
         },
-        include: { property: true },
       });
-    });
+      logger.error(
+        { lastFinalizeError, bookingId: booking.id, paymentId: payment.id },
+        "Booking cancellation DB finalization failed after all retries",
+      );
+      throw new AppError(
+        500,
+        "Your refund was processed but the booking status could not be updated. Our team has been alerted — contact support if the booking does not update within a few minutes.",
+      );
+    }
 
     return cancelledBooking;
   }
