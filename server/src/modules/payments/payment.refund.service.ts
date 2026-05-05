@@ -13,6 +13,8 @@ import {
   toFiniteNumber,
   toInputJsonObject,
 } from "./payment.helpers.js";
+import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
+import { setTimeout as sleep } from "timers/promises";
 
 export class PaymentRefundService {
   /** Refund request flow with policy gate and optional auto-approval path. */
@@ -149,49 +151,99 @@ export class PaymentRefundService {
           },
         );
       } catch (error) {
+        // Roll back to SUCCESS so the client can retry — idempotency key on
+        // the Stripe call makes a retry safe even if Stripe partially succeeded.
+        await prisma.payment.update({
+          where: { id },
+          data: { status: "SUCCESS" },
+        });
         logger.error(
           { error, paymentId: payment.id, bookingId: payment.bookingId },
-          "Failed to create Stripe auto-approved refund",
+          "Failed to create Stripe auto-approved refund; payment rolled back to SUCCESS",
         );
         throw new AppError(502, "Payment provider error during auto refund");
       }
 
-      const refundedPayment = await prisma.$transaction(async (tx) => {
-        const stripeRefundPayload = toInputJsonObject(stripeRefund);
+      const finalizeAutoRefundTx = () =>
+        prisma.$transaction(async (tx) => {
+          const stripeRefundPayload = toInputJsonObject(stripeRefund);
 
-        const updatedPayment = await tx.payment.update({
-          where: { id },
-          data: {
-            status: "REFUNDED",
-            metadata: {
-              ...processingMetadata,
-              audit: {
-                ...processingAudit,
-                refundAutoApproval: {
-                  approvedAt: new Date().toISOString(),
-                  stripeRefundId: stripeRefund.id,
-                  refundAmount,
-                  refundPercent: policy.refundPercent,
+          const updatedPayment = await tx.payment.update({
+            where: { id },
+            data: {
+              status: "REFUNDED",
+              metadata: {
+                ...processingMetadata,
+                audit: {
+                  ...processingAudit,
+                  refundAutoApproval: {
+                    approvedAt: new Date().toISOString(),
+                    stripeRefundId: stripeRefund.id,
+                    refundAmount,
+                    refundPercent: policy.refundPercent,
+                  },
+                },
+                stripePayload: {
+                  ...processingStripePayload,
+                  autoApprovedRefund: stripeRefundPayload,
                 },
               },
-              stripePayload: {
-                ...processingStripePayload,
-                autoApprovedRefund: stripeRefundPayload,
-              },
             },
-          },
+          });
+
+          await tx.booking.update({
+            where: { id: payment.bookingId },
+            data: {
+              status: "CANCELLED",
+              payoutStatus: "CANCELLED",
+            },
+          });
+
+          return updatedPayment;
         });
 
-        await tx.booking.update({
-          where: { id: payment.bookingId },
-          data: {
-            status: "CANCELLED",
-            payoutStatus: "CANCELLED",
+      const MAX_FINALIZE_ATTEMPTS = 3;
+      let refundedPayment: Awaited<ReturnType<typeof finalizeAutoRefundTx>> | null = null;
+      let lastFinalizeError: unknown;
+
+      for (let attempt = 1; attempt <= MAX_FINALIZE_ATTEMPTS; attempt++) {
+        try {
+          refundedPayment = await finalizeAutoRefundTx();
+          break;
+        } catch (err) {
+          lastFinalizeError = err;
+          logger.warn(
+            { err, paymentId: payment.id, bookingId: payment.bookingId, attempt },
+            "Auto-refund DB finalization failed — retrying",
+          );
+          if (attempt < MAX_FINALIZE_ATTEMPTS) await sleep(200 * attempt);
+        }
+      }
+
+      if (!refundedPayment) {
+        // Stripe refund confirmed; only DB write failed. Retry safely using
+        // the same idempotency key: refund_${payment.id}.
+        void sendOpsAlert({
+          title: "Auto-refund DB finalization failed after retries",
+          message:
+            "Stripe refund was issued but payment/booking DB state could not be finalized. Manual recovery required.",
+          context: {
+            paymentId: payment.id,
+            bookingId: payment.bookingId,
+            stripeRefundId: stripeRefund.id,
+            idempotencyKey: `refund_${payment.id}`,
+            error: String(lastFinalizeError),
           },
         });
-
-        return updatedPayment;
-      });
+        logger.error(
+          { lastFinalizeError, paymentId: payment.id, bookingId: payment.bookingId },
+          "Auto-refund DB finalization failed after all retries",
+        );
+        throw new AppError(
+          500,
+          "Your refund was processed but the booking status could not be updated. Our team has been alerted — contact support if the booking does not update within a few minutes.",
+        );
+      }
 
       await emailQueue.add("refund-processed-guest", {
         paymentId: refundedPayment.id,

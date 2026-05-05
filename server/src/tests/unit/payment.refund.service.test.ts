@@ -21,9 +21,18 @@ vi.mock("../../shared/queues/email.queue.js", () => ({
   },
 }));
 
+vi.mock("../../shared/lib/ops-alert.js", () => ({
+  sendOpsAlert: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("timers/promises", () => ({
+  setTimeout: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from "../../shared/lib/prisma.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
+import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { PaymentRefundService } from "../../modules/payments/payment.refund.service.js";
 
@@ -36,6 +45,7 @@ const mockStripe = stripe as unknown as {
 const mockEmailQueue = emailQueue as unknown as {
   add: ReturnType<typeof vi.fn>;
 };
+const mockSendOpsAlert = sendOpsAlert as ReturnType<typeof vi.fn>;
 
 type PaymentFixture = {
   id: string;
@@ -344,7 +354,60 @@ describe("PaymentRefundService.requestRefund", () => {
     );
   });
 
-  it("leaves payment in REFUND_PROCESSING state when Stripe call fails", async () => {
+  it("rolls back payment to SUCCESS and throws 502 when Stripe call fails", async () => {
+    const payment = buildPayment({
+      booking: { checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
+    });
+    const processingPayment = buildPayment({ status: "REFUND_PROCESSING" });
+    const rolledBackPayment = buildPayment({ status: "SUCCESS" });
+
+    mockPaymentFindUniqueResult(payment);
+    (mockPrisma.payment.update as any)
+      .mockResolvedValueOnce(processingPayment)
+      .mockResolvedValueOnce(rolledBackPayment);
+    mockStripe.refunds.create.mockRejectedValue(new Error("Stripe timeout"));
+
+    await expect(
+      PaymentRefundService.requestRefund("payment-1", "user-1"),
+    ).rejects.toMatchObject({ statusCode: 502 });
+
+    expect(mockPrisma.payment.update).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.payment.update).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ data: expect.objectContaining({ status: "REFUND_PROCESSING" }) }),
+    );
+    expect(mockPrisma.payment.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ data: expect.objectContaining({ status: "SUCCESS" }) }),
+    );
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+    expect(mockEmailQueue.add).not.toHaveBeenCalled();
+  });
+
+  it("retries DB finalization and succeeds on second attempt after Stripe succeeds", async () => {
+    const payment = buildPayment({
+      booking: { checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
+    });
+    const processingPayment = buildPayment({ status: "REFUND_PROCESSING" });
+    const refundedPayment = buildPayment({ status: "REFUNDED" });
+
+    mockPaymentFindUniqueResult(payment);
+    mockPaymentUpdateResults(processingPayment, refundedPayment);
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
+    (mockPrisma.$transaction as any)
+      .mockRejectedValueOnce(new Error("DB transient error"))
+      .mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_retry" } as any);
+
+    const result = await PaymentRefundService.requestRefund("payment-1", "user-1");
+
+    expect(result.status).toBe("REFUNDED");
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
+    expect(mockSendOpsAlert).not.toHaveBeenCalled();
+  });
+
+  it("fires ops alert and throws 500 when DB finalization fails all retries after Stripe succeeds", async () => {
     const payment = buildPayment({
       booking: { checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
     });
@@ -352,20 +415,25 @@ describe("PaymentRefundService.requestRefund", () => {
 
     mockPaymentFindUniqueResult(payment);
     (mockPrisma.payment.update as any).mockResolvedValueOnce(processingPayment);
-    mockStripe.refunds.create.mockRejectedValue(new Error("Stripe timeout"));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_exhausted" } as any);
+    (mockPrisma.$transaction as any).mockRejectedValue(new Error("DB down"));
 
     await expect(
       PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({ statusCode: 502 });
+    ).rejects.toMatchObject({ statusCode: 500 });
 
-    expect(mockPrisma.payment.update).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(mockSendOpsAlert).toHaveBeenCalledOnce();
+    expect(mockSendOpsAlert).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: "REFUND_PROCESSING" }),
+        context: expect.objectContaining({
+          paymentId: "payment-1",
+          bookingId: "booking-1",
+          stripeRefundId: "re_exhausted",
+          idempotencyKey: "refund_payment-1",
+        }),
       }),
     );
-    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
-    expect(mockEmailQueue.add).not.toHaveBeenCalled();
   });
 
   it("enqueues emails to both guest and host after auto-approve", async () => {

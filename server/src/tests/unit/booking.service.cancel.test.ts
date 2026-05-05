@@ -171,6 +171,7 @@ describe("BookingService.cancel", () => {
 
     expect(result.booking.status).toBe("CANCELLED");
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
     expect(mockSendOpsAlert).not.toHaveBeenCalled();
   });
 
