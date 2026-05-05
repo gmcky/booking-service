@@ -17,6 +17,7 @@ import sharp from "sharp";
 import { deleteFromS3, uploadToS3 } from "../../shared/lib/storage.js";
 import {
   getUserStatsCacheKey,
+  getUserPublicStatsCacheKey,
   invalidateUserStatsCache,
   USER_STATS_CACHE_TTL_SECONDS,
 } from "./user.stats.cache.js";
@@ -56,32 +57,35 @@ export class UserService {
         throw new AppError(404, "User not found");
       }
 
-      const [ratingAggregate, listingCount] = await Promise.all([
-        prisma.review.aggregate({
-          where: {
-            property: {
-              ownerId: id,
-              isActive: true,
-            },
-          },
-          _avg: { rating: true },
-        }),
-        prisma.property.count({
-          where: {
-            ownerId: id,
-            isActive: true,
-          },
-        }),
-      ]);
+      const publicStatsCacheKey = getUserPublicStatsCacheKey(id);
+      let publicStats = await cacheGet<{
+        averageRating: number | null;
+        listingsCount: number;
+      }>(publicStatsCacheKey);
 
-      return {
-        ...user,
-        averageRating:
-          ratingAggregate._avg.rating !== null
-            ? Number(ratingAggregate._avg.rating)
-            : null,
-        listingsCount: listingCount,
-      };
+      if (!publicStats) {
+        const [ratingAggregate, listingCount] = await Promise.all([
+          prisma.review.aggregate({
+            where: { property: { ownerId: id, isActive: true } },
+            _avg: { rating: true },
+          }),
+          prisma.property.count({
+            where: { ownerId: id, isActive: true },
+          }),
+        ]);
+
+        publicStats = {
+          averageRating:
+            ratingAggregate._avg.rating !== null
+              ? Number(ratingAggregate._avg.rating)
+              : null,
+          listingsCount: listingCount,
+        };
+
+        await cacheSet(publicStatsCacheKey, publicStats, USER_STATS_CACHE_TTL_SECONDS);
+      }
+
+      return { ...user, ...publicStats };
     }
 
     const user = await prisma.user.findFirst({

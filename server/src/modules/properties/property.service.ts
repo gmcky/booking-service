@@ -20,6 +20,7 @@ import {
   cacheInvalidatePattern,
   hashKey,
 } from "../../shared/lib/cache.js";
+import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 import type {
   CreatePropertyInput,
   UpdatePropertyInput,
@@ -263,6 +264,7 @@ export class PropertyService {
     await Promise.all([
       cacheDel(`property:${id}`),
       cacheInvalidatePattern("properties:search:*"),
+      invalidateUserStatsCache(ownerId),
     ]);
   }
 
@@ -278,6 +280,7 @@ export class PropertyService {
     await Promise.all([
       cacheDel(`property:${id}`),
       cacheInvalidatePattern("properties:search:*"),
+      invalidateUserStatsCache(ownerId),
     ]);
 
     return updated;
