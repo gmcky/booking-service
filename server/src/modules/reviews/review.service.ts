@@ -502,6 +502,10 @@ export class ReviewService {
       throw new AppError(404, "Property not found");
     }
 
+    const cacheKey = `reviews:property:${propertyId}:stats`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
+
     const [aggregate, groupedByRating, recentReviews] = await Promise.all([
       prisma.review.aggregate({
         where: { propertyId },
@@ -561,7 +565,7 @@ export class ReviewService {
       totalReviews: entry.count,
     }));
 
-    return {
+    const result = {
       averageRating:
         aggregate._avg.rating === null
           ? null
@@ -570,6 +574,9 @@ export class ReviewService {
       breakdown,
       recentTrend,
     };
+
+    await cacheSet(cacheKey, result, REVIEWS_CACHE_TTL_SECONDS);
+    return result;
   }
 
   private static async updatePropertyAverageRatingTx(
