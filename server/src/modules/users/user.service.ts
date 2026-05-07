@@ -292,11 +292,16 @@ export class UserService {
         lastName: true,
         isDeleted: true,
         isSuspended: true,
+        role: true,
       },
     });
 
     if (!user) {
       throw new AppError(404, "User not found");
+    }
+
+    if (user.isSuspended) {
+      return user;
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -332,11 +337,23 @@ export class UserService {
   static async restore(id: string) {
     const user = await prisma.user.findFirst({
       where: { id, isDeleted: false },
-      select: { id: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isDeleted: true,
+        isSuspended: true,
+        role: true,
+      },
     });
 
     if (!user) {
       throw new AppError(404, "User not found");
+    }
+
+    if (!user.isSuspended) {
+      return user;
     }
 
     const updated = await prisma.user.update({
