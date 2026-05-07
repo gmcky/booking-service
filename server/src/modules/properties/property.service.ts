@@ -191,6 +191,7 @@ export class PropertyService {
     // Image work is async to avoid request-path latency spikes.
     if (rawImagePaths.length > 0) {
       await imageQueue.add("process-images", {
+        type: "property",
         propertyId: property.id,
         rawImagePaths,
       });

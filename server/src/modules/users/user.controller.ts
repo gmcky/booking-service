@@ -62,8 +62,8 @@ export async function updateCurrentUser(
   const user = await UserService.update(userId, req.body as UpdateUserInput);
 
   if (req.file) {
-    const avatarUrl = await UserService.uploadAvatar(userId, req.file);
-    res.json({ ...user, avatarUrl });
+    await UserService.uploadAvatar(userId, req.file);
+    res.status(202).json({ message: "Avatar upload accepted, processing in background" });
     return;
   }
 

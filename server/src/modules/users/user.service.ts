@@ -12,9 +12,11 @@ import type { GetUsersQueryInput, UpdateUserInput } from "./user.types.js";
 import { cacheClient, cacheGet, cacheSet } from "../../shared/lib/cache.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { randomInt, randomUUID } from "crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve, dirname } from "node:path";
 import bcrypt from "bcrypt";
-import sharp from "sharp";
-import { deleteFromS3, uploadToS3 } from "../../shared/lib/storage.js";
+import { imageQueue } from "../../shared/queues/image.queue.js";
+import { deleteFromS3 } from "../../shared/lib/storage.js";
 import {
   getUserStatsCacheKey,
   getUserPublicStatsCacheKey,
@@ -209,7 +211,10 @@ export class UserService {
     return user;
   }
 
-  static async uploadAvatar(userId: string, file: Express.Multer.File) {
+  static async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<void> {
     if (!file) {
       throw new AppError(400, "Avatar file is required");
     }
@@ -231,42 +236,19 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
-    let optimizedAvatar: Buffer;
-    try {
-      optimizedAvatar = await sharp(file.buffer)
-        .rotate()
-        .resize(512, 512, {
-          fit: "cover",
-          position: "centre",
-        })
-        .webp({ quality: 82 })
-        .toBuffer();
-    } catch {
-      throw new AppError(400, "Invalid image file");
-    }
+    const tempRelPath = `uploads/avatars/temp/${userId}-${randomUUID()}`;
+    const tempAbsPath = resolve(process.cwd(), tempRelPath);
+    await mkdir(dirname(tempAbsPath), { recursive: true });
+    await writeFile(tempAbsPath, file.buffer);
 
-    const key = `avatars/${userId}/${randomUUID()}.webp`;
-    const avatarUrl = await uploadToS3(optimizedAvatar, key, "image/webp");
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { avatarUrl },
+    await imageQueue.add("process-avatar", {
+      type: "avatar",
+      userId,
+      tempFilePath: tempRelPath,
+      oldAvatarUrl: user.avatarUrl,
     });
 
-    if (user.avatarUrl) {
-      try {
-        await deleteFromS3(user.avatarUrl);
-      } catch (error) {
-        logger.warn(
-          { userId, oldAvatarUrl: user.avatarUrl, error },
-          "Failed to delete previous avatar from S3",
-        );
-      }
-    }
-
-    logger.info({ userId, avatarUrl }, "User avatar uploaded");
-
-    return avatarUrl;
+    logger.info({ userId }, "Avatar processing enqueued");
   }
 
   static async deleteAvatar(userId: string) {
