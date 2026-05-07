@@ -102,6 +102,7 @@ export class ReviewService {
         id: true,
         propertyId: true,
         checkOut: true,
+        actualCheckOutAt: true,
         property: {
           select: {
             title: true,
@@ -122,7 +123,10 @@ export class ReviewService {
     }
 
     if (
-      !this.isWithinDays(completedBooking.checkOut, REVIEW_CREATE_WINDOW_DAYS)
+      !this.isWithinDays(
+        completedBooking.actualCheckOutAt ?? completedBooking.checkOut,
+        REVIEW_CREATE_WINDOW_DAYS,
+      )
     ) {
       throw new AppError(
         400,

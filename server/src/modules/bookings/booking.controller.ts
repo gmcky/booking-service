@@ -104,6 +104,19 @@ export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @route POST /api/v1/bookings/:id/early-checkout
+ * @access Private
+ * @security Bearer token required. Guest or admin only.
+ */
+export async function earlyCheckout(req: AuthenticatedRequest, res: Response) {
+  const id = getIdParam(req);
+  const userId = req.user!.id;
+  const userRole = req.user!.role;
+  const booking = await BookingService.earlyCheckout(id, userId, userRole);
+  res.json(booking);
+}
+
+/**
  * @route PATCH /api/v1/bookings/:id/dates
  * @access Private
  * @security Bearer token required.

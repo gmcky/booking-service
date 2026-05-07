@@ -250,6 +250,51 @@ export class BookingService {
     });
   }
 
+  /** Guest-initiated early checkout: marks COMPLETED before scheduled checkOut. */
+  static async earlyCheckout(id: string, userId: string, userRole: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { property: { select: { ownerId: true } } },
+    });
+
+    if (!booking) {
+      throw new AppError(404, "Booking not found");
+    }
+
+    const role = getBookingRole(booking, userId, userRole);
+
+    if (role !== "GUEST" && role !== "ADMIN") {
+      throw new AppError(403, "Not authorized to check out early");
+    }
+
+    if (booking.status !== "CONFIRMED") {
+      throw new AppError(
+        400,
+        `Cannot early check out a booking with status ${booking.status}`,
+      );
+    }
+
+    if (booking.checkOut.getTime() <= Date.now()) {
+      throw new AppError(
+        400,
+        "Check-out time has already passed; use PATCH /:id/status instead",
+      );
+    }
+
+    const now = new Date();
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: { status: "COMPLETED", actualCheckOutAt: now },
+    });
+
+    logger.info(
+      { bookingId: id, userId, actualCheckOutAt: now },
+      "Early checkout completed",
+    );
+
+    return updated;
+  }
+
   /** Single cancellation path with idempotency + refund-policy snapshot. */
   static async cancel(id: string, userId: string, userRole: string) {
     // Centralize cancellation path; keeps policy + side effects consistent.

@@ -48,4 +48,9 @@ bookingRouter.patch(
   asyncHandler(bookingController.updateBookingDates),
 );
 
+bookingRouter.post(
+  "/:id/early-checkout",
+  asyncHandler(bookingController.earlyCheckout),
+);
+
 bookingRouter.delete("/:id", asyncHandler(bookingController.cancelBooking));

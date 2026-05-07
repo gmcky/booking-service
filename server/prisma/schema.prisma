@@ -122,13 +122,14 @@ model Booking {
   id           String        @id @default(uuid())
   propertyId   String
   userId       String
-  checkIn      DateTime
-  checkOut     DateTime
-  totalPrice   Decimal       @db.Decimal(10, 2)
-  guests       Int
-  status       BookingStatus @default(PENDING)
-  payoutStatus PayoutStatus  @default(PENDING)
-  createdAt    DateTime      @default(now())
+  checkIn           DateTime
+  checkOut          DateTime
+  actualCheckOutAt  DateTime?
+  totalPrice        Decimal       @db.Decimal(10, 2)
+  guests            Int
+  status            BookingStatus @default(PENDING)
+  payoutStatus      PayoutStatus  @default(PENDING)
+  createdAt         DateTime      @default(now())
   payment      Payment?
   review       Review?
   updatedAt    DateTime      @updatedAt
