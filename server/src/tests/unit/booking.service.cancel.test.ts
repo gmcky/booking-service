@@ -90,7 +90,7 @@ describe("BookingService.cancel", () => {
     mockStripe.refunds.create.mockResolvedValue({ id: "re_cancel_1" } as any);
     mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
     mockPrisma.booking.update.mockResolvedValue(cancelledBooking);
-    (mockPrisma.user.findUnique as any)
+    (mockPrisma.user.findFirst as any)
       .mockResolvedValueOnce({
         email: "guest@test.com",
         firstName: "Guest",
@@ -126,6 +126,21 @@ describe("BookingService.cancel", () => {
       expect.objectContaining({
         data: expect.objectContaining({ status: "REFUNDED" }),
       }),
+    );
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "CANCELLED", payoutStatus: "CANCELLED" },
+      }),
+    );
+    // Fire-and-forget email chain needs a few microtask ticks to settle.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(mockEmailQueue.add).toHaveBeenCalledWith(
+      "booking-cancelled-guest",
+      expect.objectContaining({ guestEmail: "guest@test.com", guestFirstName: "Guest" }),
+    );
+    expect(mockEmailQueue.add).toHaveBeenCalledWith(
+      "booking-cancelled-host",
+      expect.objectContaining({ hostEmail: "host@test.com", hostFirstName: "Host" }),
     );
   });
 
@@ -258,7 +273,7 @@ describe("BookingService.cancel", () => {
 
     mockPrisma.booking.findUnique.mockResolvedValue(booking);
     mockPrisma.booking.update.mockResolvedValue(cancelledBooking);
-    (mockPrisma.user.findUnique as any)
+    (mockPrisma.user.findFirst as any)
       .mockResolvedValueOnce({
         email: "guest2@test.com",
         firstName: "Guest2",
@@ -277,5 +292,20 @@ describe("BookingService.cancel", () => {
     expect(result.cancellation!.refundPercent).toBe(0);
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
     expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "CANCELLED", payoutStatus: "CANCELLED" },
+      }),
+    );
+    // Fire-and-forget email chain needs a few microtask ticks to settle.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(mockEmailQueue.add).toHaveBeenCalledWith(
+      "booking-cancelled-guest",
+      expect.objectContaining({ guestEmail: "guest2@test.com", guestFirstName: "Guest2" }),
+    );
+    expect(mockEmailQueue.add).toHaveBeenCalledWith(
+      "booking-cancelled-host",
+      expect.objectContaining({ hostEmail: "host2@test.com", hostFirstName: "Host2" }),
+    );
   });
 });
