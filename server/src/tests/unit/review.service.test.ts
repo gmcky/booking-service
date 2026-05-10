@@ -137,6 +137,8 @@ describe("ReviewService", () => {
     expect(mockCacheInvalidatePattern).toHaveBeenCalledWith(
       "reviews:property:property-1:*",
     );
+    expect(mockCacheDel).toHaveBeenCalledWith("property:property-1");
+    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith("properties:search:*");
   });
 
   it("rejects review deletion from non-author non-admin user", async () => {
@@ -192,6 +194,29 @@ describe("ReviewService", () => {
       "reviews:property:property-1:*",
     );
     expect(mockCacheDel).toHaveBeenCalledWith("property:property-1");
+    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith("properties:search:*");
+  });
+
+  it("throws 409 when host reply already exists (concurrent write race)", async () => {
+    mockPrisma.review.findUnique.mockResolvedValue({
+      id: "review-1",
+      userId: "guest-1",
+      propertyId: "property-1",
+      hostReplyText: null,
+      property: { ownerId: "owner-1" },
+    } as any);
+    mockPrisma.review.updateMany.mockResolvedValue({ count: 0 } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+
+    await expect(
+      ReviewService.replyToReview("review-1", {
+        hostId: "owner-1",
+        text: "Thanks for your feedback!",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Host reply already exists for this review",
+    });
   });
 
   it("creates report and notifies all admins", async () => {
@@ -229,7 +254,13 @@ describe("ReviewService", () => {
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(2);
     expect(mockEmailQueue.add).toHaveBeenCalledWith(
       "review-reported-admin",
-      expect.objectContaining({ reviewId: "review-1" }),
+      expect.objectContaining({
+        reviewId: "review-1",
+        propertyTitle: "Lake House",
+        reporterFullName: "Ira Reporter",
+        reporterEmail: "ira@example.com",
+        reason: "Spam and insults in the review",
+      }),
     );
   });
 
@@ -285,7 +316,7 @@ describe("ReviewService", () => {
       status: "PENDING",
     } as any);
 
-    mockPrisma.user.findUnique.mockResolvedValue({
+    (mockPrisma.user.findFirst as any).mockResolvedValue({
       firstName: "Ira",
       lastName: "Reporter",
       email: "ira@example.com",
@@ -336,6 +367,16 @@ describe("ReviewService", () => {
       statusCode: 409,
       message: "This booking already has a review",
     });
+
+    expect(mockPrisma.booking.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "booking-1",
+          userId: "user-1",
+          status: "COMPLETED",
+        }),
+      }),
+    );
   });
 
   it("rethrows unknown Prisma constraint errors on create", async () => {
