@@ -12,13 +12,13 @@ describe("parseExpiry", () => {
     const call = () => parseExpiry("15x");
 
     expect(call).toThrowError(AppError);
-    expect(call).toThrowError(expect.objectContaining({ statusCode: 400 }));
+    expect(call).toThrowError(expect.objectContaining({ statusCode: 400, message: 'Invalid expiry format: "15x"' }));
   });
 
   it("throws on missing unit", () => {
     const call = () => parseExpiry("15");
 
     expect(call).toThrowError(AppError);
-    expect(call).toThrowError(expect.objectContaining({ statusCode: 400 }));
+    expect(call).toThrowError(expect.objectContaining({ statusCode: 400, message: 'Invalid expiry format: "15"' }));
   });
 });
