@@ -139,6 +139,27 @@ describe("BookingService.checkAvailability", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: { not: "booking-to-exclude" },
+          status: { in: ["PENDING", "CONFIRMED"] },
+        }),
+      }),
+    );
+  });
+
+  it("passes correct overlap query operators (gt/lt) to booking.count", async () => {
+    (mockPrisma.booking.count as any).mockResolvedValue(0);
+    mockPrisma.blockedDate.count.mockResolvedValue(0);
+    const checkIn = d("2026-06-10");
+    const checkOut = d("2026-06-15");
+
+    await BookingService.checkAvailability("property-1", checkIn, checkOut);
+
+    expect(mockPrisma.booking.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          propertyId: "property-1",
+          status: { in: ["PENDING", "CONFIRMED"] },
+          checkOut: { gt: checkIn },
+          checkIn: { lt: checkOut },
         }),
       }),
     );
