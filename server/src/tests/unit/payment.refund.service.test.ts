@@ -307,6 +307,7 @@ describe("PaymentRefundService.requestRefund", () => {
     expect(mockStripe.refunds.create).toHaveBeenCalledWith(
       expect.objectContaining({
         payment_intent: "pi_test_123",
+        amount: 30000,
         metadata: expect.objectContaining({
           paymentId: "payment-1",
           bookingId: "booking-1",
@@ -494,6 +495,7 @@ describe("PaymentRefundService.requestRefund", () => {
 
     expect(result.status).toBe("REFUND_REQUESTED");
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
     expect(mockPrisma.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "REFUND_REQUESTED" }),
@@ -543,7 +545,7 @@ describe("PaymentRefundService.requestRefund", () => {
 
     await expect(
       PaymentRefundService.requestRefund("missing", "user-1"),
-    ).rejects.toBeInstanceOf(AppError);
+    ).rejects.toMatchObject({ statusCode: 404, message: "Payment not found" });
   });
 });
 
@@ -617,6 +619,7 @@ describe("PaymentRefundService.approveRefund", () => {
     expect(result.status).toBe("REFUNDED");
     expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
     expect(mockEmailQueue.add).not.toHaveBeenCalled();
+    expect(mockPrisma.payment.findUnique).toHaveBeenCalledTimes(3);
   });
 
   it("preserves latest audit metadata and appends refundApproval", async () => {
