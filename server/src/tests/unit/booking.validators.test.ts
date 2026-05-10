@@ -113,4 +113,18 @@ describe("createBookingSchema", () => {
       );
     }
   });
+
+  it("accepts a valid booking payload", () => {
+    const checkIn = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const checkOut = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+
+    const result = createBookingSchema.safeParse({
+      propertyId,
+      checkIn: toIso(checkIn),
+      checkOut: toIso(checkOut),
+      guests: 2,
+    });
+
+    expect(result.success).toBe(true);
+  });
 });
