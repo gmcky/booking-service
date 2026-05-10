@@ -52,17 +52,92 @@ describe("BookingService.updateStatus", () => {
     mockPrisma.booking.findUnique.mockResolvedValue(booking);
     mockPrisma.booking.update.mockResolvedValue(updatedBooking);
 
-    const result = await BookingService.updateStatus(
-      "booking-2",
-      "host-2",
-      "USER",
-      "COMPLETED",
-    );
+    await BookingService.updateStatus("booking-2", "host-2", "USER", "COMPLETED");
 
-    expect(result.status).toBe("COMPLETED");
     expect(mockPrisma.booking.update).toHaveBeenCalledWith({
       where: { id: "booking-2" },
       data: { status: "COMPLETED" },
     });
+  });
+
+  it("throws 403 when guest tries to update status", async () => {
+    const booking = {
+      id: "booking-3",
+      userId: "guest-3",
+      status: "CONFIRMED",
+      checkOut: new Date(Date.now() - 60 * 60 * 1000),
+      property: { ownerId: "host-3" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+    await expect(
+      BookingService.updateStatus("booking-3", "guest-3", "USER", "COMPLETED"),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  it("throws 403 when unrelated user tries to update status", async () => {
+    const booking = {
+      id: "booking-4",
+      userId: "guest-4",
+      status: "CONFIRMED",
+      checkOut: new Date(Date.now() - 60 * 60 * 1000),
+      property: { ownerId: "host-4" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+    await expect(
+      BookingService.updateStatus("booking-4", "stranger", "USER", "COMPLETED"),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  it("throws 400 when attempting CANCELLED via updateStatus", async () => {
+    const booking = {
+      id: "booking-5",
+      userId: "guest-5",
+      status: "CONFIRMED",
+      checkOut: new Date(Date.now() - 60 * 60 * 1000),
+      property: { ownerId: "host-5" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+    await expect(
+      BookingService.updateStatus("booking-5", "host-5", "USER", "CANCELLED"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Use DELETE /bookings/:id to cancel a booking",
+    });
+  });
+
+  it("throws 400 on invalid FSM transition (COMPLETED → CONFIRMED)", async () => {
+    const booking = {
+      id: "booking-6",
+      userId: "guest-6",
+      status: "COMPLETED",
+      checkOut: new Date(Date.now() - 60 * 60 * 1000),
+      property: { ownerId: "host-6" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+    await expect(
+      BookingService.updateStatus("booking-6", "host-6", "USER", "CONFIRMED"),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  it("throws 404 when booking not found", async () => {
+    mockPrisma.booking.findUnique.mockResolvedValue(null);
+
+    await expect(
+      BookingService.updateStatus("missing", "host-x", "USER", "COMPLETED"),
+    ).rejects.toMatchObject({ statusCode: 404, message: "Booking not found" });
   });
 });
