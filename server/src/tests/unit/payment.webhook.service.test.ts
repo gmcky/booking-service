@@ -66,15 +66,22 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     expect(mockEmailQueue.add).not.toHaveBeenCalled();
   });
 
-  it("treats concurrent P2002 on processedStripeEvent.create as success", async () => {
-    // payment_intent.payment_failed with no bookingId → handler returns early,
-    // then create throws P2002 (concurrent delivery) → must not rethrow.
-    const event = makeStripeEvent("evt_race", "payment_intent.payment_failed", {
+  it("treats concurrent P2002 on processedStripeEvent.create as success (real DB work done)", async () => {
+    // payment_intent.succeeded with bookingId → handler does real DB work,
+    // then processedStripeEvent.create throws P2002 (concurrent delivery) → must not rethrow.
+    const event = makeStripeEvent("evt_race", "payment_intent.succeeded", {
       id: "pi_race",
-      metadata: {},
+      metadata: { bookingId: "booking-race" },
+      amount_received: 10000,
+      currency: "usd",
     });
     mockStripe.webhooks.constructEvent.mockReturnValue(event);
     (mockPrisma.processedStripeEvent.findUnique as any).mockResolvedValue(null);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    (mockPrisma.payment.findUnique as any).mockResolvedValue({ id: "payment-race", metadata: null });
+    (mockPrisma.payment.update as any).mockResolvedValue({ id: "payment-race" });
+    (mockPrisma.booking.update as any).mockResolvedValue({ id: "booking-race" });
+    (mockPrisma.booking.findUnique as any).mockResolvedValue(null);
     (mockPrisma.processedStripeEvent.create as any).mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
         code: "P2002",
@@ -85,6 +92,9 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     const result = await PaymentWebhookService.handleStripeWebhook("raw", "sig");
 
     expect(result).toEqual({ success: true });
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "CONFIRMED" } }),
+    );
   });
 
   it("enqueues guest and host emails with correct jobIds for payment_intent.succeeded", async () => {
@@ -118,6 +128,14 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
 
     await PaymentWebhookService.handleStripeWebhook("raw", "sig");
 
+    expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "SUCCESS" }),
+      }),
+    );
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "CONFIRMED" } }),
+    );
     expect(mockEmailQueue.add).toHaveBeenCalledWith(
       "payment-success-guest",
       expect.any(Object),
@@ -163,6 +181,16 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
 
     await PaymentWebhookService.handleStripeWebhook("raw", "sig");
 
+    expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "REFUNDED" }),
+      }),
+    );
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "CANCELLED", payoutStatus: "CANCELLED" },
+      }),
+    );
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(1);
     expect(mockEmailQueue.add).toHaveBeenCalledWith(
       "refund-processed-host",
