@@ -1,0 +1,15 @@
+info:
+  name: Early Checkout
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{baseUrl}}/bookings/{{bookingId}}/early-checkout"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
