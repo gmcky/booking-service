@@ -4,6 +4,7 @@ import {
   Amenity,
   BookingStatus,
   PaymentStatus,
+  PayoutStatus,
 } from "@prisma/client";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
@@ -700,94 +701,108 @@ async function main() {
     );
   }
 
-  const regularUserIds = users
-    .filter((user) => user.role === Role.USER && user.email !== "admin@demo.com")
-    .map((user) => createdUsers[user.email]!.id);
-
   type BookingScenario = {
-    code: "A" | "B" | "C" | "D" | "E";
+    code: string;
+    bookerEmail: string;
     bookingStatus: BookingStatus;
     paymentStatus: PaymentStatus | null;
     checkInOffsetDays: number;
     nights: number;
+    payoutStatus?: PayoutStatus;
   };
 
   const bookingScenarios: BookingScenario[] = [
     {
-      code: "A",
+      code: "MANUAL_PENDING_INTENT",
+      bookerEmail: "user@demo.com",
       bookingStatus: "PENDING",
       paymentStatus: null,
-      checkInOffsetDays: 12,
+      checkInOffsetDays: 10,
       nights: 3,
     },
     {
-      code: "A",
+      code: "MANUAL_PENDING_SHORT_WINDOW",
+      bookerEmail: "user@demo.com",
       bookingStatus: "PENDING",
       paymentStatus: null,
-      checkInOffsetDays: 16,
+      checkInOffsetDays: 3,
       nights: 2,
     },
     {
-      code: "B",
+      code: "MANUAL_CONFIRMED_SUCCESS_AUTO_REFUND",
+      bookerEmail: "user@demo.com",
       bookingStatus: "CONFIRMED",
       paymentStatus: "SUCCESS",
-      checkInOffsetDays: 20,
+      checkInOffsetDays: 10,
       nights: 4,
     },
     {
-      code: "B",
+      code: "MANUAL_CONFIRMED_SUCCESS_MANUAL_REFUND",
+      bookerEmail: "user@demo.com",
       bookingStatus: "CONFIRMED",
       paymentStatus: "SUCCESS",
-      checkInOffsetDays: 24,
-      nights: 5,
+      checkInOffsetDays: 3,
+      nights: 2,
     },
     {
-      code: "C",
+      code: "MANUAL_CONFIRMED_REFUND_REQUESTED",
+      bookerEmail: "user@demo.com",
       bookingStatus: "CONFIRMED",
       paymentStatus: "REFUND_REQUESTED",
-      checkInOffsetDays: 18,
+      checkInOffsetDays: 5,
       nights: 3,
     },
     {
-      code: "C",
-      bookingStatus: "CONFIRMED",
-      paymentStatus: "REFUND_REQUESTED",
-      checkInOffsetDays: 22,
-      nights: 4,
-    },
-    {
-      code: "D",
+      code: "MANUAL_CANCELLED_REFUNDED",
+      bookerEmail: "user@demo.com",
       bookingStatus: "CANCELLED",
       paymentStatus: "REFUNDED",
+      payoutStatus: "CANCELLED",
       checkInOffsetDays: 14,
       nights: 2,
     },
     {
-      code: "D",
-      bookingStatus: "CANCELLED",
-      paymentStatus: "REFUNDED",
-      checkInOffsetDays: 26,
-      nights: 3,
-    },
-    {
-      code: "E",
+      code: "MANUAL_COMPLETED_SUCCESS_REVIEW",
+      bookerEmail: "user@demo.com",
       bookingStatus: "COMPLETED",
       paymentStatus: "SUCCESS",
       checkInOffsetDays: -18,
       nights: 5,
     },
     {
-      code: "E",
-      bookingStatus: "COMPLETED",
+      code: "MANUAL_ACTIVE_NOW_CONFIRMED",
+      bookerEmail: "user@demo.com",
+      bookingStatus: "CONFIRMED",
       paymentStatus: "SUCCESS",
-      checkInOffsetDays: -30,
-      nights: 4,
+      checkInOffsetDays: -2,
+      nights: 7,
+    },
+    {
+      code: "ABAC_FOREIGN_CONFIRMED_SUCCESS",
+      bookerEmail: "user2@demo.com",
+      bookingStatus: "CONFIRMED",
+      paymentStatus: "SUCCESS",
+      checkInOffsetDays: 9,
+      nights: 3,
     },
   ];
 
+  const seededScenarioRefs: Array<{
+    code: string;
+    userEmail: string;
+    bookingId: string;
+    bookingStatus: BookingStatus;
+    paymentId: string | null;
+    paymentStatus: PaymentStatus | null;
+  }> = [];
+
   let createdBookings = 0;
   for (const [index, scenario] of bookingScenarios.entries()) {
-    const userId = regularUserIds[index % regularUserIds.length]!;
+    const userId = createdUsers[scenario.bookerEmail]?.id;
+    if (!userId) {
+      throw new Error(`Seed user not found for scenario: ${scenario.bookerEmail}`);
+    }
+
     const property = createdProperties[index % createdProperties.length]!;
     const stay = getStayDates(scenario.checkInOffsetDays, scenario.nights);
 
@@ -795,13 +810,19 @@ async function main() {
     const totalPrice = property.pricePerNight * stay.nights;
 
     const bookingCreateData: any = {
-      property: { connect: { id: property.id } },
+      propertyId: property.id,
+      userId,
       checkIn: stay.checkIn,
       checkOut: stay.checkOut,
       totalPrice,
       guests,
       status: scenario.bookingStatus,
+      payoutStatus: scenario.payoutStatus ?? "PENDING",
     };
+
+    if (scenario.bookingStatus === "COMPLETED") {
+      bookingCreateData.actualCheckOutAt = stay.checkOut;
+    }
 
     if (scenario.paymentStatus) {
       const paymentMetadata: Record<string, unknown> = {
@@ -824,24 +845,38 @@ async function main() {
           currency: "USD",
           status: scenario.paymentStatus,
           provider: "STRIPE",
-          transactionId: `seed_pi_${scenario.code}_${index + 1}`,
+          transactionId: `seed_pi_${scenario.code.toLowerCase()}_${index + 1}`,
           metadata: paymentMetadata,
         },
       };
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        bookings: {
-          create: bookingCreateData,
+    const createdBooking = await prisma.booking.create({
+      data: bookingCreateData,
+      select: {
+        id: true,
+        status: true,
+        payment: {
+          select: {
+            id: true,
+            status: true,
+          },
         },
       },
     });
 
+    seededScenarioRefs.push({
+      code: scenario.code,
+      userEmail: scenario.bookerEmail,
+      bookingId: createdBooking.id,
+      bookingStatus: createdBooking.status,
+      paymentId: createdBooking.payment?.id ?? null,
+      paymentStatus: createdBooking.payment?.status ?? null,
+    });
+
     createdBookings++;
     console.log(
-      `  📅 Booking #${index + 1} (${scenario.code}) — ${scenario.bookingStatus}${scenario.paymentStatus ? ` / ${scenario.paymentStatus}` : " / no payment"} — ${property.title}`,
+      `  📅 Booking #${index + 1} (${scenario.code}) — ${scenario.bookerEmail} — ${scenario.bookingStatus}${scenario.paymentStatus ? ` / ${scenario.paymentStatus}` : " / no payment"} — ${property.title}`,
     );
   }
 
@@ -930,6 +965,15 @@ async function main() {
   console.log(
     `\n✅ Seed complete: ${users.length} users, ${created} properties, ${createdBookings} bookings, ${seededReviews} reviews`,
   );
+  console.log("\nManual testing checkpoints:");
+  for (const ref of seededScenarioRefs) {
+    const paymentInfo = ref.paymentId
+      ? `payment=${ref.paymentId} (${ref.paymentStatus})`
+      : "payment=none";
+    console.log(
+      `  ${ref.code.padEnd(38)} booking=${ref.bookingId} (${ref.bookingStatus}) | ${paymentInfo} | user=${ref.userEmail}`,
+    );
+  }
   console.log("\nTest credentials:");
   for (const user of users) {
     console.log(`  ${user.role.padEnd(5)} ${user.email}  /  ${user.password}`);
