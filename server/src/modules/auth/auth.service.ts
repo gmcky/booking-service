@@ -71,7 +71,7 @@ export class AuthService {
         role: "USER",
       });
       const refreshToken = await this.generateRefreshToken({ id: userId }, jti);
-      const tokenHash = await bcrypt.hash(refreshToken, 10);
+      const tokenHash = this.hashToken(refreshToken);
 
       // Tx scope: write-only DB ops for predictable latency.
       const user = await prisma.$transaction(async (tx) => {
@@ -200,7 +200,7 @@ export class AuthService {
 
     const accessToken = await this.generateAccessToken(user);
     const refreshToken = await this.generateRefreshToken(user, jti);
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = this.hashToken(refreshToken);
 
     // Persist + prune in one tx to avoid session-set drift.
     await prisma.$transaction(async (tx) => {
@@ -308,7 +308,7 @@ export class AuthService {
       throw new AppError(401, "Invalid refresh token");
     }
 
-    const isMatch = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+    const isMatch = this.hashToken(refreshToken) === storedToken.tokenHash;
     if (!isMatch) {
       await prisma.refreshToken.deleteMany({
         where: { userId: storedToken.userId },
@@ -418,7 +418,7 @@ export class AuthService {
       throw new AppError(401, "Refresh token expired");
     }
 
-    const isMatch = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+    const isMatch = this.hashToken(refreshToken) === storedToken.tokenHash;
     if (!isMatch) {
       // Valid jti + hash mismatch => tamper/reuse; hard revoke all sessions.
       await prisma.refreshToken.deleteMany({
@@ -440,7 +440,7 @@ export class AuthService {
     // Keep tx lean: generate/sign/hash before DB writes.
     const accessToken = await this.generateAccessToken(user);
     const newRefreshToken = await this.generateRefreshToken(user, newJti);
-    const tokenHash = await bcrypt.hash(newRefreshToken, 10);
+    const tokenHash = this.hashToken(newRefreshToken);
 
     await prisma.$transaction(async (tx) => {
       await tx.refreshToken.delete({ where: { id: storedToken.id } });
@@ -572,6 +572,10 @@ export class AuthService {
     return token;
   }
 
+  private static hashToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
+
   // TODO: implement password-reset flow methods.
 
   // TODO: implement email-verification methods.
@@ -582,6 +586,9 @@ export class AuthService {
   }
 
   // Fail-open on Redis outage; auth should degrade, not hard-stop.
+  // Trade-off: We prioritize user availability over strict security during a cache outage.
+  // In a high-security environment, we might consider a fail-closed approach or a 
+  // secondary in-memory fallback (e.g., a LRU cache) to maintain partial protection.
   private static async checkLockout(
     email: string,
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
