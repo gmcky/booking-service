@@ -24,6 +24,13 @@ vi.mock("../../shared/lib/ops-alert.js", () => ({
   sendOpsAlert: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../../shared/lib/cache.js", () => ({
+  cacheInvalidatePattern: vi.fn().mockResolvedValue(undefined),
+  cacheGet: vi.fn(),
+  cacheSet: vi.fn(),
+  cacheDel: vi.fn(),
+}));
+
 vi.mock("timers/promises", () => ({
   setTimeout: vi.fn().mockResolvedValue(undefined),
 }));

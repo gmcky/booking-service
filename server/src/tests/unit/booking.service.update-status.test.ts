@@ -6,6 +6,13 @@ vi.mock("../../shared/lib/prisma.js", () => ({
   prisma: mockDeep<PrismaClient>(),
 }));
 
+vi.mock("../../shared/lib/cache.js", () => ({
+  cacheInvalidatePattern: vi.fn().mockResolvedValue(undefined),
+  cacheGet: vi.fn(),
+  cacheSet: vi.fn(),
+  cacheDel: vi.fn(),
+}));
+
 import { prisma } from "../../shared/lib/prisma.js";
 import { BookingService } from "../../modules/bookings/booking.service.js";
 

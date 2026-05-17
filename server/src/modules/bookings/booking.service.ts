@@ -29,6 +29,7 @@ import {
 } from "../payments/payment.helpers.js";
 import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
+import { cacheInvalidatePattern } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import { setTimeout as sleep } from "timers/promises";
 
@@ -193,7 +194,10 @@ export class BookingService {
       ),
     );
 
-    await invalidateUserStatsCache(userId, booking.property.ownerId);
+    await Promise.all([
+      invalidateUserStatsCache(userId, booking.property.ownerId),
+      cacheInvalidatePattern("properties:search:*"),
+    ]);
 
     // TODO: return public booking DTO.
     return booking;
@@ -244,10 +248,14 @@ export class BookingService {
       );
     }
 
-    return prisma.booking.update({
+    const updated = await prisma.booking.update({
       where: { id },
       data: { status },
     });
+
+    await cacheInvalidatePattern("properties:search:*");
+
+    return updated;
   }
 
   /** Guest-initiated early checkout: marks COMPLETED before scheduled checkOut. */
@@ -291,6 +299,8 @@ export class BookingService {
       { bookingId: id, userId, actualCheckOutAt: now },
       "Early checkout completed",
     );
+
+    await cacheInvalidatePattern("properties:search:*");
 
     return updated;
   }
@@ -370,6 +380,8 @@ export class BookingService {
         "Failed to enqueue cancellation emails",
       ),
     );
+
+    await cacheInvalidatePattern("properties:search:*");
 
     return {
       booking: cancelled,
@@ -618,7 +630,7 @@ export class BookingService {
       throw new AppError(400, `Maximum ${property.maxGuests} guests allowed`);
     }
 
-    return prisma.$transaction(
+    const result = await prisma.$transaction(
       async (tx) => {
         const isAvailable = await this.checkAvailability(
           booking.propertyId,
@@ -646,6 +658,10 @@ export class BookingService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    await cacheInvalidatePattern("properties:search:*");
+
+    return result;
   }
 
   /** Aggregates future unavailable ranges from bookings + manual blocks. */
