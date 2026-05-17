@@ -19,6 +19,7 @@ const pinoHttp = require("pino-http");
 
 import { env } from "./config/env.js";
 import { errorHandler } from "./shared/middlewares/error.handler.js";
+import { traceMiddleware } from "./shared/middlewares/trace.js";
 import { createApiRouter } from "./api.routes.js";
 
 /**
@@ -72,6 +73,7 @@ export function createApp(): Application {
   // Trust the first proxy (needed for accurate client IP when behind load balancers)
   app.set("trust proxy", 1);
 
+  app.use(traceMiddleware);
   app.use(helmet());
 
   app.get("/health", (_req, res) => {

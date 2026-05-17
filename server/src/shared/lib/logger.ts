@@ -1,5 +1,6 @@
 import pino from "pino";
 import { env } from "../../config/env.js";
+import { getRequestId } from "./context.js";
 
 export const LOG_REDACT_PATHS = [
   "req.headers.authorization",
@@ -23,15 +24,22 @@ const transport =
       }
     : undefined;
 
+const mixin = () => {
+  const requestId = getRequestId();
+  return requestId ? { requestId } : {};
+};
+
 export const logger = pino(
   transport
     ? {
         level: env.LOG_LEVEL || "info",
         transport,
+        mixin,
         redact: { paths: [...LOG_REDACT_PATHS], censor: "[REDACTED]" },
       }
     : {
         level: env.LOG_LEVEL || "info",
+        mixin,
         redact: { paths: [...LOG_REDACT_PATHS], censor: "[REDACTED]" },
       },
 );
