@@ -57,7 +57,19 @@ export async function cacheInvalidatePattern(pattern: string): Promise<void> {
 /** Stable short hash for bounded-length cache keys. */
 export function hashKey(data: unknown): string {
   return createHash("sha256")
-    .update(JSON.stringify(data))
+    .update(stableStringify(data))
     .digest("hex")
     .slice(0, 16);
+}
+
+function stableStringify(value: unknown): string {
+  if (value instanceof Date) return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const sorted = Object.keys(value as object)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`);
+    return `{${sorted.join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
