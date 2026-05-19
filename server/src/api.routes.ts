@@ -25,7 +25,7 @@ export function createApiRouter(): Router {
     });
   });
 
-  // Module routes
+  // Module routes — OpenAPI tags declared per-operation in each module's *.routes.ts
   router.use("/auth", authRouter);
   router.use("/users", userRouter);
   router.use("/properties", propertyRouter);

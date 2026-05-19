@@ -42,9 +42,18 @@ pnpm db:migrate        # applies migrations
 pnpm dev               # app on http://localhost:3000
 ```
 
-Swagger docs available at `/api-docs` when running.
+## API Documentation & Testing
 
-To run workers (email, images, etc.):
+This project provides two ways to explore and test the API:
+
+1. **Swagger UI** — Interactive API documentation. Available at `/api-docs` when the server is running. It provides a quick overview of all endpoints and their schemas.
+2. **Bruno Collection** — A complete set of API requests located in the `server/bruno/` directory. This is the **recommended** way to test complex flows (authentication, booking creation, Stripe webhooks). 
+
+To use Bruno:
+- Install [Bruno](https://www.usebruno.com/).
+- Open the `server/bruno/` folder in Bruno.
+- Use the `Local` environment.
+- Run requests sequentially (e.g., Login -> Create Property).
 ```bash
 pnpm workers
 ```

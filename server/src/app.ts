@@ -17,10 +17,14 @@ import { cacheClient } from "./shared/lib/cache.js";
 const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http");
 
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
+
 import { env } from "./config/env.js";
 import { errorHandler } from "./shared/middlewares/error.handler.js";
 import { traceMiddleware } from "./shared/middlewares/trace.js";
 import { createApiRouter } from "./api.routes.js";
+import { swaggerOptions } from "./config/swagger.js";
 
 /**
  * Shared Redis store for all rate limiters.
@@ -135,6 +139,13 @@ export function createApp(): Application {
   app.use(apiPrefix, apiLimiter);
   app.use(`${apiPrefix}/auth/register`, registerLimiter);
   app.use(`${apiPrefix}/auth/login`, loginLimiter);
+
+  const specs = swaggerJsdoc(swaggerOptions);
+  app.get("/api-docs.json", (_req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.send(specs);
+  });
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
   app.use(apiPrefix, createApiRouter());
 
