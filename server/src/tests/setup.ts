@@ -41,3 +41,17 @@ vi.mock("../shared/queues/email.queue.js", () => ({
     add: vi.fn(),
   },
 }));
+
+vi.mock("../shared/lib/cache.js", () => ({
+  cacheClient: {},
+  cacheGet: vi.fn().mockResolvedValue(null),
+  cacheSet: vi.fn().mockResolvedValue(undefined),
+  cacheDel: vi.fn().mockResolvedValue(undefined),
+  cacheGetNamespaceVersion: vi.fn().mockResolvedValue("0"),
+  cacheInvalidateNamespace: vi.fn().mockResolvedValue(undefined),
+  hashKey: vi.fn((data: unknown) => JSON.stringify(data)),
+}));
+
+vi.mock("../shared/lib/ops-alert.js", () => ({
+  sendOpsAlert: vi.fn().mockResolvedValue(undefined),
+}));
