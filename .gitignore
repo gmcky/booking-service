@@ -38,6 +38,5 @@ tmp/
 temp/
 *.tmp
 *repomix-output.xml
-.github/
 
 /uploads/*
