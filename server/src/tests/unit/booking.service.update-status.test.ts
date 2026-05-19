@@ -7,7 +7,7 @@ vi.mock("../../shared/lib/prisma.js", () => ({
 }));
 
 vi.mock("../../shared/lib/cache.js", () => ({
-  cacheInvalidatePattern: vi.fn().mockResolvedValue(undefined),
+  cacheInvalidateNamespace: vi.fn().mockResolvedValue(undefined),
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
   cacheDel: vi.fn(),

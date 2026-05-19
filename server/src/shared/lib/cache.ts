@@ -37,24 +37,18 @@ export async function cacheDel(...keys: string[]): Promise<void> {
   if (keys.length > 0) await cacheClient.del(...keys);
 }
 
-/** Pattern invalidation via SCAN to avoid blocking Redis with KEYS. */
-export async function cacheInvalidatePattern(pattern: string): Promise<void> {
-  // TODO: add max-iteration/time budget guard for stuck cursor loops.
-  let cursor = "0";
-  do {
-    const [nextCursor, keys] = await cacheClient.scan(
-      cursor,
-      "MATCH",
-      pattern,
-      "COUNT",
-      100,
-    );
-    cursor = nextCursor;
-    if (keys.length > 0) await cacheClient.del(...keys);
-  } while (cursor !== "0");
+
+export async function cacheInvalidateNamespace(namespace: string): Promise<void> {
+  await cacheClient.incr(`cache:ver:${namespace}`);
 }
 
-/** Stable short hash for bounded-length cache keys. */
+
+export async function cacheGetNamespaceVersion(namespace: string): Promise<string> {
+  const ver = await cacheClient.get(`cache:ver:${namespace}`);
+  return ver ?? "0";
+}
+
+
 export function hashKey(data: unknown): string {
   return createHash("sha256")
     .update(stableStringify(data))

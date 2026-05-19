@@ -11,7 +11,8 @@ const testDoubles = vi.hoisted(() => ({
   cacheGet: vi.fn().mockResolvedValue(null),
   cacheSet: vi.fn().mockResolvedValue(undefined),
   cacheDel: vi.fn().mockResolvedValue(undefined),
-  cacheInvalidatePattern: vi.fn().mockResolvedValue(undefined),
+  cacheInvalidateNamespace: vi.fn().mockResolvedValue(undefined),
+  cacheGetNamespaceVersion: vi.fn().mockResolvedValue("0"),
   hashKey: vi.fn((value: unknown) => JSON.stringify(value)),
   cacheClientGet: vi.fn().mockResolvedValue(null),
   cacheClientTtl: vi.fn().mockResolvedValue(-1),
@@ -55,7 +56,8 @@ vi.mock("../../shared/lib/cache.js", () => ({
   cacheGet: testDoubles.cacheGet,
   cacheSet: testDoubles.cacheSet,
   cacheDel: testDoubles.cacheDel,
-  cacheInvalidatePattern: testDoubles.cacheInvalidatePattern,
+  cacheInvalidateNamespace: testDoubles.cacheInvalidateNamespace,
+  cacheGetNamespaceVersion: testDoubles.cacheGetNamespaceVersion,
   hashKey: testDoubles.hashKey,
 }));
 

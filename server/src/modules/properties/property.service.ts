@@ -17,7 +17,8 @@ import {
   cacheGet,
   cacheSet,
   cacheDel,
-  cacheInvalidatePattern,
+  cacheGetNamespaceVersion,
+  cacheInvalidateNamespace,
   hashKey,
 } from "../../shared/lib/cache.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
@@ -38,7 +39,8 @@ export class PropertyService {
   static async getAll(params: PaginationParams, filters: PropertyFilters) {
     const { skip, take } = calculatePagination(params.page, params.limit);
 
-    const cacheKey = `properties:search:${hashKey({ params, filters })}`;
+    const ver = await cacheGetNamespaceVersion("properties:search");
+    const cacheKey = `properties:search:v${ver}:${hashKey({ params, filters })}`;
     const cached = await cacheGet(cacheKey);
     if (cached) return cached;
 
@@ -205,7 +207,7 @@ export class PropertyService {
       propertyTitle: property.title,
     });
 
-    await cacheInvalidatePattern("properties:search:*");
+    await cacheInvalidateNamespace("properties:search");
 
     const { owner: { email: _email, ...ownerWithoutEmail }, ...propertyWithoutOwner } = property;
     return { ...propertyWithoutOwner, owner: ownerWithoutEmail };
@@ -233,7 +235,7 @@ export class PropertyService {
 
     await Promise.all([
       cacheDel(`property:${id}`),
-      cacheInvalidatePattern("properties:search:*"),
+      cacheInvalidateNamespace("properties:search"),
     ]);
 
     return updated;
@@ -264,7 +266,7 @@ export class PropertyService {
 
     await Promise.all([
       cacheDel(`property:${id}`),
-      cacheInvalidatePattern("properties:search:*"),
+      cacheInvalidateNamespace("properties:search"),
       invalidateUserStatsCache(ownerId),
     ]);
   }
@@ -280,7 +282,7 @@ export class PropertyService {
 
     await Promise.all([
       cacheDel(`property:${id}`),
-      cacheInvalidatePattern("properties:search:*"),
+      cacheInvalidateNamespace("properties:search"),
       invalidateUserStatsCache(ownerId),
     ]);
 

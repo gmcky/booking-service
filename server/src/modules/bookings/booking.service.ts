@@ -29,7 +29,7 @@ import {
 } from "../payments/payment.helpers.js";
 import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
-import { cacheInvalidatePattern } from "../../shared/lib/cache.js";
+import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import { setTimeout as sleep } from "timers/promises";
 
@@ -196,7 +196,7 @@ export class BookingService {
 
     await Promise.all([
       invalidateUserStatsCache(userId, booking.property.ownerId),
-      cacheInvalidatePattern("properties:search:*"),
+      cacheInvalidateNamespace("properties:search"),
     ]);
 
     // TODO: return public booking DTO.
@@ -253,7 +253,7 @@ export class BookingService {
       data: { status },
     });
 
-    await cacheInvalidatePattern("properties:search:*");
+    await cacheInvalidateNamespace("properties:search");
 
     return updated;
   }
@@ -300,7 +300,7 @@ export class BookingService {
       "Early checkout completed",
     );
 
-    await cacheInvalidatePattern("properties:search:*");
+    await cacheInvalidateNamespace("properties:search");
 
     return updated;
   }
@@ -381,7 +381,7 @@ export class BookingService {
       ),
     );
 
-    await cacheInvalidatePattern("properties:search:*");
+    await cacheInvalidateNamespace("properties:search");
 
     return {
       booking: cancelled,
@@ -659,7 +659,7 @@ export class BookingService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    await cacheInvalidatePattern("properties:search:*");
+    await cacheInvalidateNamespace("properties:search");
 
     return result;
   }

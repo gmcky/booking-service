@@ -4,7 +4,8 @@ import { logger } from "../../shared/lib/logger.js";
 import {
   cacheDel,
   cacheGet,
-  cacheInvalidatePattern,
+  cacheGetNamespaceVersion,
+  cacheInvalidateNamespace,
   cacheSet,
   hashKey,
 } from "../../shared/lib/cache.js";
@@ -42,7 +43,7 @@ export class ReviewService {
     params: PaginationParams,
     filters: ReviewListFilters,
   ) {
-    const cacheKey = this.getReviewCacheKey(propertyId, params, filters);
+    const cacheKey = await this.getReviewCacheKey(propertyId, params, filters);
     const cached = await cacheGet(cacheKey);
     if (cached) return cached;
 
@@ -506,7 +507,8 @@ export class ReviewService {
       throw new AppError(404, "Property not found");
     }
 
-    const cacheKey = `reviews:property:${propertyId}:stats`;
+    const ver = await cacheGetNamespaceVersion(`reviews:property:${propertyId}`);
+    const cacheKey = `reviews:property:${propertyId}:v${ver}:stats`;
     const cached = await cacheGet(cacheKey);
     if (cached) return cached;
 
@@ -637,9 +639,9 @@ export class ReviewService {
 
   private static async invalidateReviewCaches(propertyId: string) {
     await Promise.all([
-      cacheInvalidatePattern(`reviews:property:${propertyId}:*`),
+      cacheInvalidateNamespace(`reviews:property:${propertyId}`),
       cacheDel(`property:${propertyId}`),
-      cacheInvalidatePattern("properties:search:*"),
+      cacheInvalidateNamespace("properties:search"),
     ]);
   }
 
@@ -655,13 +657,14 @@ export class ReviewService {
     return [{ createdAt: "desc" as const }];
   }
 
-  private static getReviewCacheKey(
+  private static async getReviewCacheKey(
     propertyId: string,
     params: PaginationParams,
     filters: ReviewListFilters,
   ) {
+    const ver = await cacheGetNamespaceVersion(`reviews:property:${propertyId}`);
     const suffix = hashKey({ params, filters });
-    return `reviews:property:${propertyId}:${suffix}`;
+    return `reviews:property:${propertyId}:v${ver}:${suffix}`;
   }
 
   private static isWithinDays(date: Date, days: number) {

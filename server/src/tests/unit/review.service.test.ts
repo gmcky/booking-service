@@ -10,7 +10,8 @@ vi.mock("../../shared/lib/cache.js", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
   cacheDel: vi.fn(),
-  cacheInvalidatePattern: vi.fn(),
+  cacheGetNamespaceVersion: vi.fn().mockResolvedValue("0"),
+  cacheInvalidateNamespace: vi.fn(),
   hashKey: vi.fn(() => "hash"),
 }));
 
@@ -23,7 +24,7 @@ vi.mock("../../shared/queues/email.queue.js", () => ({
 import { prisma } from "../../shared/lib/prisma.js";
 import {
   cacheGet,
-  cacheInvalidatePattern,
+  cacheInvalidateNamespace,
   cacheDel,
 } from "../../shared/lib/cache.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
@@ -31,8 +32,8 @@ import { ReviewService } from "../../modules/reviews/review.service.js";
 
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
 const mockCacheGet = cacheGet as unknown as ReturnType<typeof vi.fn>;
-const mockCacheInvalidatePattern =
-  cacheInvalidatePattern as unknown as ReturnType<typeof vi.fn>;
+const mockCacheInvalidateNamespace =
+  cacheInvalidateNamespace as unknown as ReturnType<typeof vi.fn>;
 const mockCacheDel = cacheDel as unknown as ReturnType<typeof vi.fn>;
 const mockEmailQueue = emailQueue as unknown as {
   add: ReturnType<typeof vi.fn>;
@@ -134,11 +135,11 @@ describe("ReviewService", () => {
         where: { id: "property-1" },
       }),
     );
-    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith(
-      "reviews:property:property-1:*",
+    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith(
+      "reviews:property:property-1",
     );
     expect(mockCacheDel).toHaveBeenCalledWith("property:property-1");
-    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith("properties:search:*");
+    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith("properties:search");
   });
 
   it("rejects review deletion from non-author non-admin user", async () => {
@@ -190,11 +191,11 @@ describe("ReviewService", () => {
       }),
     );
     expect(result.hostReplyText).toBe("Thanks for your feedback!");
-    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith(
-      "reviews:property:property-1:*",
+    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith(
+      "reviews:property:property-1",
     );
     expect(mockCacheDel).toHaveBeenCalledWith("property:property-1");
-    expect(mockCacheInvalidatePattern).toHaveBeenCalledWith("properties:search:*");
+    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith("properties:search");
   });
 
   it("throws 409 when host reply already exists (concurrent write race)", async () => {
