@@ -5,6 +5,7 @@ import { PaymentService } from "./payment.service.js";
 import type { RequestRefundInput, RejectRefundInput } from "./payment.types.js";
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments
  * @access Private
  * @security Bearer token required.
@@ -17,6 +18,7 @@ export async function createPayment(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/payments/:id
  * @access Private
  * @security Bearer token required.
@@ -29,6 +31,7 @@ export async function getPaymentById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/:id/process
  * @access Private (admin)
  * @security Bearer token required + ADMIN role.
@@ -43,6 +46,7 @@ export async function processPayment(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/:id/refund
  * @access Private
  * @security Bearer token required.
@@ -56,6 +60,7 @@ export async function requestRefund(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/:id/refund/approve
  * @access Private
  * @security Bearer token required + ADMIN role.
@@ -68,6 +73,7 @@ export async function approveRefund(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/:id/refund/reject
  * @access Private
  * @security Bearer token required + ADMIN role.
@@ -81,6 +87,7 @@ export async function rejectRefund(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/intent
  * @access Private (authenticated user)
  * @security Bearer token required.
@@ -94,10 +101,10 @@ export async function createPaymentIntent(req: AuthenticatedRequest, res: Respon
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/webhook
  * @access Public (no JWT), protected by Stripe signature verification
  * @security Stripe signature verification required.
- * This route requires the raw request body (Buffer), not parsed JSON.
  */
 export async function handleWebhook(req: express.Request, res: Response) {
   const signature = req.headers["stripe-signature"] as string;
@@ -112,6 +119,7 @@ export async function handleWebhook(req: express.Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/payments/payout-lifecycle/run-now
  * @access Private (admin)
  * @security Bearer token required + ADMIN role.

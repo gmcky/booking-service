@@ -32,8 +32,10 @@ type AdminListParams = PaginationParams & {
   isDeleted?: boolean;
 };
 
-/** User profile, account lifecycle, and admin moderation operations. */
 export class UserService {
+  /**
+   * User retrieval with context-aware public/self views and cached stats.
+   */
   static async getById(id: string, options: { mode?: UserViewMode } = {}) {
     const mode = options.mode ?? "self";
 
@@ -103,6 +105,9 @@ export class UserService {
     return user;
   }
 
+  /**
+   * Filtered list of users for administration.
+   */
   static async getAll(params: AdminListParams) {
     const { skip, take } = calculatePagination(params.page, params.limit);
     const where: Prisma.UserWhereInput = {
@@ -152,6 +157,9 @@ export class UserService {
     return createPaginatedResponse(users, total, params);
   }
 
+  /**
+   * Whitelisted profile update.
+   */
   static async update(id: string, data: UpdateUserInput) {
     const existingUser = await prisma.user.findFirst({
       where: { id, isDeleted: false },
@@ -172,7 +180,7 @@ export class UserService {
       bio,
     });
 
-    // Whitelist patchable fields; email/role/password mutate via dedicated flows.
+    // Dedicated flows handle email, role, and password mutations.
     const user = await prisma.user.update({
       where: { id },
       data: updateData,
@@ -194,6 +202,9 @@ export class UserService {
     return user;
   }
 
+  /**
+   * Multer-based avatar upload with async processing.
+   */
   static async uploadAvatar(userId: string, file: Express.Multer.File): Promise<void> {
     if (!file) {
       throw new AppError(400, "Avatar file is required");
@@ -231,6 +242,9 @@ export class UserService {
     logger.info({ userId }, "Avatar processing enqueued");
   }
 
+  /**
+   * Atomic avatar removal from DB and S3 cleanup.
+   */
   static async deleteAvatar(userId: string) {
     const user = await prisma.user.findFirst({
       where: { id: userId, isDeleted: false },
@@ -262,6 +276,9 @@ export class UserService {
     logger.info({ userId }, "User avatar deleted");
   }
 
+  /**
+   * Suspension with full session revocation.
+   */
   static async suspend(id: string) {
     const user = await prisma.user.findFirst({
       where: { id, isDeleted: false },
@@ -311,6 +328,9 @@ export class UserService {
     return updated;
   }
 
+  /**
+   * Reactivate suspended user.
+   */
   static async restore(id: string) {
     const user = await prisma.user.findFirst({
       where: { id, isDeleted: false },
@@ -354,7 +374,9 @@ export class UserService {
     return updated;
   }
 
-  /** Queues OTP challenge for destination email and stores it in Redis. */
+  /**
+   * OTP challenge for destination email with Redis persistence.
+   */
   static async requestEmailChange(userId: string, newEmail: string) {
     const OTP_TTL_SECONDS = 15 * 60;
 
@@ -376,7 +398,7 @@ export class UserService {
 
     const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
 
-    // Single active challenge per user; repeat requests rotate OTP, TTL, and attempt counter.
+    // Repeat requests rotate OTP, TTL, and attempt counter.
     const redisKey = `email_change:${userId}`;
     const attemptsKey = `email_change_attempts:${userId}`;
     await Promise.all([
@@ -394,7 +416,9 @@ export class UserService {
     logger.info({ userId, newEmail }, "Email change OTP requested");
   }
 
-  /** Applies verified email change and notifies previous mailbox. */
+  /**
+   * Applies verified change and notifies previous mailbox.
+   */
   static async confirmEmailChange(userId: string, otp: string) {
     const OTP_MAX_ATTEMPTS = 5;
     const redisKey = `email_change:${userId}`;
@@ -416,7 +440,7 @@ export class UserService {
     if (otp !== storedOtp) {
       const attempts = await cacheClient.incr(attemptsKey);
       if (attempts === 1) {
-        // Align expiry with the OTP key so the counter doesn't outlive the challenge.
+        // Counter expiry aligned with challenge TTL.
         const ttl = await cacheClient.ttl(redisKey);
         if (ttl > 0) await cacheClient.expire(attemptsKey, ttl);
       }
@@ -433,7 +457,7 @@ export class UserService {
     });
     if (!user) throw new AppError(404, "User not found");
 
-    // Re-check uniqueness to close race between OTP issuance and confirmation.
+    // Uniqueness re-check closes race between OTP issuance and confirm.
     const conflict = await prisma.user.findFirst({
       where: { email: newEmail, isDeleted: false },
       select: { id: true },
@@ -452,7 +476,6 @@ export class UserService {
 
     await cacheClient.del(redisKey);
 
-    // Security signal for potential account takeover.
     await emailQueue.add("email-changed-notification", {
       oldEmail,
       firstName: user.firstName,
@@ -462,7 +485,9 @@ export class UserService {
     logger.info({ userId, oldEmail, newEmail }, "User email successfully changed");
   }
 
-  /** Rotates password and revokes all refresh sessions. */
+  /**
+   * Password rotation with full session revocation.
+   */
   static async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await prisma.user.findFirst({
       where: { id: userId, isDeleted: false },
@@ -504,7 +529,10 @@ export class UserService {
     return { success: true, message: "Password changed. Please login again." };
   }
 
-  // TODO: Move account deletion to a dedicated transactional closure workflow.
+  // TODO:   Move account deletion to transactional closure workflow.
+  /**
+   * Soft-delete via email scrambling and credential nuking.
+   */
   static async delete(id: string, password: string) {
     const user = await prisma.user.findFirst({
       where: { id, isDeleted: false },
@@ -591,10 +619,12 @@ export class UserService {
 
     logger.info({ userId: id }, "User account soft-deleted");
 
-    // TODO: Emit immutable compliance audit event for account deletion.
+    // TODO:   Emit compliance audit event for deletion.
   }
 
-  /** Aggregates guest/host KPIs and caches the snapshot. */
+  /**
+   * Guest/Host KPI aggregation with cached snapshot.
+   */
   static async getUserStats(userId: string) {
     const cacheKey = getUserStatsCacheKey(userId);
     const cached = await cacheGet<{

@@ -5,6 +5,7 @@ import { BookingService } from "./booking.service.js";
 import { logger } from "../../shared/lib/logger.js";
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/bookings
  * @access Private
  * @security Bearer token required.
@@ -19,6 +20,7 @@ export async function getUserBookings(req: AuthenticatedRequest, res: Response) 
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/bookings/:id
  * @access Private
  * @security Bearer token required.
@@ -32,6 +34,7 @@ export async function getBookingById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/bookings
  * @access Private
  * @security Bearer token required.
@@ -66,6 +69,7 @@ export async function createBooking(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route PATCH /api/v1/bookings/:id/status
  * @access Private
  * @security Bearer token required.
@@ -80,6 +84,7 @@ export async function updateBookingStatus(req: AuthenticatedRequest, res: Respon
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route DELETE /api/v1/bookings/:id
  * @access Private
  * @security Bearer token required.
@@ -93,6 +98,7 @@ export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/bookings/:id/early-checkout
  * @access Private
  * @security Bearer token required. Guest or admin only.
@@ -106,6 +112,7 @@ export async function earlyCheckout(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route PATCH /api/v1/bookings/:id/dates
  * @access Private
  * @security Bearer token required.
@@ -119,6 +126,7 @@ export async function updateBookingDates(req: AuthenticatedRequest, res: Respons
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/bookings/check-availability
  * @access Public
  */
@@ -131,6 +139,7 @@ export async function checkAvailability(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/bookings/:propertyId/blocked-dates
  * @access Public
  */

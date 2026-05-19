@@ -8,7 +8,9 @@ import { formatDate } from "./payment.helpers.js";
 import type { CreatePaymentInput, CreatePaymentIntentInput } from "./payment.types.js";
 
 export class PaymentIntentService {
-  /** Stripe intent flow: validate booking ownership/state, then upsert pending payment stub. */
+  /**
+   * Validate booking ownership/state and upsert pending payment stub.
+   */
   static async createIntent(data: CreatePaymentIntentInput, userId: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: data.bookingId },
@@ -97,9 +99,13 @@ export class PaymentIntentService {
     return { clientSecret: paymentIntent.client_secret };
   }
 
-  /** Legacy fallback flow for direct payment record creation. */
+  // TODO:   enforce PENDING booking status guard.
+  // TODO:   replace legacy create with PaymentIntent-first flow.
+  // TODO:   persist provider intent id for webhook reconciliation.
+  /**
+   * Legacy fallback flow for direct payment record creation.
+   */
   static async create(data: CreatePaymentInput, userId: string) {
-    // TODO: enforce PENDING booking status guard.
     if (data.provider !== "STRIPE") {
       throw new AppError(400, `Unsupported payment provider: ${data.provider}`);
     }
@@ -121,8 +127,6 @@ export class PaymentIntentService {
       throw new AppError(409, "Payment already exists for this booking");
     }
 
-    // TODO: replace legacy create with PaymentIntent-first flow.
-    // TODO: persist provider intent id for webhook reconciliation.
     return prisma.payment.create({
       data: {
         bookingId: data.bookingId,
@@ -134,7 +138,9 @@ export class PaymentIntentService {
     });
   }
 
-  /** Read path for payment details scoped to booking owner. */
+  /**
+   * Read path for payment details scoped to booking owner.
+   */
   static async getById(id: string, userId: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -159,7 +165,10 @@ export class PaymentIntentService {
     return paymentWithoutMetadata;
   }
 
-  /** Manual override path; intended only for test/ops intervention. */
+  // TODO:   verify provider state before marking SUCCESS.
+  /**
+   * Manual override path; intended only for test/ops intervention.
+   */
   static async process(id: string, userId: string, userRole: string) {
     if (userRole !== "ADMIN") {
       throw new AppError(403, "Not authorized");
@@ -178,9 +187,8 @@ export class PaymentIntentService {
       throw new AppError(400, "Payment already processed");
     }
 
-    // Bypasses provider-state checks; keep this path out of normal prod flow.
+    // Bypasses provider-state checks; isolate from normal prod flow.
     logger.warn({ paymentId: id, userId }, "Manual payment process override used");
-    // TODO: verify provider state before marking SUCCESS.
 
     const updatedPayment = await prisma.$transaction(async (tx) => {
       const p = await tx.payment.update({

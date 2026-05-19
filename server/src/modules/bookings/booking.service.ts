@@ -42,7 +42,7 @@ const BOOKING_PROPERTY_SELECT = {
   ownerId: true,
 } as const;
 
-// Service-level FSM; block backward/skip transitions even if caller retries.
+// FSM transitions to block backward or skip steps.
 const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["COMPLETED", "CANCELLED"],
@@ -77,7 +77,9 @@ export class BookingService {
     return createPaginatedResponse(bookings, total, params);
   }
 
-  /** Access gate: owner/host/admin can read booking + payment snapshot. */
+  /**
+   * RBAC gate for booking and payment snapshot access.
+   */
   static async getById(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -111,11 +113,14 @@ export class BookingService {
     return booking;
   }
 
-  /** Create flow: enforce policy guards and serialize overlap check + insert. */
+  // TODO:   return public booking DTO.
+  /**
+   * Enforce policy guards and serialize overlap check + insert.
+   */
   static async create(data: CreateBookingInput) {
     const { propertyId, userId, checkIn, checkOut, guests } = data;
 
-    // Fail fast on cheap guards before opening Serializable tx.
+    // Fail fast on guards before opening Serializable tx.
     const now = new Date();
     const hoursUntilCheckIn = (checkIn.getTime() - now.getTime()) / (1000 * 60 * 60);
     if (hoursUntilCheckIn < MIN_ADVANCE_HOURS) {
@@ -143,7 +148,7 @@ export class BookingService {
       throw new AppError(400, `Maximum ${property.maxGuests} guests allowed`);
     }
 
-    // Single tx for overlap check + insert; closes race window on concurrent bookings.
+    // Serializable tx closes race window on concurrent bookings.
     const booking = await prisma.$transaction(
       async (tx) => {
         const isAvailable = await this.checkAvailability(propertyId, checkIn, checkOut, tx);
@@ -171,7 +176,7 @@ export class BookingService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    // Async enqueue to keep API latency predictable.
+    // Async enqueue for predictable API latency.
     this.enqueueBookingCreatedEmails(booking, userId).catch((err) =>
       logger.error({ err, bookingId: booking.id }, "Failed to enqueue booking-created emails"),
     );
@@ -181,13 +186,14 @@ export class BookingService {
       cacheInvalidateNamespace("properties:search"),
     ]);
 
-    // TODO: return public booking DTO.
     return booking;
   }
 
-  /** Status FSM: host/admin-only forward transitions; cancellation is separate path. */
+  /**
+   * Handle host/admin forward transitions; cancellations use separate path.
+   */
   static async updateStatus(id: string, userId: string, userRole: string, status: BookingStatus) {
-    // Keep cancel side effects centralized (refund/logging/notifications).
+    // Keep cancel side effects centralized (refunds, notifications).
     if (status === "CANCELLED") {
       throw new AppError(400, "Use DELETE /bookings/:id to cancel a booking");
     }
@@ -205,7 +211,7 @@ export class BookingService {
 
     const role = getBookingRole(booking, userId, userRole);
 
-    // Guests cannot mutate status; only host/admin can advance FSM.
+    // Only host/admin can advance FSM.
     if (role === "NONE" || role === "GUEST") {
       throw new AppError(403, "Not authorized to update this booking");
     }
@@ -229,7 +235,9 @@ export class BookingService {
     return updated;
   }
 
-  /** Guest-initiated early checkout: marks COMPLETED before scheduled checkOut. */
+  /**
+   * Allow COMPLETED status before scheduled check-out.
+   */
   static async earlyCheckout(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -267,9 +275,11 @@ export class BookingService {
     return updated;
   }
 
-  /** Single cancellation path with idempotency + refund-policy snapshot. */
+  // TODO:   execute Stripe refund via PaymentService.
+  /**
+   * Unified cancellation path with idempotency and refund-policy snapshot.
+   */
   static async cancel(id: string, userId: string, userRole: string) {
-    // Centralize cancellation path; keeps policy + side effects consistent.
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: { property: true, payment: true },
@@ -290,10 +300,10 @@ export class BookingService {
     }
 
     if (booking.status === "CANCELLED") {
-      return { booking, cancellation: null }; // Idempotent cancel endpoint.
+      return { booking, cancellation: null };
     }
 
-    // Snapshot policy inputs for logs/response; avoids drift if constants change later.
+    // Snapshot policy to avoid drift if constants change.
     const policy = calculateRefundPolicy(booking.checkIn);
     const hoursUntilCheckIn = policy.hoursUntilCheckIn;
     const refundPercent = policy.refundPercent;
@@ -315,8 +325,6 @@ export class BookingService {
       "Cancellation policy applied",
     );
 
-    // TODO: execute Stripe refund via PaymentService (not just status updates).
-
     const cancelled =
       refundPercent > 0 && booking.payment?.status === "SUCCESS"
         ? await this.cancelPaidBookingWithRefund(booking, userId, role, refundPercent, refundAmount)
@@ -329,7 +337,6 @@ export class BookingService {
             include: { property: true },
           });
 
-    // Notify original guest regardless of canceller role.
     this.enqueueCancellationEmails(cancelled, booking.userId).catch((err) =>
       logger.error({ err, bookingId: id }, "Failed to enqueue cancellation emails"),
     );
@@ -351,7 +358,9 @@ export class BookingService {
     };
   }
 
-  /** Paid-booking cancellation: issue provider refund first, then finalize DB state. */
+  /**
+   * Refund-first cancellation flow with database finalization retries.
+   */
   private static async cancelPaidBookingWithRefund(
     booking: {
       id: string;
@@ -416,7 +425,7 @@ export class BookingService {
       if (latestPayment.status === "REFUNDED") {
         shouldCallStripe = false;
       } else if (latestPayment.status === "REFUND_PROCESSING") {
-        // Recovery path after unknown result/timeouts: replay same idempotency key.
+        // Replay idempotency key for recovery after timeouts.
         shouldCallStripe = true;
       } else {
         throw new AppError(400, "Payment is not eligible for direct refund");
@@ -514,8 +523,7 @@ export class BookingService {
     }
 
     if (!cancelledBooking) {
-      // Stripe refund is confirmed; only the DB write failed. Safe to retry manually
-      // using the same idempotency key: booking_cancel_refund_${payment.id}.
+      // Manual recovery needed if Stripe refund is confirmed but DB write fails.
       void sendOpsAlert({
         title: "Booking cancellation DB finalization failed after retries",
         message:
@@ -541,14 +549,16 @@ export class BookingService {
     return cancelledBooking;
   }
 
-  /** Reschedule flow: role guard + self-excluded overlap check in serializable tx. */
+  /**
+   * Reschedule flow: role guard + self-excluded overlap check.
+   */
   static async updateDates(
     id: string,
     userId: string,
     userRole: string,
     data: UpdateBookingDatesInput,
   ) {
-    // Host reschedule is blocked to prevent unilateral date shifts.
+    // Host reschedule blocked to prevent unilateral shifts.
     const booking = await this.getById(id, userId, userRole);
 
     const role = getBookingRole(booking, userId, userRole);
@@ -586,7 +596,7 @@ export class BookingService {
           newCheckIn,
           newCheckOut,
           tx,
-          id, // self-exclusion avoids false conflict on reschedule.
+          id, // Avoid false conflict on same booking.
         );
         if (!isAvailable) {
           throw new AppError(409, "Property not available for selected dates");
@@ -613,7 +623,9 @@ export class BookingService {
     return result;
   }
 
-  /** Aggregates future unavailable ranges from bookings + manual blocks. */
+  /**
+   * Aggregate future unavailable ranges from bookings and manual blocks.
+   */
   static async getBlockedDates(propertyId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -646,7 +658,9 @@ export class BookingService {
     return { bookedRanges, blockedRanges };
   }
 
-  /** Overlap predicate for booking and blocked-date windows. */
+  /**
+   * Overlap predicate for booking and blocked-date windows.
+   */
   static async checkAvailability(
     propertyId: string,
     checkIn: Date,
@@ -660,7 +674,6 @@ export class BookingService {
         status: { in: ["PENDING", "CONFIRMED"] },
         checkIn: { lt: checkOut },
         checkOut: { gt: checkIn },
-        // Self-exclusion for update path; create path passes undefined.
         ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
     });

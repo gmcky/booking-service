@@ -3,7 +3,7 @@ import { Redis } from "ioredis";
 import { env } from "../../config/env.js";
 import { logger } from "./logger.js";
 
-/** Dedicated Redis client for app cache; isolated from BullMQ traffic. */
+/** Isolated Redis client for application caching. */
 export const cacheClient = new Redis({
   host: env.REDIS_HOST,
   port: env.REDIS_PORT,

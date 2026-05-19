@@ -3,7 +3,9 @@ import { PaymentRefundService } from "./payment.refund.service.js";
 import { PaymentWebhookService } from "./payment.webhook.service.js";
 import { enqueueManualPayoutLifecycleJob } from "../../shared/queues/payout.queue.js";
 
-/** Facade over intent/refund/webhook services; keeps controller imports stable. */
+/**
+ * Facade over intent/refund/webhook services; stabilizes controller imports.
+ */
 export class PaymentService {
   static createIntent = PaymentIntentService.createIntent.bind(PaymentIntentService);
   static create = PaymentIntentService.create.bind(PaymentIntentService);

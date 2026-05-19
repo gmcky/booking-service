@@ -17,7 +17,9 @@ import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import { setTimeout as sleep } from "timers/promises";
 
 export class PaymentRefundService {
-  /** Refund request flow with policy gate and optional auto-approval path. */
+  /**
+   * Request refund with policy gate and optional auto-approval.
+   */
   static async requestRefund(id: string, userId: string, reason?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -88,7 +90,7 @@ export class PaymentRefundService {
     const refundAmount = (Number(payment.amount) * Number(policy.refundPercent)) / 100;
     const refundRequestedAt = new Date().toISOString();
 
-    // TODO: add refund-abuse guard from user history.
+    // TODO:   add refund-abuse guard from user history.
     if (policy.isAutoApprove) {
       if (!payment.transactionId) {
         throw new AppError(400, "Missing payment transaction id");
@@ -137,8 +139,7 @@ export class PaymentRefundService {
           },
         );
       } catch (error) {
-        // Roll back to SUCCESS so the client can retry — idempotency key on
-        // the Stripe call makes a retry safe even if Stripe partially succeeded.
+        // Roll back to SUCCESS so the client can retry. Idempotency key makes retry safe.
         await prisma.payment.update({
           where: { id },
           data: { status: "SUCCESS" },
@@ -207,8 +208,7 @@ export class PaymentRefundService {
       }
 
       if (!refundedPayment) {
-        // Stripe refund confirmed; only DB write failed. Retry safely using
-        // the same idempotency key: refund_${payment.id}.
+        // Safe manual retry via same idempotency key `refund_${payment.id}`.
         void sendOpsAlert({
           title: "Auto-refund DB finalization failed after retries",
           message:
@@ -310,7 +310,11 @@ export class PaymentRefundService {
     return updatedPaymentData;
   }
 
-  /** Admin approval flow with idempotent state transition and provider refund call. */
+  // TODO:   add compensation/outbox for Stripe-success + DB-failure window.
+  // TODO:   align approveRefund transition semantics with requestRefund flow.
+  /**
+   * Admin approval flow with idempotent state transition and provider refund call.
+   */
   static async approveRefund(id: string, adminId: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },
@@ -380,7 +384,7 @@ export class PaymentRefundService {
         ? Math.min(100, Math.max(0, Math.round((refundAmount / paymentAmount) * 100)))
         : 100;
 
-    // Step 1: move to processing once; if already processing, continue recovery path.
+    // Transition to processing once; continue recovery if already processing.
     if (payment.status === "REFUND_REQUESTED") {
       const movedToProcessing = await prisma.payment.updateMany({
         where: {
@@ -407,8 +411,6 @@ export class PaymentRefundService {
       }
     }
 
-    // TODO: add compensation/outbox for Stripe-success + DB-failure window.
-    // TODO: align approveRefund transition semantics with requestRefund flow.
     let stripeRefund;
     try {
       stripeRefund = await stripe.refunds.create(
@@ -436,8 +438,7 @@ export class PaymentRefundService {
     const finalized = await prisma.$transaction(async (tx) => {
       const stripeRefundPayload = toInputJsonObject(stripeRefund);
 
-      // Re-fetch inside tx so any audit entries written between initial fetch
-      // and this transaction are not overwritten by stale existingMetadata.
+      // Re-fetch inside tx to avoid overwriting interleaved audit entries.
       const latestPaymentState = await tx.payment.findUnique({
         where: { id },
         select: { metadata: true },
@@ -525,7 +526,9 @@ export class PaymentRefundService {
     return finalizedPaymentData;
   }
 
-  /** Admin rejection flow that restores payment to SUCCESS state. */
+  /**
+   * Admin rejection flow that restores payment to SUCCESS state.
+   */
   static async rejectRefund(id: string, adminId: string, reason?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id },

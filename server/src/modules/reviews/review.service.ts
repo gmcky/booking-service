@@ -29,9 +29,10 @@ const REVIEWS_CACHE_TTL_SECONDS = 5 * 60;
 
 type ReviewListFilters = Pick<ReviewQueryInput, "sort" | "rating" | "hasHostReply">;
 
-/** Review lifecycle service with booking-scoped invariants and cache invalidation. */
 export class ReviewService {
-  /** Read flow: filter/sort/paginate property reviews via cache-aside. */
+  /**
+   * Filtered list of property reviews with cache-aside.
+   */
   static async getPropertyReviews(
     propertyId: string,
     params: PaginationParams,
@@ -81,7 +82,9 @@ export class ReviewService {
     return result;
   }
 
-  /** Create flow: completed-booking gate + atomic rating aggregate update. */
+  /**
+   * Create review with completed-booking guard and atomic rating aggregate update.
+   */
   static async create(data: CreateReviewInput) {
     const { userId, bookingId, rating, comment } = data;
 
@@ -185,7 +188,9 @@ export class ReviewService {
     }
   }
 
-  /** Update flow: owner-only edit within time window + aggregate recompute. */
+  /**
+   * Ownership and time-window guard for review edits.
+   */
   static async update(id: string, userId: string, data: UpdateReviewInput) {
     const review = await prisma.review.findUnique({ where: { id } });
 
@@ -248,7 +253,9 @@ export class ReviewService {
     }
   }
 
-  /** Delete flow: author/admin delete with aggregate recompute. */
+  /**
+   * Ownership/Admin guard for review removal.
+   */
   static async delete(id: string, userId: string, userRole: string) {
     const review = await prisma.review.findUnique({ where: { id } });
 
@@ -279,7 +286,9 @@ export class ReviewService {
     );
   }
 
-  /** Host reply flow: one-shot reply enforced with updateMany race guard. */
+  /**
+   * One-shot host reply with updateMany race guard.
+   */
   static async replyToReview(reviewId: string, data: ReplyToReviewInput) {
     const { hostId } = data;
     const text = data.text.trim();
@@ -372,7 +381,9 @@ export class ReviewService {
     return repliedReview;
   }
 
-  /** Abuse-report flow with duplicate-report guard and async admin notification. */
+  /**
+   * Abuse report with duplicate-report guard and async notification.
+   */
   static async reportReview(reviewId: string, data: ReportReviewInput) {
     const { reporterId } = data;
     const reason = data.reason.trim();
@@ -476,7 +487,9 @@ export class ReviewService {
     }
   }
 
-  /** Stats flow for rating distribution and monthly trend series. */
+  /**
+   * Aggregated rating distribution and trend series.
+   */
   static async getPropertyReviewStats(propertyId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },

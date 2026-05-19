@@ -27,9 +27,10 @@ type PropertyViewer = {
   role: string;
 };
 
-/** Listing lifecycle service with cache-aside and async queue side-effects. */
 export class PropertyService {
-  /** Public search flow: filter/sort/paginate with short-lived cache. */
+  /**
+   * Filtered search with short-lived cache-aside.
+   */
   static async getAll(params: PaginationParams, filters: PropertyFilters) {
     const { skip, take } = calculatePagination(params.page, params.limit);
 
@@ -57,7 +58,7 @@ export class PropertyService {
       ...(filters.maxGuests !== undefined && {
         maxGuests: { gte: filters.maxGuests },
       }),
-      // Search is advisory — actual booking creation re-checks under Serializable tx.
+      // Advisory availability — final check performed under Serializable tx during booking.
       ...(filters.checkIn &&
         filters.checkOut && {
           NOT: [
@@ -125,7 +126,9 @@ export class PropertyService {
     return createPaginatedResponse(properties, total, params);
   }
 
-  /** Read flow: public view is cached; inactive listings are visible only to owner/admin. */
+  /**
+   * Cached public view; inactive listings restricted to owner/admin.
+   */
   static async getById(id: string, viewer?: PropertyViewer) {
     const cacheKey = `property:${id}`;
     const cached = await cacheGet(cacheKey);
@@ -158,7 +161,7 @@ export class PropertyService {
       throw new AppError(404, "Property not found");
     }
 
-    // Cache only publicly visible state to avoid leaking owner/admin-only access.
+    // Avoid leaking restricted access state to public cache.
     if (property.isActive) {
       await cacheSet(cacheKey, property, 60 * 60);
     }
@@ -166,11 +169,13 @@ export class PropertyService {
     return property;
   }
 
-  /** Create flow: persist listing first, then fan out async jobs. */
+  // TODO:   add configurable listing moderation.
+  /**
+   * Persist listing and fan out async image/notification jobs.
+   */
   static async create(data: CreatePropertyInput) {
     const { rawImagePaths, ...propertyData } = data;
 
-    // TODO: add configurable listing moderation.
     const property = await prisma.property.create({
       data: {
         ...propertyData,
@@ -183,7 +188,7 @@ export class PropertyService {
       },
     });
 
-    // Image work is async to avoid request-path latency spikes.
+    // Async processing to avoid request-path latency.
     if (rawImagePaths.length > 0) {
       await imageQueue.add("process-images", {
         type: "property",
@@ -192,7 +197,6 @@ export class PropertyService {
       });
     }
 
-    // Notification enqueue is fire-and-forget.
     await emailQueue.add("property-created-host", {
       ownerEmail: property.owner.email,
       ownerFirstName: property.owner.firstName,
@@ -209,7 +213,9 @@ export class PropertyService {
     return { ...propertyWithoutOwner, owner: ownerWithoutEmail };
   }
 
-  /** Update flow: ownership-guarded patch with orphan-image cleanup. */
+  /**
+   * Ownership-guarded patch with orphan-image cleanup.
+   */
   static async update(id: string, ownerId: string, data: UpdatePropertyInput) {
     const current = await this.verifyOwnership(id, ownerId);
 
@@ -218,7 +224,7 @@ export class PropertyService {
       data: omitUndefined(data),
     });
 
-    // `images: []` is explicit orphaning intent; trigger cleanup.
+    // Explicit orphaning triggers cleanup job.
     if (data.images !== undefined) {
       const incoming = new Set(data.images);
       const orphaned = current.images.filter((p) => !incoming.has(p));
@@ -234,7 +240,9 @@ export class PropertyService {
     return updated;
   }
 
-  /** Delete flow: ownership check + soft-delete by deactivation. */
+  /**
+   * Soft-delete via deactivation; blocks if active bookings exist.
+   */
   static async delete(id: string, ownerId: string) {
     await this.verifyOwnership(id, ownerId);
 
@@ -261,7 +269,9 @@ export class PropertyService {
     ]);
   }
 
-  /** Toggle listing visibility and invalidate read/search caches. */
+  /**
+   * Toggle visibility and invalidate related caches.
+   */
   static async setActive(id: string, ownerId: string, isActive: boolean) {
     await this.verifyOwnership(id, ownerId);
 
@@ -279,7 +289,9 @@ export class PropertyService {
     return updated;
   }
 
-  /** Ownership guard used by all mutating listing operations. */
+  /**
+   * Ownership guard for mutating operations.
+   */
   private static async verifyOwnership(propertyId: string, ownerId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },

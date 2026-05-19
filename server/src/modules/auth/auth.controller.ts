@@ -14,6 +14,7 @@ const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
 };
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/auth/register
  * @access Public
  * @security Rate-limited at HTTP layer.
@@ -25,13 +26,14 @@ export async function register(req: Request, res: Response) {
   });
   const { refreshToken, ...responsePayload } = result;
 
-  // Keep refresh token off JSON payload to reduce client-side exfiltration surface.
+  // Off-payload refresh token reduces client-side exfiltration surface.
   setRefreshTokenCookie(res, refreshToken);
 
   res.status(201).json(responsePayload);
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/auth/login
  * @access Public
  * @security Rate-limited + lockout-backed.
@@ -49,6 +51,7 @@ export async function login(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/auth/logout
  * @access Private
  * @security Requires refresh token cookie.
@@ -67,6 +70,7 @@ export async function logout(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/auth/refresh
  * @access Public
  * @security Rotation + reuse-detection path.
@@ -85,8 +89,7 @@ export async function refreshToken(req: Request, res: Response) {
   res.json(responsePayload);
 }
 
-// TODO: add password-reset endpoints.
-// TODO: add email-verification endpoint.
+// TODO:   add password-reset and email-verification endpoints.
 
 function setRefreshTokenCookie(res: Response, token: string) {
   res.cookie(REFRESH_TOKEN_COOKIE_NAME, token, REFRESH_TOKEN_COOKIE_OPTIONS);

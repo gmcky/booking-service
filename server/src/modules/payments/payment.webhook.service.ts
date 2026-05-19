@@ -16,7 +16,9 @@ import {
 } from "./payment.helpers.js";
 
 export class PaymentWebhookService {
-  /** Verifies webhook signature, deduplicates events, then dispatches handlers. */
+  /**
+   * Verify webhook signature, deduplicate events, and dispatch handlers.
+   */
   static async handleStripeWebhook(event: string | Buffer, signature: string) {
     let stripeEvent: Stripe.Event;
     try {
@@ -37,10 +39,8 @@ export class PaymentWebhookService {
       return { success: true };
     }
 
-    // Handler runs before the dedup record is written. If the app crashes
-    // mid-handler the record is never inserted, so Stripe will retry and
-    // the handler will run again — correct. Handlers must be idempotent;
-    // email jobs carry a jobId so BullMQ deduplicates on concurrent delivery.
+    // Handlers run before dedup record. App crash mid-handler = safe retry.
+    // Handlers must be idempotent; email jobs use jobId for deduplication.
     switch (stripeEvent.type) {
       case "payment_intent.succeeded":
         await this.handlePaymentSuccess(
@@ -67,8 +67,7 @@ export class PaymentWebhookService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        // Concurrent delivery: another request processed the same event.
-        // Handler already ran (idempotent), so this is safe to ignore.
+        // Concurrent delivery race condition. Idempotent handler ran, safe to ignore.
         return { success: true };
       }
 
@@ -81,7 +80,9 @@ export class PaymentWebhookService {
     return { success: true };
   }
 
-  /** Success sync: upsert payment state and confirm booking in one transaction. */
+  /**
+   * Upsert payment state and confirm booking atomically.
+   */
   private static async handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent, eventId: string) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
@@ -216,7 +217,9 @@ export class PaymentWebhookService {
     logger.info({ bookingId, paymentIntentId: paymentIntent.id }, "Payment succeeded");
   }
 
-  /** Failure sync: mark payment as FAILED and persist provider payload. */
+  /**
+   * Mark payment FAILED and persist provider payload.
+   */
   private static async handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
@@ -259,7 +262,9 @@ export class PaymentWebhookService {
     logger.warn({ bookingId, paymentIntentId: paymentIntent.id }, "Payment failed");
   }
 
-  /** Refund sync from provider event; updates payment/booking and notifies host. */
+  /**
+   * Sync refund from provider, update booking, and notify host.
+   */
   private static async handleChargeRefunded(charge: Stripe.Charge, eventId: string) {
     const paymentIntentRaw = charge?.payment_intent;
     const paymentIntentId =

@@ -21,11 +21,11 @@ const REFRESH_TOKEN_CLEAR_OPTIONS: CookieOptions = {
 };
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/users/me
  * @access Private
  * @security Bearer token required.
  */
-
 export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const user = await UserService.getById(userId, { mode: "self" });
@@ -33,6 +33,7 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/users/me/stats
  * @access Private
  * @security Bearer token required.
@@ -44,13 +45,14 @@ export async function getCurrentUserStats(req: AuthenticatedRequest, res: Respon
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route PATCH /api/v1/users/me
  * @access Private
  * @security Bearer token required.
  * @body { firstName?, lastName?, avatar? }
  */
 export async function updateCurrentUser(req: AuthenticatedRequest, res: Response) {
-  // Auth anchor: self-update routes derive subject from JWT only.
+  // Derive subject from JWT only for self-update.
   const userId = req.user!.id;
 
   const user = await UserService.update(userId, req.body as UpdateUserInput);
@@ -64,8 +66,9 @@ export async function updateCurrentUser(req: AuthenticatedRequest, res: Response
   res.json(user);
 }
 
-// TODO: Enforce step-up confirmation token for account deletion.
+// TODO:   Enforce step-up confirmation token for account deletion.
 /**
+ * @server\src\api.routes.ts
  * @route DELETE /api/v1/users/me
  * @access Private
  * @security Bearer token required.
@@ -80,6 +83,7 @@ export async function deleteCurrentUser(req: AuthenticatedRequest, res: Response
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route DELETE /api/v1/users/me/avatar
  * @access Private
  * @security Bearer token required.
@@ -91,6 +95,7 @@ export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/users/me/email/request-change
  * @access Private
  * @security Bearer token required.
@@ -109,6 +114,7 @@ export async function requestEmailChange(req: AuthenticatedRequest, res: Respons
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/users/me/email/confirm-change
  * @access Private
  * @security Bearer token required.
@@ -124,6 +130,7 @@ export async function confirmEmailChange(req: AuthenticatedRequest, res: Respons
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/users/me/change-password
  * @access Private
  * @security Bearer token required.
@@ -135,7 +142,7 @@ export async function changePassword(req: AuthenticatedRequest, res: Response) {
 
   await UserService.changePassword(userId, currentPassword, newPassword);
 
-  // Refresh sessions are revoked in service; clear cookie to avoid phantom refresh attempts.
+  // Clear cookie to avoid phantom refresh attempts after session revocation.
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, REFRESH_TOKEN_CLEAR_OPTIONS);
 
   res.json({
@@ -145,6 +152,7 @@ export async function changePassword(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/users?page=1&limit=10
  * @access Private (Admin)
  * @security Bearer token required + ADMIN role.
@@ -165,6 +173,7 @@ export async function getAllUsers(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/users/:id
  * @access Public
  */
@@ -176,6 +185,7 @@ export async function getUserById(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route PATCH /api/v1/users/:id/suspend
  * @access Private (Admin)
  * @security Bearer token required + ADMIN role.
@@ -187,6 +197,7 @@ export async function suspendUser(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route PATCH /api/v1/users/:id/restore
  * @access Private (Admin)
  * @security Bearer token required + ADMIN role.

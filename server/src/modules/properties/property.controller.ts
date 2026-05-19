@@ -5,7 +5,8 @@ import { PropertyService } from "./property.service.js";
 import type { PropertyQueryInput } from "./property.types.js";
 
 /**
- * @route GET /api/v1/properties?page=1&limit=10&city=Berlin&type=APARTMENT&minPrice=50&maxPrice=200&maxGuests=4&amenities=WIFI,PARKING&sort=price_asc&checkIn=2025-06-01&checkOut=2025-06-07
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/properties
  * @access Public
  */
 export async function getProperties(req: Request, res: Response) {
@@ -23,7 +24,7 @@ export async function getProperties(req: Request, res: Response) {
     checkOut,
   } = req.query as unknown as PropertyQueryInput;
 
-  // TODO: add controller cache-aside if service cache is removed.
+  // TODO:   add controller cache-aside if service cache is removed.
 
   const result = await PropertyService.getAll(
     { page, limit },
@@ -34,6 +35,7 @@ export async function getProperties(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/properties/my
  * @access Private
  * @security Bearer token required.
@@ -47,6 +49,7 @@ export async function getMyProperties(req: AuthenticatedRequest, res: Response) 
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route GET /api/v1/properties/:id
  * @access Public
  */
@@ -65,16 +68,15 @@ export async function getPropertyById(req: Request, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/properties
  * @access Private
  * @security Bearer token required. Any authenticated user can create a property; ownerId is set from req.user.id.
  */
 export async function createProperty(req: AuthenticatedRequest, res: Response) {
-  // Any authenticated user becomes the owner of the created property via ownerId.
-
   const ownerId = req.user!.id;
 
-  // TODO: add per-owner listing rate limit.
+  // TODO:   add per-owner listing rate limit.
 
   const property = await PropertyService.create({ ...req.body, ownerId });
 
@@ -82,6 +84,7 @@ export async function createProperty(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route PATCH /api/v1/properties/:id
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
@@ -94,6 +97,7 @@ export async function updateProperty(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route DELETE /api/v1/properties/:id
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
@@ -106,6 +110,7 @@ export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/properties/:id/activate
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
@@ -118,6 +123,7 @@ export async function activateProperty(req: AuthenticatedRequest, res: Response)
 }
 
 /**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/properties/:id/deactivate
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.

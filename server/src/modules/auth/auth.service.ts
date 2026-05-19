@@ -19,7 +19,9 @@ const REFRESH_SECRET = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 // TODO: implement magic-link unlock for locked accounts.
 
 export class AuthService {
-  /** Registration flow: create user + first refresh session atomically. */
+  /**
+   * Atomic user creation and initial refresh session.
+   */
   static async register(
     data: RegisterInput,
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
@@ -50,7 +52,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(data.password, 12);
 
     try {
-      // Move crypto/bcrypt out of tx to reduce lock time under load.
+      // Crypto/bcrypt kept outside tx to reduce lock time.
       const userId = crypto.randomUUID();
       const jti = crypto.randomUUID();
       const refreshExpiresIn = parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
@@ -65,7 +67,7 @@ export class AuthService {
       const refreshToken = await this.generateRefreshToken({ id: userId }, jti);
       const tokenHash = this.hashToken(refreshToken);
 
-      // Tx scope: write-only DB ops for predictable latency.
+      // Write-only DB ops for predictable tx latency.
       const user = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -115,7 +117,7 @@ export class AuthService {
         refreshToken,
       };
     } catch (error) {
-      // Race-safe duplicate handling: normalize unique-constraint conflicts.
+      // Normalize unique-constraint conflicts.
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
           logger.warn(
@@ -135,14 +137,16 @@ export class AuthService {
     }
   }
 
-  /** Login flow: auth + lockout guards + bounded session issuance. */
+  /**
+   * Credential validation with lockout guards and session issuance.
+   */
   static async login(
     data: LoginInput,
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<AuthResponse> {
     const email = data.email.toLowerCase();
 
-    // Short-circuit before bcrypt: cheaper path + consistent failure behavior.
+    // Short-circuit before bcrypt to block enumeration.
     await this.checkLockout(email, meta);
 
     const user = await prisma.user.findFirst({
@@ -152,7 +156,7 @@ export class AuthService {
       },
     });
 
-    // Same 401 payload for absent user / bad password; blocks enum signal.
+    // Consistent 401 response for absent user or bad password.
     if (!user || !user.passwordHash) {
       logger.warn(
         { email, ip: meta?.ip, userAgent: meta?.userAgent },
@@ -182,7 +186,6 @@ export class AuthService {
 
     await this.clearLockout(email);
 
-    // Keep crypto outside tx; reserve tx time for persistence only.
     const jti = crypto.randomUUID();
     const refreshExpiresIn = parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
     const expiresAt = new Date(Date.now() + refreshExpiresIn);
@@ -191,7 +194,7 @@ export class AuthService {
     const refreshToken = await this.generateRefreshToken(user, jti);
     const tokenHash = this.hashToken(refreshToken);
 
-    // Persist + prune in one tx to avoid session-set drift.
+    // Persist session and prune stale/excess tokens in one batch.
     await prisma.$transaction(async (tx) => {
       await tx.refreshToken.create({
         data: {
@@ -211,7 +214,7 @@ export class AuthService {
         },
       });
 
-      // Cap active sessions per user to avoid unbounded token growth.
+      // Cap active sessions to prevent unbounded growth.
       const tokensToPrune = await tx.refreshToken.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
@@ -244,7 +247,9 @@ export class AuthService {
     };
   }
 
-  /** Logout flow: validate refresh token and revoke current session. */
+  /**
+   * Session revocation via refresh token invalidation.
+   */
   static async logout(
     refreshToken: string,
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
@@ -288,7 +293,7 @@ export class AuthService {
     });
 
     if (!storedToken) {
-      // Missing jti after JWT validation usually means reuse/rotation race.
+      // Token missing from DB usually indicates rotation race or reuse.
       await prisma.refreshToken.deleteMany({ where: { userId } });
       logger.warn(
         { userId, jti, ip: meta?.ip, userAgent: meta?.userAgent },
@@ -314,7 +319,6 @@ export class AuthService {
       throw new AppError(401, "Invalid refresh token");
     }
 
-    // Revoke current token and trim expired rows in the same write batch.
     await prisma.$transaction([
       prisma.refreshToken.delete({ where: { id: storedToken.id } }),
       prisma.refreshToken.deleteMany({
@@ -336,7 +340,9 @@ export class AuthService {
     );
   }
 
-  /** Refresh flow: enforce rotation and nuke sessions on reuse signals. */
+  /**
+   * Token rotation with nuke-on-reuse protection.
+   */
   static async refreshToken(
     refreshToken: string,
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
@@ -377,7 +383,7 @@ export class AuthService {
     });
 
     if (!storedToken) {
-      // Missing jti on refresh is a strong reuse signal; revoke all sessions.
+      // Reuse signal: missing jti on refresh triggers full session revocation.
       await prisma.refreshToken.deleteMany({ where: { userId } });
       logger.warn(
         { userId, jti, ip: meta?.ip, userAgent: meta?.userAgent },
@@ -397,7 +403,7 @@ export class AuthService {
       throw new AppError(401, "Invalid refresh token");
     }
 
-    // Defensive cleanup for stale DB rows that outlived JWT expiry.
+    // Defensive cleanup for JWTs that outlived DB records.
     if (storedToken.expiresAt < new Date()) {
       await prisma.refreshToken.delete({ where: { id: storedToken.id } });
       logger.warn(
@@ -409,7 +415,6 @@ export class AuthService {
 
     const isMatch = this.hashToken(refreshToken) === storedToken.tokenHash;
     if (!isMatch) {
-      // Valid jti + hash mismatch => tamper/reuse; hard revoke all sessions.
       await prisma.refreshToken.deleteMany({
         where: { userId: storedToken.userId },
       });
@@ -420,13 +425,11 @@ export class AuthService {
       throw new AppError(401, "Invalid refresh token");
     }
 
-    // Rotation stays atomic: consume old token before persisting new one.
     const user = storedToken.user;
     const newJti = crypto.randomUUID();
     const refreshExpiresIn = parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
     const expiresAt = new Date(Date.now() + refreshExpiresIn);
 
-    // Keep tx lean: generate/sign/hash before DB writes.
     const accessToken = await this.generateAccessToken(user);
     const newRefreshToken = await this.generateRefreshToken(user, newJti);
     const tokenHash = this.hashToken(newRefreshToken);
@@ -445,7 +448,6 @@ export class AuthService {
         },
       });
 
-      // Opportunistic GC to keep token table compact.
       await tx.refreshToken.deleteMany({
         where: {
           userId: user.id,
