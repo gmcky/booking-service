@@ -1,15 +1,9 @@
 import type { Request } from "express";
 import { describe, expect, it } from "vitest";
 import { AppError } from "../../shared/middlewares/error.handler.js";
-import {
-  getIdParam,
-  getQueryParam,
-} from "../../shared/utils/request.helpers.js";
+import { getIdParam, getQueryParam } from "../../shared/utils/request.helpers.js";
 
-function makeReq(
-  params: Record<string, unknown>,
-  query: Record<string, unknown> = {},
-): Request {
+function makeReq(params: Record<string, unknown>, query: Record<string, unknown> = {}): Request {
   return { params, query } as unknown as Request;
 }
 

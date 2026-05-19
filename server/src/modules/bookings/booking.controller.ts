@@ -9,10 +9,7 @@ import { logger } from "../../shared/lib/logger.js";
  * @access Private
  * @security Bearer token required.
  */
-export async function getUserBookings(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function getUserBookings(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
@@ -73,20 +70,12 @@ export async function createBooking(req: AuthenticatedRequest, res: Response) {
  * @access Private
  * @security Bearer token required.
  */
-export async function updateBookingStatus(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function updateBookingStatus(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const userRole = req.user!.role;
   const { status } = req.body;
-  const booking = await BookingService.updateStatus(
-    id,
-    userId,
-    userRole,
-    status,
-  );
+  const booking = await BookingService.updateStatus(id, userId, userRole, status);
   res.json(booking);
 }
 
@@ -121,19 +110,11 @@ export async function earlyCheckout(req: AuthenticatedRequest, res: Response) {
  * @access Private
  * @security Bearer token required.
  */
-export async function updateBookingDates(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function updateBookingDates(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const userId = req.user!.id;
   const userRole = req.user!.role;
-  const booking = await BookingService.updateDates(
-    id,
-    userId,
-    userRole,
-    req.body,
-  );
+  const booking = await BookingService.updateDates(id, userId, userRole, req.body);
   res.json(booking);
 }
 
@@ -144,11 +125,7 @@ export async function updateBookingDates(
 export async function checkAvailability(req: Request, res: Response) {
   const { propertyId, checkIn, checkOut } = req.body;
 
-  const isAvailable = await BookingService.checkAvailability(
-    propertyId,
-    checkIn,
-    checkOut,
-  );
+  const isAvailable = await BookingService.checkAvailability(propertyId, checkIn, checkOut);
 
   res.json({ available: isAvailable });
 }

@@ -55,26 +55,17 @@ export class PaymentRefundService {
       throw new AppError(403, "Not authorized");
     }
 
-    if (
-      payment.status === "REFUND_REQUESTED" ||
-      payment.status === "REFUND_PROCESSING"
-    ) {
+    if (payment.status === "REFUND_REQUESTED" || payment.status === "REFUND_PROCESSING") {
       const { metadata: _m, booking: _b, ...paymentData } = payment;
       return paymentData;
     }
 
     if (payment.status !== "SUCCESS") {
-      throw new AppError(
-        400,
-        "Refund request can only be created for successful payments",
-      );
+      throw new AppError(400, "Refund request can only be created for successful payments");
     }
 
     if (payment.booking.payoutStatus === "PAID_OUT") {
-      throw new AppError(
-        400,
-        "Cannot request refund after payout has been disbursed to host",
-      );
+      throw new AppError(400, "Cannot request refund after payout has been disbursed to host");
     }
 
     if (payment.booking.status === "COMPLETED") {
@@ -87,18 +78,14 @@ export class PaymentRefundService {
     }
 
     if (policy.refundPercent === 0) {
-      throw new AppError(
-        400,
-        "Refund request is not allowed less than 24 hours before check-in",
-      );
+      throw new AppError(400, "Refund request is not allowed less than 24 hours before check-in");
     }
 
     // Safe snapshot: following update only mutates status.
     const existingMetadata = getMetadataObject(payment.metadata);
     const existingAudit = getAuditObject(existingMetadata);
     const existingStripePayload = getStripePayloadObject(existingMetadata);
-    const refundAmount =
-      (Number(payment.amount) * Number(policy.refundPercent)) / 100;
+    const refundAmount = (Number(payment.amount) * Number(policy.refundPercent)) / 100;
     const refundRequestedAt = new Date().toISOString();
 
     // TODO: add refund-abuse guard from user history.
@@ -130,8 +117,7 @@ export class PaymentRefundService {
 
       const processingMetadata = getMetadataObject(processingPayment.metadata);
       const processingAudit = getAuditObject(processingMetadata);
-      const processingStripePayload =
-        getStripePayloadObject(processingMetadata);
+      const processingStripePayload = getStripePayloadObject(processingMetadata);
 
       let stripeRefund;
       try {
@@ -362,18 +348,12 @@ export class PaymentRefundService {
       return payment;
     }
 
-    if (
-      payment.status !== "REFUND_REQUESTED" &&
-      payment.status !== "REFUND_PROCESSING"
-    ) {
+    if (payment.status !== "REFUND_REQUESTED" && payment.status !== "REFUND_PROCESSING") {
       throw new AppError(400, "Payment is not waiting for refund approval");
     }
 
     if (payment.booking.payoutStatus === "PAID_OUT") {
-      throw new AppError(
-        400,
-        "Cannot approve refund after payout has been disbursed to host",
-      );
+      throw new AppError(400, "Cannot approve refund after payout has been disbursed to host");
     }
 
     if (!payment.transactionId) {
@@ -385,26 +365,19 @@ export class PaymentRefundService {
     const existingStripePayload = getStripePayloadObject(existingMetadata);
     const refundRequestRaw = existingAudit.refundRequest;
     const refundRequest =
-      refundRequestRaw &&
-      typeof refundRequestRaw === "object" &&
-      !Array.isArray(refundRequestRaw)
+      refundRequestRaw && typeof refundRequestRaw === "object" && !Array.isArray(refundRequestRaw)
         ? (refundRequestRaw as Prisma.JsonObject)
         : null;
 
     const paymentAmount = Number(payment.amount);
     const requestedRefundAmount = toFiniteNumber(refundRequest?.refundAmount);
     const refundAmount =
-      requestedRefundAmount &&
-      requestedRefundAmount > 0 &&
-      requestedRefundAmount <= paymentAmount
+      requestedRefundAmount && requestedRefundAmount > 0 && requestedRefundAmount <= paymentAmount
         ? requestedRefundAmount
         : paymentAmount;
     const refundPercent =
       paymentAmount > 0
-        ? Math.min(
-            100,
-            Math.max(0, Math.round((refundAmount / paymentAmount) * 100)),
-          )
+        ? Math.min(100, Math.max(0, Math.round((refundAmount / paymentAmount) * 100)))
         : 100;
 
     // Step 1: move to processing once; if already processing, continue recovery path.

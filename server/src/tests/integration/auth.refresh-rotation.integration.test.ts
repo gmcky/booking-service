@@ -7,10 +7,7 @@ import type { PrismaClient } from "@prisma/client";
 let app: Application;
 let prisma: PrismaClient;
 
-function getCookieValue(
-  setCookieHeader: string | string[] | undefined,
-  name: string,
-): string {
+function getCookieValue(setCookieHeader: string | string[] | undefined, name: string): string {
   const cookies = Array.isArray(setCookieHeader)
     ? setCookieHeader
     : setCookieHeader
@@ -46,10 +43,7 @@ async function registerAndGetRefreshToken() {
 
   expect(response.status).toBe(201);
 
-  const refreshToken = getCookieValue(
-    response.headers["set-cookie"],
-    "refreshToken",
-  );
+  const refreshToken = getCookieValue(response.headers["set-cookie"], "refreshToken");
 
   return {
     userId: response.body.user.id as string,
@@ -59,12 +53,11 @@ async function registerAndGetRefreshToken() {
 
 describe("Auth refresh token rotation integration", () => {
   beforeAll(async () => {
-    const [{ authRouter }, { errorHandler }, { prisma: prismaClient }] =
-      await Promise.all([
-        import("../../modules/auth/auth.routes.js"),
-        import("../../shared/middlewares/error.handler.js"),
-        import("../../shared/lib/prisma.js"),
-      ]);
+    const [{ authRouter }, { errorHandler }, { prisma: prismaClient }] = await Promise.all([
+      import("../../modules/auth/auth.routes.js"),
+      import("../../shared/middlewares/error.handler.js"),
+      import("../../shared/lib/prisma.js"),
+    ]);
 
     prisma = prismaClient;
 
@@ -85,14 +78,12 @@ describe("Auth refresh token rotation integration", () => {
     const email = `login-rotation-${Date.now()}@example.com`;
     const password = "S3cure!Passw0rd#2026";
 
-    const registerResponse = await request(app)
-      .post("/api/v1/auth/register")
-      .send({
-        email,
-        password,
-        firstName: "Login",
-        lastName: "Rotation",
-      });
+    const registerResponse = await request(app).post("/api/v1/auth/register").send({
+      email,
+      password,
+      firstName: "Login",
+      lastName: "Rotation",
+    });
 
     expect(registerResponse.status).toBe(201);
     const userId = registerResponse.body.user.id as string;
@@ -105,10 +96,7 @@ describe("Auth refresh token rotation integration", () => {
     // 1. login -> receives refresh token (in cookie)
     expect(loginResponse.status).toBe(200);
     expect(loginResponse.body.accessToken).toEqual(expect.any(String));
-    const initialRefreshToken = getCookieValue(
-      loginResponse.headers["set-cookie"],
-      "refreshToken",
-    );
+    const initialRefreshToken = getCookieValue(loginResponse.headers["set-cookie"], "refreshToken");
 
     // 2. refresh -> receives new access token + rotated refresh token
     const refreshResponse = await request(app)
@@ -144,8 +132,7 @@ describe("Auth refresh token rotation integration", () => {
   });
 
   it("returns a new refresh token on successful rotation", async () => {
-    const { refreshToken: initialRefreshToken } =
-      await registerAndGetRefreshToken();
+    const { refreshToken: initialRefreshToken } = await registerAndGetRefreshToken();
 
     const refreshResponse = await request(app)
       .post("/api/v1/auth/refresh")
@@ -165,8 +152,7 @@ describe("Auth refresh token rotation integration", () => {
   });
 
   it("rejects old token after rotation and revokes all sessions", async () => {
-    const { userId, refreshToken: initialRefreshToken } =
-      await registerAndGetRefreshToken();
+    const { userId, refreshToken: initialRefreshToken } = await registerAndGetRefreshToken();
 
     const firstRotation = await request(app)
       .post("/api/v1/auth/refresh")
@@ -175,10 +161,7 @@ describe("Auth refresh token rotation integration", () => {
 
     expect(firstRotation.status).toBe(200);
 
-    const newRefreshToken = getCookieValue(
-      firstRotation.headers["set-cookie"],
-      "refreshToken",
-    );
+    const newRefreshToken = getCookieValue(firstRotation.headers["set-cookie"], "refreshToken");
 
     const reusedOldTokenResponse = await request(app)
       .post("/api/v1/auth/refresh")
@@ -205,8 +188,7 @@ describe("Auth refresh token rotation integration", () => {
   });
 
   it("handles concurrent refresh requests with the same token", async () => {
-    const { refreshToken: initialRefreshToken } =
-      await registerAndGetRefreshToken();
+    const { refreshToken: initialRefreshToken } = await registerAndGetRefreshToken();
 
     const [first, second] = await Promise.all([
       request(app)
@@ -225,9 +207,7 @@ describe("Auth refresh token rotation integration", () => {
     // In a rotation race, only one request can succeed at most.
     expect(successCount).toBeLessThanOrEqual(1);
     expect(statuses.some((status) => status !== 200)).toBe(true);
-    expect(statuses.every((status) => [200, 401, 404].includes(status))).toBe(
-      true,
-    );
+    expect(statuses.every((status) => [200, 401, 404].includes(status))).toBe(true);
 
     const remainingTokens = await prisma.refreshToken.count();
     expect(remainingTokens).toBeLessThanOrEqual(1);

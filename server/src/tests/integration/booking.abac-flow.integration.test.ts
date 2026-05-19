@@ -171,8 +171,7 @@ describe("ABAC booking flow integration", () => {
       .set("Authorization", `Bearer ${host.accessToken}`)
       .send({
         title: "Awesome Villa in Kyiv",
-        description:
-          "A spacious and stylish villa with fast Wi-Fi, garden and parking.",
+        description: "A spacious and stylish villa with fast Wi-Fi, garden and parking.",
         type: "HOUSE",
         city: "Kyiv",
         address: "Khreshchatyk street 10",

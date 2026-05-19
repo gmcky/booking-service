@@ -1,16 +1,11 @@
 import { z } from "zod";
 
 const PHONE_NUMBER_REGEX = /^\+?[1-9]\d{9,14}$/;
-const PASSWORD_COMPLEXITY_REGEX =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/;
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/;
 
 function isAdult(dateOfBirth: Date): boolean {
   const now = new Date();
-  const adultThreshold = new Date(
-    now.getFullYear() - 18,
-    now.getMonth(),
-    now.getDate(),
-  );
+  const adultThreshold = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
 
   return dateOfBirth <= adultThreshold;
 }
@@ -24,9 +19,12 @@ export const updateUserSchema = z.object({
     .trim()
     .regex(PHONE_NUMBER_REGEX, "Invalid phone number format")
     .optional(),
-  dateOfBirth: z.coerce.date().refine(isAdult, {
-    message: "You must be at least 18 years old",
-  }).optional(),
+  dateOfBirth: z.coerce
+    .date()
+    .refine(isAdult, {
+      message: "You must be at least 18 years old",
+    })
+    .optional(),
   bio: z.string().trim().max(500).optional(),
 });
 

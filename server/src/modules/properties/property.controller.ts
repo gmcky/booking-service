@@ -110,10 +110,7 @@ export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
  */
-export async function activateProperty(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function activateProperty(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const ownerId = req.user!.id;
   const property = await PropertyService.setActive(id, ownerId, true);
@@ -125,10 +122,7 @@ export async function activateProperty(
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
  */
-export async function deactivateProperty(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function deactivateProperty(req: AuthenticatedRequest, res: Response) {
   const id = getIdParam(req);
   const ownerId = req.user!.id;
   const property = await PropertyService.setActive(id, ownerId, false);

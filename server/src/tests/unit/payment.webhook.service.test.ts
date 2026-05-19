@@ -78,7 +78,10 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     mockStripe.webhooks.constructEvent.mockReturnValue(event);
     (mockPrisma.processedStripeEvent.findUnique as any).mockResolvedValue(null);
     mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
-    (mockPrisma.payment.findUnique as any).mockResolvedValue({ id: "payment-race", metadata: null });
+    (mockPrisma.payment.findUnique as any).mockResolvedValue({
+      id: "payment-race",
+      metadata: null,
+    });
     (mockPrisma.payment.update as any).mockResolvedValue({ id: "payment-race" });
     (mockPrisma.booking.update as any).mockResolvedValue({ id: "booking-race" });
     (mockPrisma.booking.findUnique as any).mockResolvedValue(null);
@@ -136,16 +139,12 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     expect(mockPrisma.booking.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: "CONFIRMED" } }),
     );
-    expect(mockEmailQueue.add).toHaveBeenCalledWith(
-      "payment-success-guest",
-      expect.any(Object),
-      { jobId: `payment-success-guest:${eventId}` },
-    );
-    expect(mockEmailQueue.add).toHaveBeenCalledWith(
-      "payment-success-host",
-      expect.any(Object),
-      { jobId: `payment-success-host:${eventId}` },
-    );
+    expect(mockEmailQueue.add).toHaveBeenCalledWith("payment-success-guest", expect.any(Object), {
+      jobId: `payment-success-guest:${eventId}`,
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith("payment-success-host", expect.any(Object), {
+      jobId: `payment-success-host:${eventId}`,
+    });
   });
 
   it("enqueues host email with correct jobId for charge.refunded", async () => {
@@ -192,10 +191,8 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
       }),
     );
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(1);
-    expect(mockEmailQueue.add).toHaveBeenCalledWith(
-      "refund-processed-host",
-      expect.any(Object),
-      { jobId: `refund-processed-host:${eventId}` },
-    );
+    expect(mockEmailQueue.add).toHaveBeenCalledWith("refund-processed-host", expect.any(Object), {
+      jobId: `refund-processed-host:${eventId}`,
+    });
   });
 });

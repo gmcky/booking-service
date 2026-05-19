@@ -3,10 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import type { PaginationParams } from "../../shared/types/index.js";
-import {
-  calculatePagination,
-  createPaginatedResponse,
-} from "../../shared/utils/pagination.js";
+import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import type { GetUsersQueryInput, UpdateUserInput } from "./user.types.js";
 import { cacheClient, cacheGet, cacheSet } from "../../shared/lib/cache.js";
@@ -37,10 +34,7 @@ type AdminListParams = PaginationParams & {
 
 /** User profile, account lifecycle, and admin moderation operations. */
 export class UserService {
-  static async getById(
-    id: string,
-    options: { mode?: UserViewMode } = {},
-  ) {
+  static async getById(id: string, options: { mode?: UserViewMode } = {}) {
     const mode = options.mode ?? "self";
 
     if (mode === "public") {
@@ -78,9 +72,7 @@ export class UserService {
 
         publicStats = {
           averageRating:
-            ratingAggregate._avg.rating !== null
-              ? Number(ratingAggregate._avg.rating)
-              : null,
+            ratingAggregate._avg.rating !== null ? Number(ratingAggregate._avg.rating) : null,
           listingsCount: listingCount,
         };
 
@@ -170,13 +162,7 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
-    const {
-      firstName,
-      lastName,
-      phoneNumber,
-      dateOfBirth,
-      bio,
-    } = data;
+    const { firstName, lastName, phoneNumber, dateOfBirth, bio } = data;
 
     const updateData = omitUndefined({
       firstName,
@@ -203,18 +189,12 @@ export class UserService {
       },
     });
 
-    logger.info(
-      { userId: id, changedFields: Object.keys(updateData) },
-      "User profile updated",
-    );
+    logger.info({ userId: id, changedFields: Object.keys(updateData) }, "User profile updated");
 
     return user;
   }
 
-  static async uploadAvatar(
-    userId: string,
-    file: Express.Multer.File,
-  ): Promise<void> {
+  static async uploadAvatar(userId: string, file: Express.Multer.File): Promise<void> {
     if (!file) {
       throw new AppError(400, "Avatar file is required");
     }
@@ -324,10 +304,7 @@ export class UserService {
       return updatedUser;
     });
 
-    await Promise.all([
-      invalidateUserStatsCache(id),
-      invalidateUserAuthCache(id),
-    ]);
+    await Promise.all([invalidateUserStatsCache(id), invalidateUserAuthCache(id)]);
 
     logger.info({ userId: id }, "User suspended by admin");
 
@@ -370,10 +347,7 @@ export class UserService {
       },
     });
 
-    await Promise.all([
-      invalidateUserStatsCache(id),
-      invalidateUserAuthCache(id),
-    ]);
+    await Promise.all([invalidateUserStatsCache(id), invalidateUserAuthCache(id)]);
 
     logger.info({ userId: id }, "User restored by admin");
 
@@ -406,12 +380,7 @@ export class UserService {
     const redisKey = `email_change:${userId}`;
     const attemptsKey = `email_change_attempts:${userId}`;
     await Promise.all([
-      cacheClient.set(
-        redisKey,
-        JSON.stringify({ newEmail, otp }),
-        "EX",
-        OTP_TTL_SECONDS,
-      ),
+      cacheClient.set(redisKey, JSON.stringify({ newEmail, otp }), "EX", OTP_TTL_SECONDS),
       cacheClient.del(attemptsKey),
     ]);
 
@@ -422,10 +391,7 @@ export class UserService {
       expiresInMinutes: OTP_TTL_SECONDS / 60,
     });
 
-    logger.info(
-      { userId, newEmail },
-      "Email change OTP requested",
-    );
+    logger.info({ userId, newEmail }, "Email change OTP requested");
   }
 
   /** Applies verified email change and notifies previous mailbox. */
@@ -456,10 +422,7 @@ export class UserService {
       }
       if (attempts >= OTP_MAX_ATTEMPTS) {
         await cacheClient.del(redisKey, attemptsKey);
-        throw new AppError(
-          429,
-          "Too many incorrect attempts. Please request a new code.",
-        );
+        throw new AppError(429, "Too many incorrect attempts. Please request a new code.");
       }
       throw new AppError(400, "Invalid or expired OTP");
     }
@@ -496,18 +459,11 @@ export class UserService {
       newEmail,
     });
 
-    logger.info(
-      { userId, oldEmail, newEmail },
-      "User email successfully changed",
-    );
+    logger.info({ userId, oldEmail, newEmail }, "User email successfully changed");
   }
 
   /** Rotates password and revokes all refresh sessions. */
-  static async changePassword(
-    userId: string,
-    currentPassword: string,
-    newPassword: string,
-  ) {
+  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await prisma.user.findFirst({
       where: { id: userId, isDeleted: false },
       select: { id: true, email: true, firstName: true, passwordHash: true },
@@ -516,15 +472,9 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
-    const isValidPassword = await bcrypt.compare(
-      currentPassword,
-      user.passwordHash,
-    );
+    const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isValidPassword) {
-      logger.warn(
-        { userId, event: "password_change_failed" },
-        "Invalid current password",
-      );
+      logger.warn({ userId, event: "password_change_failed" }, "Invalid current password");
       throw new AppError(401, "Current password is incorrect");
     }
 
@@ -593,10 +543,7 @@ export class UserService {
     ]);
 
     if (activeBookingsCount > 0) {
-      throw new AppError(
-        400,
-        "Cannot delete account with active bookings. Cancel them first.",
-      );
+      throw new AppError(400, "Cannot delete account with active bookings. Cancel them first.");
     }
 
     if (activePropertiesCount > 0) {
@@ -640,10 +587,7 @@ export class UserService {
       deletedAtIso: deletedAt.toISOString(),
     });
 
-    await Promise.all([
-      invalidateUserStatsCache(id),
-      invalidateUserAuthCache(id),
-    ]);
+    await Promise.all([invalidateUserStatsCache(id), invalidateUserAuthCache(id)]);
 
     logger.info({ userId: id }, "User account soft-deleted");
 
@@ -674,15 +618,20 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
-    const [completedBookingsCount, completedNightsRows, guestRatingAggregate, hostRatingAggregate, listingsCount] =
-      await Promise.all([
-        prisma.booking.count({
-          where: {
-            userId,
-            status: "COMPLETED",
-          },
-        }),
-        prisma.$queryRaw<Array<{ completedNights: bigint }>>`
+    const [
+      completedBookingsCount,
+      completedNightsRows,
+      guestRatingAggregate,
+      hostRatingAggregate,
+      listingsCount,
+    ] = await Promise.all([
+      prisma.booking.count({
+        where: {
+          userId,
+          status: "COMPLETED",
+        },
+      }),
+      prisma.$queryRaw<Array<{ completedNights: bigint }>>`
           SELECT COALESCE(
             SUM(
               GREATEST(
@@ -696,22 +645,22 @@ export class UserService {
           WHERE "userId" = ${userId}
             AND "status" = 'COMPLETED'
         `,
-        prisma.review.aggregate({
-          where: { userId },
-          _avg: { rating: true },
-        }),
-        prisma.review.aggregate({
-          where: {
-            property: {
-              ownerId: userId,
-            },
+      prisma.review.aggregate({
+        where: { userId },
+        _avg: { rating: true },
+      }),
+      prisma.review.aggregate({
+        where: {
+          property: {
+            ownerId: userId,
           },
-          _avg: { rating: true },
-        }),
-        prisma.property.count({
-          where: { ownerId: userId },
-        }),
-      ]);
+        },
+        _avg: { rating: true },
+      }),
+      prisma.property.count({
+        where: { ownerId: userId },
+      }),
+    ]);
 
     const completedNights = Number(completedNightsRows[0]?.completedNights ?? 0n);
 
@@ -719,13 +668,9 @@ export class UserService {
       completedBookingsCount,
       completedNights,
       averageRatingAsGuest:
-        guestRatingAggregate._avg.rating !== null
-          ? Number(guestRatingAggregate._avg.rating)
-          : null,
+        guestRatingAggregate._avg.rating !== null ? Number(guestRatingAggregate._avg.rating) : null,
       averageRatingAsHost:
-        hostRatingAggregate._avg.rating !== null
-          ? Number(hostRatingAggregate._avg.rating)
-          : null,
+        hostRatingAggregate._avg.rating !== null ? Number(hostRatingAggregate._avg.rating) : null,
       listingsCount,
     };
 

@@ -1,8 +1,4 @@
-import express, {
-  type Application,
-  type Request,
-  type Response,
-} from "express";
+import express, { type Application, type Request, type Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -35,8 +31,7 @@ const redisStore = (prefix: string) =>
   new RedisStore({
     prefix: `rl:${prefix}:`,
     // ioredis exposes arbitrary commands via .call(command, ...args)
-    sendCommand: (...args: string[]) =>
-      (cacheClient as any).call(...args) as Promise<any>,
+    sendCommand: (...args: string[]) => (cacheClient as any).call(...args) as Promise<any>,
   });
 
 const apiLimiter = rateLimit({
@@ -120,8 +115,7 @@ export function createApp(): Application {
         autoLogging: {
           ignore: (req: Request) => req.url === "/health",
         },
-        customSuccessMessage: (req: Request) =>
-          `${req.method} ${req.url} completed`,
+        customSuccessMessage: (req: Request) => `${req.method} ${req.url} completed`,
         customErrorMessage: (req: Request, _res: Response, err: Error) =>
           `${req.method} ${req.url} failed: ${err.message}`,
       }),

@@ -37,10 +37,7 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
  * @access Private
  * @security Bearer token required.
  */
-export async function getCurrentUserStats(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function getCurrentUserStats(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const stats = await UserService.getUserStats(userId);
   res.json(stats);
@@ -52,10 +49,7 @@ export async function getCurrentUserStats(
  * @security Bearer token required.
  * @body { firstName?, lastName?, avatar? }
  */
-export async function updateCurrentUser(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function updateCurrentUser(req: AuthenticatedRequest, res: Response) {
   // Auth anchor: self-update routes derive subject from JWT only.
   const userId = req.user!.id;
 
@@ -76,10 +70,7 @@ export async function updateCurrentUser(
  * @access Private
  * @security Bearer token required.
  */
-export async function deleteCurrentUser(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function deleteCurrentUser(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
 
   const { password } = req.body as DeleteCurrentUserInput;
@@ -105,10 +96,7 @@ export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
  * @security Bearer token required.
  * @body { newEmail: string }
  */
-export async function requestEmailChange(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function requestEmailChange(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const { newEmail } = req.body as RequestEmailChangeInput;
 
@@ -126,10 +114,7 @@ export async function requestEmailChange(
  * @security Bearer token required.
  * @body { otp: string }
  */
-export async function confirmEmailChange(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function confirmEmailChange(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const { otp } = req.body as ConfirmEmailChangeInput;
 

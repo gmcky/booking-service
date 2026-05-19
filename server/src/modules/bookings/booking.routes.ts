@@ -52,10 +52,7 @@ bookingRouter.post(
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 // TODO: move blocked-dates route under /properties.
-bookingRouter.get(
-  "/:propertyId/blocked-dates",
-  asyncHandler(bookingController.getBlockedDates),
-);
+bookingRouter.get("/:propertyId/blocked-dates", asyncHandler(bookingController.getBlockedDates));
 
 bookingRouter.use(authenticate);
 
@@ -195,10 +192,7 @@ bookingRouter.patch(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-bookingRouter.post(
-  "/:id/early-checkout",
-  asyncHandler(bookingController.earlyCheckout),
-);
+bookingRouter.post("/:id/early-checkout", asyncHandler(bookingController.earlyCheckout));
 
 /**
  * @openapi

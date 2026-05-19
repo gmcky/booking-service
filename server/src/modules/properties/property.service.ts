@@ -2,17 +2,11 @@ import { prisma } from "../../shared/lib/prisma.js";
 import { BookingStatus } from "@prisma/client";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import type { PaginationParams } from "../../shared/types/index.js";
-import {
-  calculatePagination,
-  createPaginatedResponse,
-} from "../../shared/utils/pagination.js";
+import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import { imageQueue } from "../../shared/queues/image.queue.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
-import {
-  cleanupQueue,
-  type CleanupJobName,
-} from "../../shared/queues/cleanup.queue.js";
+import { cleanupQueue, type CleanupJobName } from "../../shared/queues/cleanup.queue.js";
 import {
   cacheGet,
   cacheSet,
@@ -158,8 +152,7 @@ export class PropertyService {
       throw new AppError(404, "Property not found");
     }
 
-    const canViewInactive =
-      viewer?.role === "ADMIN" || viewer?.id === property.ownerId;
+    const canViewInactive = viewer?.role === "ADMIN" || viewer?.id === property.ownerId;
 
     if (!property.isActive && !canViewInactive) {
       throw new AppError(404, "Property not found");
@@ -209,7 +202,10 @@ export class PropertyService {
 
     await cacheInvalidateNamespace("properties:search");
 
-    const { owner: { email: _email, ...ownerWithoutEmail }, ...propertyWithoutOwner } = property;
+    const {
+      owner: { email: _email, ...ownerWithoutEmail },
+      ...propertyWithoutOwner
+    } = property;
     return { ...propertyWithoutOwner, owner: ownerWithoutEmail };
   }
 
@@ -233,10 +229,7 @@ export class PropertyService {
       }
     }
 
-    await Promise.all([
-      cacheDel(`property:${id}`),
-      cacheInvalidateNamespace("properties:search"),
-    ]);
+    await Promise.all([cacheDel(`property:${id}`), cacheInvalidateNamespace("properties:search")]);
 
     return updated;
   }
@@ -253,10 +246,7 @@ export class PropertyService {
     });
 
     if (activeBookingsCount > 0) {
-      throw new AppError(
-        400,
-        "Cannot delete property with active bookings. Cancel them first.",
-      );
+      throw new AppError(400, "Cannot delete property with active bookings. Cancel them first.");
     }
 
     await prisma.property.update({

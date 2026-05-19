@@ -15,12 +15,7 @@ export class AppError extends Error {
   }
 }
 
-export function errorHandler(
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
   if (err instanceof ZodError) {
     logger.warn({ issues: err.issues }, "Validation error");
     return res.status(400).json({
@@ -32,9 +27,7 @@ export function errorHandler(
   if (err instanceof MulterError) {
     logger.warn({ code: err.code }, "Multer error");
     const message =
-      err.code === "LIMIT_FILE_SIZE"
-        ? "File is too large. Maximum size is 2MB."
-        : err.message;
+      err.code === "LIMIT_FILE_SIZE" ? "File is too large. Maximum size is 2MB." : err.message;
     return res.status(400).json({ error: message });
   }
 
@@ -49,10 +42,7 @@ export function errorHandler(
   }
 
   if (err instanceof AppError) {
-    logger.warn(
-      { statusCode: err.statusCode, message: err.message },
-      "Operational error",
-    );
+    logger.warn({ statusCode: err.statusCode, message: err.message }, "Operational error");
     return res.status(err.statusCode).json({ error: err.message });
   }
 

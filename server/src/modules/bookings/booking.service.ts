@@ -3,21 +3,12 @@ import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import type { PaginationParams } from "../../shared/types/index.js";
-import {
-  calculatePagination,
-  createPaginatedResponse,
-} from "../../shared/utils/pagination.js";
-import type {
-  CreateBookingInput,
-  UpdateBookingDatesInput,
-} from "./booking.types.js";
+import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
+import type { CreateBookingInput, UpdateBookingDatesInput } from "./booking.types.js";
 import { Prisma } from "@prisma/client";
 import type { BookingStatus } from "@prisma/client";
 import { emailQueue } from "../../shared/queues/email.queue.js";
-import {
-  calculateNights,
-  formatDate,
-} from "../../shared/utils/date.helpers.js";
+import { calculateNights, formatDate } from "../../shared/utils/date.helpers.js";
 import { getBookingRole } from "./booking.helpers.js";
 import {
   calculateRefundPolicy,
@@ -126,8 +117,7 @@ export class BookingService {
 
     // Fail fast on cheap guards before opening Serializable tx.
     const now = new Date();
-    const hoursUntilCheckIn =
-      (checkIn.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilCheckIn = (checkIn.getTime() - now.getTime()) / (1000 * 60 * 60);
     if (hoursUntilCheckIn < MIN_ADVANCE_HOURS) {
       throw new AppError(400, "Check-in must be at least 24 hours from now");
     }
@@ -156,12 +146,7 @@ export class BookingService {
     // Single tx for overlap check + insert; closes race window on concurrent bookings.
     const booking = await prisma.$transaction(
       async (tx) => {
-        const isAvailable = await this.checkAvailability(
-          propertyId,
-          checkIn,
-          checkOut,
-          tx,
-        );
+        const isAvailable = await this.checkAvailability(propertyId, checkIn, checkOut, tx);
 
         if (!isAvailable) {
           throw new AppError(409, "Property not available for selected dates");
@@ -188,10 +173,7 @@ export class BookingService {
 
     // Async enqueue to keep API latency predictable.
     this.enqueueBookingCreatedEmails(booking, userId).catch((err) =>
-      logger.error(
-        { err, bookingId: booking.id },
-        "Failed to enqueue booking-created emails",
-      ),
+      logger.error({ err, bookingId: booking.id }, "Failed to enqueue booking-created emails"),
     );
 
     await Promise.all([
@@ -204,12 +186,7 @@ export class BookingService {
   }
 
   /** Status FSM: host/admin-only forward transitions; cancellation is separate path. */
-  static async updateStatus(
-    id: string,
-    userId: string,
-    userRole: string,
-    status: BookingStatus,
-  ) {
+  static async updateStatus(id: string, userId: string, userRole: string, status: BookingStatus) {
     // Keep cancel side effects centralized (refund/logging/notifications).
     if (status === "CANCELLED") {
       throw new AppError(400, "Use DELETE /bookings/:id to cancel a booking");
@@ -235,17 +212,11 @@ export class BookingService {
 
     const allowed = ALLOWED_TRANSITIONS[booking.status];
     if (!allowed.includes(status)) {
-      throw new AppError(
-        400,
-        `Cannot transition from ${booking.status} to ${status}`,
-      );
+      throw new AppError(400, `Cannot transition from ${booking.status} to ${status}`);
     }
 
     if (status === "COMPLETED" && booking.checkOut.getTime() > Date.now()) {
-      throw new AppError(
-        400,
-        "Cannot mark booking as completed before check-out time",
-      );
+      throw new AppError(400, "Cannot mark booking as completed before check-out time");
     }
 
     const updated = await prisma.booking.update({
@@ -276,17 +247,11 @@ export class BookingService {
     }
 
     if (booking.status !== "CONFIRMED") {
-      throw new AppError(
-        400,
-        `Cannot early check out a booking with status ${booking.status}`,
-      );
+      throw new AppError(400, `Cannot early check out a booking with status ${booking.status}`);
     }
 
     if (booking.checkOut.getTime() <= Date.now()) {
-      throw new AppError(
-        400,
-        "Check-out time has already passed; use PATCH /:id/status instead",
-      );
+      throw new AppError(400, "Check-out time has already passed; use PATCH /:id/status instead");
     }
 
     const now = new Date();
@@ -295,10 +260,7 @@ export class BookingService {
       data: { status: "COMPLETED", actualCheckOutAt: now },
     });
 
-    logger.info(
-      { bookingId: id, userId, actualCheckOutAt: now },
-      "Early checkout completed",
-    );
+    logger.info({ bookingId: id, userId, actualCheckOutAt: now }, "Early checkout completed");
 
     await cacheInvalidateNamespace("properties:search");
 
@@ -357,13 +319,7 @@ export class BookingService {
 
     const cancelled =
       refundPercent > 0 && booking.payment?.status === "SUCCESS"
-        ? await this.cancelPaidBookingWithRefund(
-            booking,
-            userId,
-            role,
-            refundPercent,
-            refundAmount,
-          )
+        ? await this.cancelPaidBookingWithRefund(booking, userId, role, refundPercent, refundAmount)
         : await prisma.booking.update({
             where: { id },
             data: {
@@ -375,10 +331,7 @@ export class BookingService {
 
     // Notify original guest regardless of canceller role.
     this.enqueueCancellationEmails(cancelled, booking.userId).catch((err) =>
-      logger.error(
-        { err, bookingId: id },
-        "Failed to enqueue cancellation emails",
-      ),
+      logger.error({ err, bookingId: id }, "Failed to enqueue cancellation emails"),
     );
 
     await cacheInvalidateNamespace("properties:search");
@@ -428,10 +381,7 @@ export class BookingService {
     }
 
     if (booking.payoutStatus === "PAID_OUT") {
-      throw new AppError(
-        400,
-        "Cannot cancel booking with refund after host payout was disbursed",
-      );
+      throw new AppError(400, "Cannot cancel booking with refund after host payout was disbursed");
     }
 
     if (!payment.transactionId) {
@@ -473,8 +423,7 @@ export class BookingService {
       }
     }
 
-    let stripeRefund: Awaited<ReturnType<typeof stripe.refunds.create>> | null =
-      null;
+    let stripeRefund: Awaited<ReturnType<typeof stripe.refunds.create>> | null = null;
 
     if (shouldCallStripe) {
       try {

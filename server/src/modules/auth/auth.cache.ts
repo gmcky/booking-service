@@ -9,9 +9,7 @@ export function getUserAuthCacheKey(userId: string): string {
 export async function getCachedAuthUser(
   userId: string,
 ): Promise<{ id: string; email: string; role: string } | null> {
-  return cacheGet<{ id: string; email: string; role: string }>(
-    getUserAuthCacheKey(userId),
-  );
+  return cacheGet<{ id: string; email: string; role: string }>(getUserAuthCacheKey(userId));
 }
 
 export async function setCachedAuthUser(user: {
@@ -25,9 +23,7 @@ export async function setCachedAuthUser(user: {
 export async function invalidateUserAuthCache(
   ...userIds: Array<string | null | undefined>
 ): Promise<void> {
-  const unique = Array.from(
-    new Set(userIds.filter((id): id is string => Boolean(id))),
-  );
+  const unique = Array.from(new Set(userIds.filter((id): id is string => Boolean(id))));
   if (unique.length === 0) return;
   await cacheDel(...unique.map(getUserAuthCacheKey));
 }

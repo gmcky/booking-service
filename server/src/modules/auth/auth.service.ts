@@ -3,16 +3,8 @@ import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import { cacheClient } from "../../shared/lib/cache.js";
 import { parseExpiry } from "../../shared/utils/time.js";
-import type {
-  RegisterInput,
-  LoginInput,
-  AuthResponse,
-  AuthTokens,
-} from "./auth.types.js";
-import {
-  getCachedAuthUser,
-  setCachedAuthUser,
-} from "./auth.cache.js";
+import type { RegisterInput, LoginInput, AuthResponse, AuthTokens } from "./auth.types.js";
+import { getCachedAuthUser, setCachedAuthUser } from "./auth.cache.js";
 import bcrypt from "bcrypt";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "../../config/env.js";
@@ -178,10 +170,7 @@ export class AuthService {
       throw new AppError(403, "Account is suspended");
     }
 
-    const isValidPassword = await bcrypt.compare(
-      data.password,
-      user.passwordHash,
-    );
+    const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
     if (!isValidPassword) {
       logger.warn(
         { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
@@ -508,10 +497,7 @@ export class AuthService {
 
     const cached = await getCachedAuthUser(userId);
     if (cached) {
-      logger.debug(
-        { userId, endpoint: "verifyAccessToken" },
-        "Access token verified (cache hit)",
-      );
+      logger.debug({ userId, endpoint: "verifyAccessToken" }, "Access token verified (cache hit)");
       return cached;
     }
 
@@ -526,10 +512,7 @@ export class AuthService {
 
     await setCachedAuthUser({ id: user.id, email: user.email, role: user.role });
 
-    logger.debug(
-      { userId, endpoint: "verifyAccessToken" },
-      "Access token verified",
-    );
+    logger.debug({ userId, endpoint: "verifyAccessToken" }, "Access token verified");
 
     return { id: user.id, email: user.email, role: user.role };
   }
@@ -553,10 +536,7 @@ export class AuthService {
     return token;
   }
 
-  private static async generateRefreshToken(
-    user: Pick<User, "id">,
-    jti: string,
-  ): Promise<string> {
+  private static async generateRefreshToken(user: Pick<User, "id">, jti: string): Promise<string> {
     const token = await new SignJWT({
       userId: user.id,
     })
@@ -587,7 +567,7 @@ export class AuthService {
 
   // Fail-open on Redis outage; auth should degrade, not hard-stop.
   // Trade-off: We prioritize user availability over strict security during a cache outage.
-  // In a high-security environment, we might consider a fail-closed approach or a 
+  // In a high-security environment, we might consider a fail-closed approach or a
   // secondary in-memory fallback (e.g., a LRU cache) to maintain partial protection.
   private static async checkLockout(
     email: string,
@@ -600,8 +580,7 @@ export class AuthService {
       const attempts = parseInt(raw, 10);
       if (attempts >= env.LOGIN_MAX_ATTEMPTS) {
         const ttl = await cacheClient.ttl(this.lockoutKey(email));
-        const minutesLeft =
-          ttl > 0 ? Math.ceil(ttl / 60) : env.LOGIN_LOCKOUT_MINUTES;
+        const minutesLeft = ttl > 0 ? Math.ceil(ttl / 60) : env.LOGIN_LOCKOUT_MINUTES;
         logger.warn(
           { email, attempts, ttl, ip: meta?.ip, userAgent: meta?.userAgent },
           "Login blocked: account is locked",

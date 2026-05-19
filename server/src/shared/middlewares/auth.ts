@@ -4,11 +4,7 @@ import { AuthService } from "../../modules/auth/auth.service.js";
 import { logger } from "../lib/logger.js";
 
 /** Mandatory auth middleware. */
-export async function authenticate(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
@@ -48,11 +44,7 @@ export function authorize(...roles: string[]) {
 }
 
 /** Best-effort auth for public endpoints. */
-export async function optionalAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.startsWith("Bearer ")
     ? req.headers.authorization.slice(7)
     : null;

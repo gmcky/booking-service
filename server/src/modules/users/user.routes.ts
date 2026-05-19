@@ -272,12 +272,7 @@ userRouter.get(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
-userRouter.patch(
-  "/:id/suspend",
-  authenticate,
-  authorize("ADMIN"),
-  asyncHandler(suspendUser),
-);
+userRouter.patch("/:id/suspend", authenticate, authorize("ADMIN"), asyncHandler(suspendUser));
 
 /**
  * @openapi
@@ -294,12 +289,7 @@ userRouter.patch(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
-userRouter.patch(
-  "/:id/restore",
-  authenticate,
-  authorize("ADMIN"),
-  asyncHandler(restoreUser),
-);
+userRouter.patch("/:id/restore", authenticate, authorize("ADMIN"), asyncHandler(restoreUser));
 
 /**
  * @openapi

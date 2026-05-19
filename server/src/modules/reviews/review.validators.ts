@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-const booleanStringSchema = z
-  .enum(["true", "false"])
-  .transform((value) => value === "true");
+const booleanStringSchema = z.enum(["true", "false"]).transform((value) => value === "true");
 
 const optionalBooleanStringSchema = z.preprocess((value) => {
   if (value === undefined) return undefined;

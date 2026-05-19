@@ -5,10 +5,7 @@ import { stripe } from "../../shared/lib/stripe.js";
 import { env } from "../../config/env.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { formatDate } from "./payment.helpers.js";
-import type {
-  CreatePaymentInput,
-  CreatePaymentIntentInput,
-} from "./payment.types.js";
+import type { CreatePaymentInput, CreatePaymentIntentInput } from "./payment.types.js";
 
 export class PaymentIntentService {
   /** Stripe intent flow: validate booking ownership/state, then upsert pending payment stub. */

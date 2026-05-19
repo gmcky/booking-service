@@ -38,14 +38,9 @@ export function createApiRouter(): Router {
     res.status(404).json({
       error: "Route not found",
       path: req.path,
-      availableRoutes: [
-        "/auth",
-        "/users",
-        "/properties",
-        "/bookings",
-        "/payments",
-        "/reviews",
-      ].map((r) => `/api/${env.API_VERSION}${r}`),
+      availableRoutes: ["/auth", "/users", "/properties", "/bookings", "/payments", "/reviews"].map(
+        (r) => `/api/${env.API_VERSION}${r}`,
+      ),
     });
   });
 

@@ -50,11 +50,7 @@ propertyRouter.get(
  *       200: { description: List of owned properties }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
-propertyRouter.get(
-  "/my",
-  authenticate,
-  asyncHandler(propertyController.getMyProperties),
-);
+propertyRouter.get("/my", authenticate, asyncHandler(propertyController.getMyProperties));
 
 /**
  * @openapi
@@ -68,11 +64,7 @@ propertyRouter.get(
  *       200: { description: Property detail }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
-propertyRouter.get(
-  "/:id",
-  optionalAuth,
-  asyncHandler(propertyController.getPropertyById),
-);
+propertyRouter.get("/:id", optionalAuth, asyncHandler(propertyController.getPropertyById));
 
 propertyRouter.use(authenticate);
 
@@ -180,10 +172,7 @@ propertyRouter.delete("/:id", asyncHandler(propertyController.deleteProperty));
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
-propertyRouter.post(
-  "/:id/activate",
-  asyncHandler(propertyController.activateProperty),
-);
+propertyRouter.post("/:id/activate", asyncHandler(propertyController.activateProperty));
 
 /**
  * @openapi
@@ -200,7 +189,4 @@ propertyRouter.post(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
-propertyRouter.post(
-  "/:id/deactivate",
-  asyncHandler(propertyController.deactivateProperty),
-);
+propertyRouter.post("/:id/deactivate", asyncHandler(propertyController.deactivateProperty));

@@ -30,10 +30,7 @@ import type {
   PropertyImageJob,
   AvatarImageJob,
 } from "../shared/queues/image.queue.js";
-import {
-  cleanupQueue,
-  type CleanupJobName,
-} from "../shared/queues/cleanup.queue.js";
+import { cleanupQueue, type CleanupJobName } from "../shared/queues/cleanup.queue.js";
 import { uploadToS3, deleteFromS3 } from "../shared/lib/storage.js";
 
 // ---------------------------------------------------------------------------
@@ -67,9 +64,7 @@ function safeResolve(inputPath: string): string {
 // Job handlers
 // ---------------------------------------------------------------------------
 
-async function processPropertyImages(
-  job: Job<PropertyImageJob>,
-): Promise<void> {
+async function processPropertyImages(job: Job<PropertyImageJob>): Promise<void> {
   const { propertyId, rawImagePaths } = job.data;
 
   logger.info(
@@ -87,12 +82,7 @@ async function processPropertyImages(
     const absoluteInput = safeResolve(rawPath);
     const id = randomUUID();
     const relativePath = `uploads/properties/${propertyId}/${id}.webp`;
-    const absoluteOutput = resolve(
-      UPLOADS_ROOT,
-      "properties",
-      propertyId,
-      `${id}.webp`,
-    );
+    const absoluteOutput = resolve(UPLOADS_ROOT, "properties", propertyId, `${id}.webp`);
 
     await sharp(absoluteInput)
       .resize({ width: 1200, height: 800, fit: "cover" })
@@ -111,19 +101,13 @@ async function processPropertyImages(
     data: { images: processedPaths },
   });
 
-  logger.info(
-    { propertyId, processedPaths },
-    "DB updated with processed image paths",
-  );
+  logger.info({ propertyId, processedPaths }, "DB updated with processed image paths");
 
   // Remove raw source files via the dedicated cleanup worker.
   const jobName: CleanupJobName = "unlink-property-images";
   await cleanupQueue.add(jobName, { paths: rawImagePaths });
 
-  logger.info(
-    { propertyId, count: rawImagePaths.length },
-    "Property image processing complete",
-  );
+  logger.info({ propertyId, count: rawImagePaths.length }, "Property image processing complete");
 }
 
 async function processAvatarJob(job: Job<AvatarImageJob>): Promise<void> {
@@ -151,10 +135,7 @@ async function processAvatarJob(job: Job<AvatarImageJob>): Promise<void> {
     try {
       await deleteFromS3(oldAvatarUrl);
     } catch (error) {
-      logger.warn(
-        { userId, oldAvatarUrl, error },
-        "Failed to delete previous avatar from S3",
-      );
+      logger.warn({ userId, oldAvatarUrl, error }, "Failed to delete previous avatar from S3");
     }
   }
 
@@ -173,11 +154,9 @@ async function processJob(job: Job<ImageProcessingJob>): Promise<void> {
   }
 }
 
-const worker = new Worker<ImageProcessingJob>(
-  "image-processing",
-  processJob,
-  { connection: redisConnection },
-);
+const worker = new Worker<ImageProcessingJob>("image-processing", processJob, {
+  connection: redisConnection,
+});
 
 worker.on("completed", (job) => {
   logger.info({ jobId: job.id, type: job.data.type }, "Image job completed");
@@ -189,16 +168,10 @@ worker.on("failed", (job, error) => {
     return;
   }
 
-  logger.error(
-    { jobId: job.id, type: job.data.type, error },
-    "Image job failed",
-  );
+  logger.error({ jobId: job.id, type: job.data.type, error }, "Image job failed");
 
   // Clean up orphaned temp file when all retries are exhausted.
-  if (
-    job.data.type === "avatar" &&
-    job.attemptsMade >= (job.opts.attempts ?? 1)
-  ) {
+  if (job.data.type === "avatar" && job.attemptsMade >= (job.opts.attempts ?? 1)) {
     const abs = resolve(process.cwd(), job.data.tempFilePath);
     unlink(abs).catch(() => {});
   }

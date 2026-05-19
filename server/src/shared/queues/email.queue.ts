@@ -215,15 +215,12 @@ export type EmailJobData =
       data: AccountDeletedNotificationJob;
     };
 
-export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>(
-  "email",
-  {
-    connection: redisConnection,
-    defaultJobOptions: {
-      attempts: 5,
-      backoff: { type: "exponential", delay: 10_000 },
-      removeOnComplete: 200,
-      removeOnFail: 500,
-    },
+export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>("email", {
+  connection: redisConnection,
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: "exponential", delay: 10_000 },
+    removeOnComplete: 200,
+    removeOnFail: 500,
   },
-);
+});

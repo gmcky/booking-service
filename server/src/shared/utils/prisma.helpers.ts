@@ -1,9 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 /** Strips undefined fields before Prisma writes (exactOptionalPropertyTypes-safe). */
-export function omitUndefined<T extends Record<string, any>>(
-  obj: T,
-): Partial<T> {
+export function omitUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   const result: any = {};
 
   for (const key in obj) {
@@ -15,9 +13,7 @@ export function omitUndefined<T extends Record<string, any>>(
   return result;
 }
 
-export function getMetadataObject(
-  metadata: Prisma.JsonValue | null,
-): Prisma.JsonObject {
+export function getMetadataObject(metadata: Prisma.JsonValue | null): Prisma.JsonObject {
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
     return metadata as Prisma.JsonObject;
   }
@@ -34,9 +30,7 @@ export function getAuditObject(metadata: Prisma.JsonObject): Prisma.JsonObject {
   return {} as Prisma.JsonObject;
 }
 
-export function getStripePayloadObject(
-  metadata: Prisma.JsonObject,
-): Prisma.JsonObject {
+export function getStripePayloadObject(metadata: Prisma.JsonObject): Prisma.JsonObject {
   const raw = metadata.stripePayload;
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     return raw as Prisma.JsonObject;

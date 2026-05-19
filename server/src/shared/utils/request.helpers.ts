@@ -11,10 +11,7 @@ export function getIdParam(req: Request, paramName: string = "id"): string {
   return id;
 }
 
-export function getQueryParam(
-  req: Request,
-  paramName: string,
-): string | undefined {
+export function getQueryParam(req: Request, paramName: string): string | undefined {
   const value = req.query[paramName];
 
   if (Array.isArray(value)) {

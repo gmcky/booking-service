@@ -25,11 +25,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   }
 }
 
-export async function cacheSet(
-  key: string,
-  value: unknown,
-  ttlSeconds: number,
-): Promise<void> {
+export async function cacheSet(key: string, value: unknown, ttlSeconds: number): Promise<void> {
   await cacheClient.set(key, JSON.stringify(value), "EX", ttlSeconds);
 }
 
@@ -37,23 +33,17 @@ export async function cacheDel(...keys: string[]): Promise<void> {
   if (keys.length > 0) await cacheClient.del(...keys);
 }
 
-
 export async function cacheInvalidateNamespace(namespace: string): Promise<void> {
   await cacheClient.incr(`cache:ver:${namespace}`);
 }
-
 
 export async function cacheGetNamespaceVersion(namespace: string): Promise<string> {
   const ver = await cacheClient.get(`cache:ver:${namespace}`);
   return ver ?? "0";
 }
 
-
 export function hashKey(data: unknown): string {
-  return createHash("sha256")
-    .update(stableStringify(data))
-    .digest("hex")
-    .slice(0, 16);
+  return createHash("sha256").update(stableStringify(data)).digest("hex").slice(0, 16);
 }
 
 function stableStringify(value: unknown): string {

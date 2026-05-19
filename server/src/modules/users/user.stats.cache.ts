@@ -13,9 +13,7 @@ export function getUserPublicStatsCacheKey(userId: string): string {
 export async function invalidateUserStatsCache(
   ...userIds: Array<string | null | undefined>
 ): Promise<void> {
-  const uniqueUserIds = Array.from(
-    new Set(userIds.filter((id): id is string => Boolean(id))),
-  );
+  const uniqueUserIds = Array.from(new Set(userIds.filter((id): id is string => Boolean(id))));
 
   if (uniqueUserIds.length === 0) {
     return;

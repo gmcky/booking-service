@@ -4,9 +4,7 @@ import { logger } from "./logger.js";
 const ALERT_TIMEOUT_MS = 5000;
 
 function trimMessage(message: string, maxLength: number): string {
-  return message.length > maxLength
-    ? `${message.slice(0, maxLength - 1)}…`
-    : message;
+  return message.length > maxLength ? `${message.slice(0, maxLength - 1)}…` : message;
 }
 
 export async function sendOpsAlert(params: {

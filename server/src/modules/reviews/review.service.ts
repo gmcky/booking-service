@@ -12,10 +12,7 @@ import {
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import type { PaginationParams } from "../../shared/types/index.js";
-import {
-  calculatePagination,
-  createPaginatedResponse,
-} from "../../shared/utils/pagination.js";
+import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import type {
   CreateReviewInput,
@@ -30,10 +27,7 @@ const REVIEW_CREATE_WINDOW_DAYS = 30;
 const REVIEW_EDIT_WINDOW_DAYS = 7;
 const REVIEWS_CACHE_TTL_SECONDS = 5 * 60;
 
-type ReviewListFilters = Pick<
-  ReviewQueryInput,
-  "sort" | "rating" | "hasHostReply"
->;
+type ReviewListFilters = Pick<ReviewQueryInput, "sort" | "rating" | "hasHostReply">;
 
 /** Review lifecycle service with booking-scoped invariants and cache invalidation. */
 export class ReviewService {
@@ -53,9 +47,7 @@ export class ReviewService {
       propertyId,
       ...(filters.rating !== undefined && { rating: filters.rating }),
       ...(filters.hasHostReply !== undefined &&
-        (filters.hasHostReply
-          ? { hostReplyText: { not: null } }
-          : { hostReplyText: null })),
+        (filters.hasHostReply ? { hostReplyText: { not: null } } : { hostReplyText: null })),
     };
 
     const orderBy = this.getReviewOrderBy(filters.sort);
@@ -161,18 +153,12 @@ export class ReviewService {
           },
         });
 
-        await this.updatePropertyAverageRatingTx(
-          tx,
-          completedBooking.propertyId,
-        );
+        await this.updatePropertyAverageRatingTx(tx, completedBooking.propertyId);
         return createdReview;
       });
 
       await this.invalidateReviewCaches(completedBooking.propertyId);
-      await invalidateUserStatsCache(
-        userId,
-        completedBooking.property.owner.id,
-      );
+      await invalidateUserStatsCache(userId, completedBooking.property.owner.id);
       await this.enqueueReviewReceivedHostEmail(
         review,
         completedBooking.property.title,
@@ -212,10 +198,7 @@ export class ReviewService {
     }
 
     if (!this.isWithinDays(review.createdAt, REVIEW_EDIT_WINDOW_DAYS)) {
-      throw new AppError(
-        400,
-        `Reviews can only be edited within ${REVIEW_EDIT_WINDOW_DAYS} days`,
-      );
+      throw new AppError(400, `Reviews can only be edited within ${REVIEW_EDIT_WINDOW_DAYS} days`);
     }
 
     try {
@@ -485,10 +468,7 @@ export class ReviewService {
 
       return report;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new AppError(409, "You have already reported this review");
       }
 
@@ -552,10 +532,7 @@ export class ReviewService {
       breakdown[group.rating] = group._count.rating;
     }
 
-    const trendMap = new Map<
-      string,
-      { month: string; sum: number; count: number }
-    >();
+    const trendMap = new Map<string, { month: string; sum: number; count: number }>();
 
     for (const review of recentReviews) {
       const month = `${review.createdAt.getUTCFullYear()}-${String(review.createdAt.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -573,9 +550,7 @@ export class ReviewService {
 
     const result = {
       averageRating:
-        aggregate._avg.rating === null
-          ? null
-          : Number(aggregate._avg.rating.toFixed(1)),
+        aggregate._avg.rating === null ? null : Number(aggregate._avg.rating.toFixed(1)),
       totalReviews: aggregate._count._all,
       breakdown,
       recentTrend,
@@ -630,10 +605,7 @@ export class ReviewService {
         comment: review.comment,
       });
     } catch (error) {
-      logger.error(
-        { error, reviewId: review.id },
-        "Failed to enqueue review-received-host email",
-      );
+      logger.error({ error, reviewId: review.id }, "Failed to enqueue review-received-host email");
     }
   }
 

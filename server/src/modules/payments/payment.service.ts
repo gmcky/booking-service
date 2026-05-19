@@ -5,22 +5,17 @@ import { enqueueManualPayoutLifecycleJob } from "../../shared/queues/payout.queu
 
 /** Facade over intent/refund/webhook services; keeps controller imports stable. */
 export class PaymentService {
-  static createIntent =
-    PaymentIntentService.createIntent.bind(PaymentIntentService);
+  static createIntent = PaymentIntentService.createIntent.bind(PaymentIntentService);
   static create = PaymentIntentService.create.bind(PaymentIntentService);
   static getById = PaymentIntentService.getById.bind(PaymentIntentService);
   static process = PaymentIntentService.process.bind(PaymentIntentService);
 
-  static requestRefund =
-    PaymentRefundService.requestRefund.bind(PaymentRefundService);
-  static approveRefund =
-    PaymentRefundService.approveRefund.bind(PaymentRefundService);
-  static rejectRefund =
-    PaymentRefundService.rejectRefund.bind(PaymentRefundService);
+  static requestRefund = PaymentRefundService.requestRefund.bind(PaymentRefundService);
+  static approveRefund = PaymentRefundService.approveRefund.bind(PaymentRefundService);
+  static rejectRefund = PaymentRefundService.rejectRefund.bind(PaymentRefundService);
 
-  static handleStripeWebhook = PaymentWebhookService.handleStripeWebhook.bind(
-    PaymentWebhookService,
-  );
+  static handleStripeWebhook =
+    PaymentWebhookService.handleStripeWebhook.bind(PaymentWebhookService);
 
   static triggerPayoutLifecycle = enqueueManualPayoutLifecycleJob;
 }

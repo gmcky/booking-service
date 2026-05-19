@@ -22,18 +22,15 @@ vi.mock("../../shared/queues/email.queue.js", () => ({
 }));
 
 import { prisma } from "../../shared/lib/prisma.js";
-import {
-  cacheGet,
-  cacheInvalidateNamespace,
-  cacheDel,
-} from "../../shared/lib/cache.js";
+import { cacheGet, cacheInvalidateNamespace, cacheDel } from "../../shared/lib/cache.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { ReviewService } from "../../modules/reviews/review.service.js";
 
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
 const mockCacheGet = cacheGet as unknown as ReturnType<typeof vi.fn>;
-const mockCacheInvalidateNamespace =
-  cacheInvalidateNamespace as unknown as ReturnType<typeof vi.fn>;
+const mockCacheInvalidateNamespace = cacheInvalidateNamespace as unknown as ReturnType<
+  typeof vi.fn
+>;
 const mockCacheDel = cacheDel as unknown as ReturnType<typeof vi.fn>;
 const mockEmailQueue = emailQueue as unknown as {
   add: ReturnType<typeof vi.fn>;
@@ -121,9 +118,7 @@ describe("ReviewService", () => {
       _count: 2,
     } as any);
     mockPrisma.property.update.mockResolvedValue({ id: "property-1" } as any);
-    mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-      cb(mockPrisma),
-    );
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
 
     await ReviewService.delete("review-1", "admin-1", "ADMIN");
 
@@ -135,9 +130,7 @@ describe("ReviewService", () => {
         where: { id: "property-1" },
       }),
     );
-    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith(
-      "reviews:property:property-1",
-    );
+    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith("reviews:property:property-1");
     expect(mockCacheDel).toHaveBeenCalledWith("property:property-1");
     expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith("properties:search");
   });
@@ -149,9 +142,7 @@ describe("ReviewService", () => {
       propertyId: "property-2",
     } as any);
 
-    await expect(
-      ReviewService.delete("review-2", "user-3", "USER"),
-    ).rejects.toMatchObject({
+    await expect(ReviewService.delete("review-2", "user-3", "USER")).rejects.toMatchObject({
       statusCode: 403,
       message: "Not authorized to delete this review",
     });
@@ -176,9 +167,7 @@ describe("ReviewService", () => {
       });
 
     mockPrisma.review.updateMany.mockResolvedValue({ count: 1 } as any);
-    mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-      cb(mockPrisma),
-    );
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
 
     const result = await ReviewService.replyToReview("review-1", {
       hostId: "owner-1",
@@ -191,9 +180,7 @@ describe("ReviewService", () => {
       }),
     );
     expect(result.hostReplyText).toBe("Thanks for your feedback!");
-    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith(
-      "reviews:property:property-1",
-    );
+    expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith("reviews:property:property-1");
     expect(mockCacheDel).toHaveBeenCalledWith("property:property-1");
     expect(mockCacheInvalidateNamespace).toHaveBeenCalledWith("properties:search");
   });
@@ -336,13 +323,10 @@ describe("ReviewService", () => {
   });
 
   it("maps bookingId unique violation to 409 on create", async () => {
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      "Unique constraint failed",
-      {
-        code: "P2002",
-        clientVersion: "test",
-      },
-    );
+    const prismaError = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "test",
+    });
     (prismaError as any).meta = { target: ["bookingId"] };
 
     mockPrisma.booking.findFirst.mockResolvedValue({
@@ -381,13 +365,10 @@ describe("ReviewService", () => {
   });
 
   it("rethrows unknown Prisma constraint errors on create", async () => {
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      "Unexpected constraint error",
-      {
-        code: "P2010",
-        clientVersion: "test",
-      },
-    );
+    const prismaError = new Prisma.PrismaClientKnownRequestError("Unexpected constraint error", {
+      code: "P2010",
+      clientVersion: "test",
+    });
 
     mockPrisma.booking.findFirst.mockResolvedValue({
       id: "booking-1",
@@ -412,13 +393,10 @@ describe("ReviewService", () => {
   });
 
   it("maps rating check constraint violation to 400 on update", async () => {
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      "Check constraint failed",
-      {
-        code: "P2004",
-        clientVersion: "test",
-      },
-    );
+    const prismaError = new Prisma.PrismaClientKnownRequestError("Check constraint failed", {
+      code: "P2004",
+      clientVersion: "test",
+    });
 
     mockPrisma.review.findUnique.mockResolvedValue({
       id: "review-1",
@@ -440,13 +418,10 @@ describe("ReviewService", () => {
   });
 
   it("rethrows unknown Prisma constraint errors on update", async () => {
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      "Unexpected constraint error",
-      {
-        code: "P2010",
-        clientVersion: "test",
-      },
-    );
+    const prismaError = new Prisma.PrismaClientKnownRequestError("Unexpected constraint error", {
+      code: "P2010",
+      clientVersion: "test",
+    });
 
     mockPrisma.review.findUnique.mockResolvedValue({
       id: "review-1",

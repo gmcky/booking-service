@@ -15,11 +15,7 @@ export const REFUND_POLICY = {
 
 export function toFiniteNumber(value: unknown): number | null {
   const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value)
-        : NaN;
+    typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
 
   return Number.isFinite(parsed) ? parsed : null;
 }

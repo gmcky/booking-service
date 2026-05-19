@@ -2,10 +2,7 @@ import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./shared/lib/logger.js";
 import { prisma } from "./shared/lib/prisma.js";
-import {
-  payoutQueue,
-  schedulePayoutLifecycleJobs,
-} from "./shared/queues/payout.queue.js";
+import { payoutQueue, schedulePayoutLifecycleJobs } from "./shared/queues/payout.queue.js";
 
 const app = createApp();
 

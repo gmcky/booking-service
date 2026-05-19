@@ -4,10 +4,7 @@ import { logger } from "../shared/lib/logger.js";
 import { redisConnection } from "../shared/lib/redis.js";
 import { sendOpsAlert } from "../shared/lib/ops-alert.js";
 import { disburseReadyPayouts } from "../shared/lib/payout-disbursement.service.js";
-import type {
-  PayoutLifecycleJobData,
-  PayoutJobName,
-} from "../shared/queues/payout.queue.js";
+import type { PayoutLifecycleJobData, PayoutJobName } from "../shared/queues/payout.queue.js";
 
 const PAYOUT_WORKER_CONCURRENCY = 5;
 const PAYOUT_JOB_LOCK_DURATION_MS = 10 * 60 * 1000;
@@ -125,9 +122,7 @@ worker.on("failed", (job, error) => {
   }
 
   const alertMessage =
-    error instanceof Error
-      ? `${error.name}: ${error.message}`
-      : JSON.stringify(error);
+    error instanceof Error ? `${error.name}: ${error.message}` : JSON.stringify(error);
 
   void sendOpsAlert({
     title: "Payout lifecycle job permanently failed",

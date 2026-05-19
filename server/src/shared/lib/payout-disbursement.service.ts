@@ -74,10 +74,7 @@ export async function disburseReadyPayouts(
     const payment = booking.payment;
     if (!payment) {
       stats.skipped += 1;
-      logger.warn(
-        { bookingId: booking.id },
-        "Skipping payout because booking has no payment",
-      );
+      logger.warn({ bookingId: booking.id }, "Skipping payout because booking has no payment");
       continue;
     }
 

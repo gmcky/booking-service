@@ -12,11 +12,7 @@ export const PAYOUT_LIFECYCLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const STARTUP_PAYOUT_JOB_ID = "payout-lifecycle-startup";
 const REPEATABLE_PAYOUT_JOB_ID = "payout-lifecycle-repeatable";
 
-export const payoutQueue = new Queue<
-  PayoutLifecycleJobData,
-  void,
-  PayoutJobName
->("payout", {
+export const payoutQueue = new Queue<PayoutLifecycleJobData, void, PayoutJobName>("payout", {
   connection: redisConnection,
   defaultJobOptions: {
     attempts: 5,

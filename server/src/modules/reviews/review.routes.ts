@@ -79,11 +79,7 @@ reviewRouter.use(authenticate);
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-reviewRouter.post(
-  "/",
-  validate(createReviewSchema),
-  asyncHandler(reviewController.createReview),
-);
+reviewRouter.post("/", validate(createReviewSchema), asyncHandler(reviewController.createReview));
 
 /**
  * @openapi

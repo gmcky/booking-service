@@ -20,11 +20,7 @@ export class PaymentWebhookService {
   static async handleStripeWebhook(event: string | Buffer, signature: string) {
     let stripeEvent: Stripe.Event;
     try {
-      stripeEvent = stripe.webhooks.constructEvent(
-        event,
-        signature,
-        env.STRIPE_WEBHOOK_SECRET,
-      );
+      stripeEvent = stripe.webhooks.constructEvent(event, signature, env.STRIPE_WEBHOOK_SECRET);
     } catch (error) {
       logger.error({ error }, "Webhook signature verification failed");
       throw new AppError(400, "Invalid webhook signature");
@@ -53,21 +49,13 @@ export class PaymentWebhookService {
         );
         break;
       case "payment_intent.payment_failed":
-        await this.handlePaymentFailed(
-          stripeEvent.data.object as Stripe.PaymentIntent,
-        );
+        await this.handlePaymentFailed(stripeEvent.data.object as Stripe.PaymentIntent);
         break;
       case "charge.refunded":
-        await this.handleChargeRefunded(
-          stripeEvent.data.object as Stripe.Charge,
-          stripeEvent.id,
-        );
+        await this.handleChargeRefunded(stripeEvent.data.object as Stripe.Charge, stripeEvent.id);
         break;
       default:
-        logger.info(
-          { eventType: stripeEvent.type },
-          "Unhandled webhook event",
-        );
+        logger.info({ eventType: stripeEvent.type }, "Unhandled webhook event");
     }
 
     try {
@@ -78,10 +66,7 @@ export class PaymentWebhookService {
         },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         // Concurrent delivery: another request processed the same event.
         // Handler already ran (idempotent), so this is safe to ignore.
         return { success: true };
@@ -97,10 +82,7 @@ export class PaymentWebhookService {
   }
 
   /** Success sync: upsert payment state and confirm booking in one transaction. */
-  private static async handlePaymentSuccess(
-    paymentIntent: Stripe.PaymentIntent,
-    eventId: string,
-  ) {
+  private static async handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent, eventId: string) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
       logger.error(
@@ -110,9 +92,7 @@ export class PaymentWebhookService {
       return;
     }
 
-    const amount = Number(
-      paymentIntent.amount_received ?? paymentIntent.amount,
-    );
+    const amount = Number(paymentIntent.amount_received ?? paymentIntent.amount);
     const amountInMainCurrency = Number.isFinite(amount) ? amount / 100 : 0;
     const paymentIntentPayload = toInputJsonObject(paymentIntent);
 
@@ -233,16 +213,11 @@ export class PaymentWebhookService {
       );
     }
 
-    logger.info(
-      { bookingId, paymentIntentId: paymentIntent.id },
-      "Payment succeeded",
-    );
+    logger.info({ bookingId, paymentIntentId: paymentIntent.id }, "Payment succeeded");
   }
 
   /** Failure sync: mark payment as FAILED and persist provider payload. */
-  private static async handlePaymentFailed(
-    paymentIntent: Stripe.PaymentIntent,
-  ) {
+  private static async handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
     if (!bookingId) {
       logger.warn(
@@ -281,25 +256,17 @@ export class PaymentWebhookService {
       });
     }
 
-    logger.warn(
-      { bookingId, paymentIntentId: paymentIntent.id },
-      "Payment failed",
-    );
+    logger.warn({ bookingId, paymentIntentId: paymentIntent.id }, "Payment failed");
   }
 
   /** Refund sync from provider event; updates payment/booking and notifies host. */
   private static async handleChargeRefunded(charge: Stripe.Charge, eventId: string) {
     const paymentIntentRaw = charge?.payment_intent;
     const paymentIntentId =
-      typeof paymentIntentRaw === "string"
-        ? paymentIntentRaw
-        : paymentIntentRaw?.id;
+      typeof paymentIntentRaw === "string" ? paymentIntentRaw : paymentIntentRaw?.id;
 
     if (!paymentIntentId) {
-      logger.warn(
-        { chargeId: charge?.id },
-        "Missing payment_intent in charge.refunded webhook",
-      );
+      logger.warn({ chargeId: charge?.id }, "Missing payment_intent in charge.refunded webhook");
       return;
     }
 
@@ -387,16 +354,11 @@ export class PaymentWebhookService {
 
     const chargeRefundedRaw = toFiniteNumber(charge?.amount_refunded);
     const refundedAmount =
-      chargeRefundedRaw && chargeRefundedRaw > 0
-        ? chargeRefundedRaw / 100
-        : Number(payment.amount);
+      chargeRefundedRaw && chargeRefundedRaw > 0 ? chargeRefundedRaw / 100 : Number(payment.amount);
     const totalAmount = Number(payment.amount);
     const refundPercent =
       totalAmount > 0
-        ? Math.min(
-            100,
-            Math.max(0, Math.round((refundedAmount / totalAmount) * 100)),
-          )
+        ? Math.min(100, Math.max(0, Math.round((refundedAmount / totalAmount) * 100)))
         : 100;
 
     await emailQueue.add(

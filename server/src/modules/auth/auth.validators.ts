@@ -14,8 +14,7 @@ export const registerSchema = z.object({
         return result.score >= 3;
       },
       {
-        message:
-          "Password is too weak or common. Please use a stronger password.",
+        message: "Password is too weak or common. Please use a stronger password.",
       },
     ),
   firstName: z.string().min(1),

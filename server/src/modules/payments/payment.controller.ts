@@ -87,10 +87,7 @@ export async function rejectRefund(req: AuthenticatedRequest, res: Response) {
  * @body { bookingId: string (UUID) }
  * @returns { clientSecret: string }
  */
-export async function createPaymentIntent(
-  req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function createPaymentIntent(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.id;
   const result = await PaymentService.createIntent(req.body, userId);
   res.status(201).json(result);
@@ -119,10 +116,7 @@ export async function handleWebhook(req: express.Request, res: Response) {
  * @access Private (admin)
  * @security Bearer token required + ADMIN role.
  */
-export async function runPayoutLifecycleNow(
-  _req: AuthenticatedRequest,
-  res: Response,
-) {
+export async function runPayoutLifecycleNow(_req: AuthenticatedRequest, res: Response) {
   const job = await PaymentService.triggerPayoutLifecycle();
   res.status(202).json({
     message: "Payout lifecycle job queued",

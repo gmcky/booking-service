@@ -31,11 +31,7 @@ export const authRouter: IRouter = Router();
  *       400:
  *         description: Validation error
  */
-authRouter.post(
-  "/register",
-  validate(registerSchema),
-  asyncHandler(authController.register),
-);
+authRouter.post("/register", validate(registerSchema), asyncHandler(authController.register));
 
 /**
  * @openapi
@@ -59,11 +55,7 @@ authRouter.post(
  *       401:
  *         description: Invalid credentials
  */
-authRouter.post(
-  "/login",
-  validate(loginSchema),
-  asyncHandler(authController.login),
-);
+authRouter.post("/login", validate(loginSchema), asyncHandler(authController.login));
 
 /**
  * @openapi

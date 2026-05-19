@@ -10,8 +10,7 @@ import type { ReviewQueryInput } from "./review.types.js";
  */
 export async function getPropertyReviews(req: Request, res: Response) {
   const propertyId = getIdParam(req, "propertyId");
-  const { page, limit, sort, rating, hasHostReply } =
-    req.query as unknown as ReviewQueryInput;
+  const { page, limit, sort, rating, hasHostReply } = req.query as unknown as ReviewQueryInput;
 
   const result = await ReviewService.getPropertyReviews(
     propertyId,

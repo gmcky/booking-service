@@ -39,9 +39,7 @@ const transporter = nodemailer.createTransport({
   }),
 });
 
-async function sendPropertyCreatedHost(
-  data: PropertyCreatedHostJob,
-): Promise<void> {
+async function sendPropertyCreatedHost(data: PropertyCreatedHostJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.ownerEmail,
@@ -67,9 +65,7 @@ async function sendPropertyCreatedHost(
   });
 }
 
-async function sendBookingCreatedGuest(
-  data: BookingCreatedGuestJob,
-): Promise<void> {
+async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.guestEmail,
@@ -105,9 +101,7 @@ async function sendBookingCreatedGuest(
   });
 }
 
-async function sendBookingCreatedHost(
-  data: BookingCreatedHostJob,
-): Promise<void> {
+async function sendBookingCreatedHost(data: BookingCreatedHostJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.hostEmail,
@@ -142,9 +136,7 @@ async function sendBookingCreatedHost(
   });
 }
 
-async function sendBookingCancelledGuest(
-  data: BookingCancelledGuestJob,
-): Promise<void> {
+async function sendBookingCancelledGuest(data: BookingCancelledGuestJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.guestEmail,
@@ -172,9 +164,7 @@ async function sendBookingCancelledGuest(
   });
 }
 
-async function sendBookingCancelledHost(
-  data: BookingCancelledHostJob,
-): Promise<void> {
+async function sendBookingCancelledHost(data: BookingCancelledHostJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.hostEmail,
@@ -204,9 +194,7 @@ async function sendBookingCancelledHost(
   });
 }
 
-async function sendReviewReceivedHost(
-  data: ReviewReceivedHostJob,
-): Promise<void> {
+async function sendReviewReceivedHost(data: ReviewReceivedHostJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.hostEmail,
@@ -233,9 +221,7 @@ async function sendReviewReceivedHost(
   });
 }
 
-async function sendReviewReportedAdmin(
-  data: ReviewReportedAdminJob,
-): Promise<void> {
+async function sendReviewReportedAdmin(data: ReviewReportedAdminJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.adminEmail,
@@ -266,9 +252,7 @@ async function sendReviewReportedAdmin(
   });
 }
 
-async function sendPaymentSuccessGuest(
-  data: PaymentSuccessGuestJob,
-): Promise<void> {
+async function sendPaymentSuccessGuest(data: PaymentSuccessGuestJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.guestEmail,
@@ -300,9 +284,7 @@ async function sendPaymentSuccessGuest(
   });
 }
 
-async function sendPaymentSuccessHost(
-  data: PaymentSuccessHostJob,
-): Promise<void> {
+async function sendPaymentSuccessHost(data: PaymentSuccessHostJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.hostEmail,
@@ -336,9 +318,7 @@ async function sendPaymentSuccessHost(
   });
 }
 
-async function sendRefundRequestedAdmin(
-  data: RefundRequestedAdminJob,
-): Promise<void> {
+async function sendRefundRequestedAdmin(data: RefundRequestedAdminJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.adminEmail,
@@ -377,9 +357,7 @@ async function sendRefundRequestedAdmin(
   });
 }
 
-async function sendRefundProcessedGuest(
-  data: RefundProcessedGuestJob,
-): Promise<void> {
+async function sendRefundProcessedGuest(data: RefundProcessedGuestJob): Promise<void> {
   const decision = data.isApproved ? "approved" : "rejected";
   const decisionLabel = data.isApproved ? "Approved" : "Rejected";
 
@@ -411,9 +389,7 @@ async function sendRefundProcessedGuest(
   });
 }
 
-async function sendRefundProcessedHost(
-  data: RefundProcessedHostJob,
-): Promise<void> {
+async function sendRefundProcessedHost(data: RefundProcessedHostJob): Promise<void> {
   const hostPayoutPercent = Math.max(0, 100 - data.refundPercent);
   const hostPayoutAmount = Math.max(0, data.totalAmount - data.refundedAmount);
   const payoutMessage =
@@ -486,9 +462,7 @@ async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
   });
 }
 
-async function sendEmailChangedNotification(
-  data: EmailChangedNotificationJob,
-): Promise<void> {
+async function sendEmailChangedNotification(data: EmailChangedNotificationJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.oldEmail,
@@ -544,9 +518,7 @@ async function sendPasswordChangedNotification(
   });
 }
 
-async function sendAccountDeletedNotification(
-  data: AccountDeletedNotificationJob,
-): Promise<void> {
+async function sendAccountDeletedNotification(data: AccountDeletedNotificationJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to: data.email,
@@ -571,9 +543,7 @@ async function sendAccountDeletedNotification(
   });
 }
 
-async function processEmail(
-  job: Job<EmailJobData["data"], void, EmailJobName>,
-): Promise<void> {
+async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>): Promise<void> {
   logger.info({ jobId: job.id, name: job.name }, "Processing email job");
 
   switch (job.name) {
@@ -617,30 +587,23 @@ async function processEmail(
       await sendEmailChangeOtp(job.data as EmailChangeOtpJob);
       break;
     case "email-changed-notification":
-      await sendEmailChangedNotification(
-        job.data as EmailChangedNotificationJob,
-      );
+      await sendEmailChangedNotification(job.data as EmailChangedNotificationJob);
       break;
     case "password-changed-notification":
-      await sendPasswordChangedNotification(
-        job.data as PasswordChangedNotificationJob,
-      );
+      await sendPasswordChangedNotification(job.data as PasswordChangedNotificationJob);
       break;
     case "account-deleted-notification":
-      await sendAccountDeletedNotification(
-        job.data as AccountDeletedNotificationJob,
-      );
+      await sendAccountDeletedNotification(job.data as AccountDeletedNotificationJob);
       break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");
   }
 }
 
-const worker = new Worker<EmailJobData["data"], void, EmailJobName>(
-  "email",
-  processEmail,
-  { connection: redisConnection, concurrency: 10 },
-);
+const worker = new Worker<EmailJobData["data"], void, EmailJobName>("email", processEmail, {
+  connection: redisConnection,
+  concurrency: 10,
+});
 
 worker.on("completed", (job) => {
   logger.info({ jobId: job.id, name: job.name }, "Email job completed");

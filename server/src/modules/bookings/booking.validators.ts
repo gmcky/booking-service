@@ -23,15 +23,10 @@ export const createBookingSchema = z
     message: "Check-out must be after check-in",
     path: ["checkOut"],
   })
-  .refine(
-    (data) =>
-      data.checkIn.getTime() >=
-      Date.now() + MIN_ADVANCE_HOURS * 60 * 60 * 1000,
-    {
-      message: `Check-in must be at least ${MIN_ADVANCE_HOURS} hours from now`,
-      path: ["checkIn"],
-    },
-  )
+  .refine((data) => data.checkIn.getTime() >= Date.now() + MIN_ADVANCE_HOURS * 60 * 60 * 1000, {
+    message: `Check-in must be at least ${MIN_ADVANCE_HOURS} hours from now`,
+    path: ["checkIn"],
+  })
   .refine((data) => calculateNights(data.checkIn, data.checkOut) >= 1, {
     message: "Minimum stay is 1 night",
     path: ["checkOut"],
@@ -43,9 +38,7 @@ export const createBookingSchema = z
   .refine(
     (data) => {
       const oneYearFromNow = new Date();
-      oneYearFromNow.setFullYear(
-        oneYearFromNow.getFullYear() + MAX_BOOKING_ADVANCE_YEARS,
-      );
+      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + MAX_BOOKING_ADVANCE_YEARS);
       return data.checkIn <= oneYearFromNow;
     },
     {

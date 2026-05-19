@@ -14,10 +14,7 @@ import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { redisConnection } from "../shared/lib/redis.js";
 import { logger } from "../shared/lib/logger.js";
-import type {
-  CleanupJobData,
-  CleanupJobName,
-} from "../shared/queues/cleanup.queue.js";
+import type { CleanupJobData, CleanupJobName } from "../shared/queues/cleanup.queue.js";
 
 // ---------------------------------------------------------------------------
 // Security: Path Traversal guard
@@ -71,18 +68,12 @@ async function unlinkPropertyImages(paths: string[]): Promise<void> {
 
     // Path traversal or null-byte: poisoned job data — do not retry.
     if (!err.code) {
-      logger.error(
-        { path: paths[i], error: err },
-        "Unsafe path rejected — discarding job",
-      );
+      logger.error({ path: paths[i], error: err }, "Unsafe path rejected — discarding job");
       throw err;
     }
 
     if (err.code === "ENOENT") {
-      logger.warn(
-        { path: paths[i] },
-        "File not found during cleanup — skipping",
-      );
+      logger.warn({ path: paths[i] }, "File not found during cleanup — skipping");
       return;
     }
 
@@ -99,9 +90,7 @@ async function unlinkPropertyImages(paths: string[]): Promise<void> {
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-async function processCleanup(
-  job: Job<CleanupJobData, void, CleanupJobName>,
-): Promise<void> {
+async function processCleanup(job: Job<CleanupJobData, void, CleanupJobName>): Promise<void> {
   logger.info({ jobId: job.id, name: job.name }, "Processing cleanup job");
 
   switch (job.name) {
@@ -121,24 +110,16 @@ async function processCleanup(
 // Worker
 // ---------------------------------------------------------------------------
 
-const worker = new Worker<CleanupJobData, void, CleanupJobName>(
-  "cleanup",
-  processCleanup,
-  { connection: redisConnection },
-);
+const worker = new Worker<CleanupJobData, void, CleanupJobName>("cleanup", processCleanup, {
+  connection: redisConnection,
+});
 
 worker.on("completed", (job) => {
-  logger.info(
-    { jobId: job.id, name: job.name, paths: job.data.paths },
-    "Cleanup job completed",
-  );
+  logger.info({ jobId: job.id, name: job.name, paths: job.data.paths }, "Cleanup job completed");
 });
 
 worker.on("failed", (job, error) => {
-  logger.error(
-    { jobId: job?.id, name: job?.name, error },
-    "Cleanup job failed",
-  );
+  logger.error({ jobId: job?.id, name: job?.name, error }, "Cleanup job failed");
 });
 
 logger.info("Cleanup worker started");

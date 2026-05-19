@@ -55,12 +55,7 @@ type PaymentFixture = {
   bookingId: string;
   amount: Prisma.Decimal;
   currency: string;
-  status:
-    | "SUCCESS"
-    | "PENDING"
-    | "REFUND_REQUESTED"
-    | "REFUND_PROCESSING"
-    | "REFUNDED";
+  status: "SUCCESS" | "PENDING" | "REFUND_REQUESTED" | "REFUND_PROCESSING" | "REFUNDED";
   transactionId: string | null;
   metadata: Prisma.JsonValue | null;
   booking: {
@@ -168,10 +163,7 @@ describe("PaymentRefundService.requestRefund", () => {
     const payment = buildPayment({ status: "REFUND_REQUESTED" });
     mockPaymentFindUniqueResult(payment);
 
-    const result = await PaymentRefundService.requestRefund(
-      "payment-1",
-      "user-1",
-    );
+    const result = await PaymentRefundService.requestRefund("payment-1", "user-1");
 
     expect(result).toMatchObject({ id: "payment-1", status: "REFUND_REQUESTED" });
     expect(result).not.toHaveProperty("metadata");
@@ -184,10 +176,7 @@ describe("PaymentRefundService.requestRefund", () => {
     const payment = buildPayment({ status: "REFUND_PROCESSING" });
     mockPaymentFindUniqueResult(payment);
 
-    const result = await PaymentRefundService.requestRefund(
-      "payment-1",
-      "user-1",
-    );
+    const result = await PaymentRefundService.requestRefund("payment-1", "user-1");
 
     expect(result).toMatchObject({ id: "payment-1", status: "REFUND_PROCESSING" });
     expect(result).not.toHaveProperty("metadata");
@@ -209,9 +198,7 @@ describe("PaymentRefundService.requestRefund", () => {
     const payment = buildPayment({ status: "PENDING" });
     mockPaymentFindUniqueResult(payment);
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
       statusCode: 400,
       message: "Refund request can only be created for successful payments",
     });
@@ -223,9 +210,7 @@ describe("PaymentRefundService.requestRefund", () => {
     });
     mockPaymentFindUniqueResult(payment);
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
       statusCode: 400,
       message: "Cannot request refund after payout has been disbursed to host",
     });
@@ -241,9 +226,7 @@ describe("PaymentRefundService.requestRefund", () => {
     });
     mockPaymentFindUniqueResult(payment);
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
       statusCode: 400,
       message: "Cannot request refund for completed booking",
     });
@@ -257,9 +240,7 @@ describe("PaymentRefundService.requestRefund", () => {
     });
     mockPaymentFindUniqueResult(payment);
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
       statusCode: 400,
       message: "Cannot request refund after check-in date",
     });
@@ -273,12 +254,9 @@ describe("PaymentRefundService.requestRefund", () => {
     });
     mockPaymentFindUniqueResult(payment);
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
       statusCode: 400,
-      message:
-        "Refund request is not allowed less than 24 hours before check-in",
+      message: "Refund request is not allowed less than 24 hours before check-in",
     });
   });
 
@@ -292,16 +270,10 @@ describe("PaymentRefundService.requestRefund", () => {
     mockPaymentFindUniqueResult(payment);
     mockPaymentUpdateResults(processingPayment, refundedPayment);
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
-    mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-      cb(mockPrisma),
-    );
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
     mockStripe.refunds.create.mockResolvedValue({ id: "re_test_123" } as any);
 
-    await PaymentRefundService.requestRefund(
-      "payment-1",
-      "user-1",
-      "changed plans",
-    );
+    await PaymentRefundService.requestRefund("payment-1", "user-1", "changed plans");
 
     expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
     expect(mockStripe.refunds.create).toHaveBeenCalledWith(
@@ -336,9 +308,7 @@ describe("PaymentRefundService.requestRefund", () => {
       })
       .mockImplementationOnce(async () => refundedPayment);
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
-    mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-      cb(mockPrisma),
-    );
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
     mockStripe.refunds.create.mockImplementation(async () => {
       callOrder.push("stripe_call");
       return { id: "re_test_order" } as any;
@@ -368,9 +338,9 @@ describe("PaymentRefundService.requestRefund", () => {
       .mockResolvedValueOnce(rolledBackPayment);
     mockStripe.refunds.create.mockRejectedValue(new Error("Stripe timeout"));
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({ statusCode: 502 });
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
+      statusCode: 502,
+    });
 
     expect(mockPrisma.payment.update).toHaveBeenCalledTimes(2);
     expect(mockPrisma.payment.update).toHaveBeenNthCalledWith(
@@ -419,9 +389,9 @@ describe("PaymentRefundService.requestRefund", () => {
     mockStripe.refunds.create.mockResolvedValue({ id: "re_exhausted" } as any);
     (mockPrisma.$transaction as any).mockRejectedValue(new Error("DB down"));
 
-    await expect(
-      PaymentRefundService.requestRefund("payment-1", "user-1"),
-    ).rejects.toMatchObject({ statusCode: 500 });
+    await expect(PaymentRefundService.requestRefund("payment-1", "user-1")).rejects.toMatchObject({
+      statusCode: 500,
+    });
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3);
     expect(mockSendOpsAlert).toHaveBeenCalledOnce();
@@ -447,9 +417,7 @@ describe("PaymentRefundService.requestRefund", () => {
     mockPaymentFindUniqueResult(payment);
     mockPaymentUpdateResults(processingPayment, refundedPayment);
     mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
-    mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-      cb(mockPrisma),
-    );
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
     mockStripe.refunds.create.mockResolvedValue({ id: "re_test_email" } as any);
 
     await PaymentRefundService.requestRefund("payment-1", "user-1", "reason");
@@ -487,11 +455,7 @@ describe("PaymentRefundService.requestRefund", () => {
     mockPaymentUpdateResult(updatedPayment);
     mockPrisma.user.findMany.mockResolvedValue([] as any);
 
-    const result = await PaymentRefundService.requestRefund(
-      "payment-1",
-      "user-1",
-      "manual",
-    );
+    const result = await PaymentRefundService.requestRefund("payment-1", "user-1", "manual");
 
     expect(result.status).toBe("REFUND_REQUESTED");
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
@@ -519,33 +483,26 @@ describe("PaymentRefundService.requestRefund", () => {
       { email: "admin2@test.com", firstName: "Admin2" },
     ] as any);
 
-    await PaymentRefundService.requestRefund(
-      "payment-1",
-      "user-1",
-      "manual reason",
-    );
+    await PaymentRefundService.requestRefund("payment-1", "user-1", "manual reason");
 
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(2);
     const adminEmails = mockEmailQueue.add.mock.calls.map(
       ([, payload]) => (payload as { adminEmail: string }).adminEmail,
     );
-    expect(adminEmails).toEqual(
-      expect.arrayContaining(["admin1@test.com", "admin2@test.com"]),
-    );
+    expect(adminEmails).toEqual(expect.arrayContaining(["admin1@test.com", "admin2@test.com"]));
     expect(
-      mockEmailQueue.add.mock.calls.every(
-        ([jobName]) => jobName === "refund-requested-admin",
-      ),
+      mockEmailQueue.add.mock.calls.every(([jobName]) => jobName === "refund-requested-admin"),
     ).toBe(true);
   });
 
   it("throws AppError when payment not found", async () => {
     mockPaymentFindUniqueResult(null);
 
-    await expect(
-      PaymentRefundService.requestRefund("missing", "user-1"),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Payment not found" });
+    await expect(PaymentRefundService.requestRefund("missing", "user-1")).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Payment not found",
+    });
   });
 });
 
