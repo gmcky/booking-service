@@ -1,5 +1,5 @@
 import { prisma } from "../../shared/lib/prisma.js";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import { stripe } from "../../shared/lib/stripe.js";

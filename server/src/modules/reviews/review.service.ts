@@ -1,4 +1,5 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { prisma } from "../../shared/lib/prisma.js";
 import { logger } from "../../shared/lib/logger.js";
 import {
@@ -479,7 +480,7 @@ export class ReviewService {
 
       return report;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
         throw new AppError(409, "You have already reported this review");
       }
 
@@ -668,7 +669,7 @@ export class ReviewService {
   }
 
   private static throwKnownReviewConstraintError(error: unknown) {
-    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    if (!(error instanceof PrismaClientKnownRequestError)) {
       return;
     }
 

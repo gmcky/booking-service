@@ -5,7 +5,7 @@ import { stripe } from "../../shared/lib/stripe.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import type { CreateBookingInput, UpdateBookingDatesInput } from "./booking.types.js";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { BookingStatus } from "@prisma/client";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { calculateNights, formatDate } from "../../shared/utils/date.helpers.js";
@@ -173,7 +173,7 @@ export class BookingService {
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      { isolationLevel: "Serializable" },
     );
 
     // Async enqueue for predictable API latency.
@@ -615,7 +615,7 @@ export class BookingService {
           include: { property: { select: BOOKING_PROPERTY_SELECT } },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      { isolationLevel: "Serializable" },
     );
 
     await cacheInvalidateNamespace("properties:search");

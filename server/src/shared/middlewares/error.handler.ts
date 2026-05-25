@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { MulterError } from "multer";
 import { ZodError } from "zod";
 import { logger } from "../lib/logger.js";
@@ -31,7 +32,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
     return res.status(400).json({ error: message });
   }
 
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (err instanceof PrismaClientKnownRequestError) {
     logger.warn({ code: err.code }, "Prisma known request error");
     if (err.code === "P2002") {
       return res.status(409).json({ error: "Resource already exists" });

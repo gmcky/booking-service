@@ -10,7 +10,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { env } from "../../config/env.js";
 import type { User } from "@prisma/client";
 import crypto from "crypto";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
 // Pre-encode once; avoids per-request TextEncoder churn.
 const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
@@ -118,7 +118,7 @@ export class AuthService {
       };
     } catch (error) {
       // Normalize unique-constraint conflicts.
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
           logger.warn(
             {
