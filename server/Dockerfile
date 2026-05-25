@@ -1,7 +1,7 @@
 # ====================
 # Build Stage
 # ====================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Install pnpm
 RUN npm install -g pnpm@latest
@@ -26,7 +26,7 @@ RUN pnpm build
 # ====================
 # Production Stage
 # ====================
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install pnpm
 RUN npm install -g pnpm@latest
