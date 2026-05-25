@@ -1,6 +1,7 @@
 # Production docker-compose
 services:
   app:
+    image: ghcr.io/gmcky/booking-service-app:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -30,6 +31,7 @@ services:
       retries: 3
 
   workers:
+    image: ghcr.io/gmcky/booking-service-app:latest
     build:
       context: .
       dockerfile: Dockerfile
