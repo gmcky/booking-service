@@ -7,6 +7,7 @@ import { logger } from "./logger.js";
 export const cacheClient = new Redis({
   host: env.REDIS_HOST,
   port: env.REDIS_PORT,
+  username: env.REDIS_USERNAME || undefined,
   password: env.REDIS_PASSWORD || undefined,
   lazyConnect: true,
 });
