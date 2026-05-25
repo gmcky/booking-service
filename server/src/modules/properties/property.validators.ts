@@ -1,4 +1,5 @@
-import { Amenity, PropertyType } from "@prisma/client";
+import prismaClientPkg from "@prisma/client";
+const { Amenity, PropertyType } = prismaClientPkg;
 import { z } from "zod";
 import { sanitizeString } from "../../shared/utils/sanitize.js";
 

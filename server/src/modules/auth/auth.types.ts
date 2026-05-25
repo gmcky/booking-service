@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { registerSchema, loginSchema } from "./auth.validators.js";
-import { Role } from "@prisma/client";
+import type { Role } from "@prisma/client";
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -1,5 +1,6 @@
 import { prisma } from "../../shared/lib/prisma.js";
-import { BookingStatus } from "@prisma/client";
+import prismaClientPkg from "@prisma/client";
+const { BookingStatus } = prismaClientPkg;
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
