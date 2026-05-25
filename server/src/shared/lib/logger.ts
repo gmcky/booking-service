@@ -12,17 +12,16 @@ export const LOG_REDACT_PATHS = [
   "err.body",
 ] as const;
 
-const transport =
-  env.NODE_ENV === "development"
-    ? {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "HH:MM:ss Z",
-          ignore: "pid,hostname",
-        },
-      }
-    : undefined;
+const transport = env.LOG_PRETTY_PRINT
+  ? {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        translateTime: "HH:MM:ss Z",
+        ignore: "pid,hostname",
+      },
+    }
+  : undefined;
 
 const mixin = () => {
   const requestId = getRequestId();

@@ -28,7 +28,7 @@ export const env = cleanEnv(process.env, {
     default: "info",
     choices: ["debug", "info", "warn", "error"],
   }),
-  LOG_PRETTY_PRINT: bool({ default: true }),
+  LOG_PRETTY_PRINT: bool({ default: false }),
 
   // CORS
   CORS_ORIGIN: str({ default: "http://localhost:3000" }),
