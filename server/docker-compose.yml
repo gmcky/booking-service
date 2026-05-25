@@ -45,6 +45,8 @@ services:
     networks:
       - booking-network
     restart: unless-stopped
+    healthcheck:
+      disable: true
 
   postgres:
     image: postgres:16-alpine
