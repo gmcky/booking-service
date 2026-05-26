@@ -105,9 +105,12 @@ function makeUser(overrides = {}) {
     isDeleted: false,
     isSuspended: false,
     phoneNumber: null,
+    dateOfBirth: null,
+    bio: null,
+    avatarUrl: null,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    avatarUrl: null,
     ...overrides,
   };
 }
