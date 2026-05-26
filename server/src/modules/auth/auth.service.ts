@@ -16,8 +16,6 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const REFRESH_SECRET = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 
-// TODO: implement magic-link unlock for locked accounts.
-
 export class AuthService {
   /**
    * Atomic user creation and initial refresh session.
