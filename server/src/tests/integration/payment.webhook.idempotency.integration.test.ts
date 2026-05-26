@@ -146,7 +146,9 @@ describe("Stripe webhook idempotency integration", () => {
     const second = await PaymentWebhookService.handleStripeWebhook("raw-body", "sig");
     expect(second).toEqual({ success: true });
 
-    const paymentCountAfterSecond = await prisma.payment.count({ where: { bookingId: booking.id } });
+    const paymentCountAfterSecond = await prisma.payment.count({
+      where: { bookingId: booking.id },
+    });
     expect(paymentCountAfterSecond).toBe(1);
 
     const dedupCountAfterSecond = await prisma.processedStripeEvent.count({

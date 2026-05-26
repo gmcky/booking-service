@@ -143,10 +143,7 @@ describe("Booking race condition integration", () => {
     expect(createPropertyRes.status).toBe(201);
     const propertyId = createPropertyRes.body.id as string;
 
-    const [guestA, guestB] = await Promise.all([
-      registerUser("guest-a"),
-      registerUser("guest-b"),
-    ]);
+    const [guestA, guestB] = await Promise.all([registerUser("guest-a"), registerUser("guest-b")]);
 
     const stay = buildIsoRange(10, 3);
 
