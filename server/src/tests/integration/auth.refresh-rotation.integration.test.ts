@@ -1,8 +1,44 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Application } from "express";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import type { PrismaClient } from "@prisma/client";
+
+const cacheMocks = vi.hoisted(() => ({
+  cacheClientGet: vi.fn().mockResolvedValue(null),
+  cacheClientTtl: vi.fn().mockResolvedValue(-1),
+  cacheClientIncr: vi.fn().mockResolvedValue(1),
+  cacheClientExpire: vi.fn().mockResolvedValue(1),
+  cacheClientDel: vi.fn().mockResolvedValue(1),
+  cacheClientSet: vi.fn().mockResolvedValue("OK"),
+  cacheClientScan: vi.fn().mockResolvedValue(["0", []]),
+  cacheClientCall: vi.fn().mockResolvedValue([]),
+  cacheGet: vi.fn().mockResolvedValue(null),
+  cacheSet: vi.fn().mockResolvedValue(undefined),
+  cacheDel: vi.fn().mockResolvedValue(undefined),
+  cacheInvalidateNamespace: vi.fn().mockResolvedValue(undefined),
+  cacheGetNamespaceVersion: vi.fn().mockResolvedValue("0"),
+  hashKey: vi.fn((value: unknown) => JSON.stringify(value)),
+}));
+
+vi.mock("../../shared/lib/cache.js", () => ({
+  cacheClient: {
+    get: cacheMocks.cacheClientGet,
+    ttl: cacheMocks.cacheClientTtl,
+    incr: cacheMocks.cacheClientIncr,
+    expire: cacheMocks.cacheClientExpire,
+    del: cacheMocks.cacheClientDel,
+    set: cacheMocks.cacheClientSet,
+    scan: cacheMocks.cacheClientScan,
+    call: cacheMocks.cacheClientCall,
+  },
+  cacheGet: cacheMocks.cacheGet,
+  cacheSet: cacheMocks.cacheSet,
+  cacheDel: cacheMocks.cacheDel,
+  cacheInvalidateNamespace: cacheMocks.cacheInvalidateNamespace,
+  cacheGetNamespaceVersion: cacheMocks.cacheGetNamespaceVersion,
+  hashKey: cacheMocks.hashKey,
+}));
 
 let app: Application;
 let prisma: PrismaClient;
