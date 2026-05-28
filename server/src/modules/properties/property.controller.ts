@@ -24,8 +24,6 @@ export async function getProperties(req: Request, res: Response) {
     checkOut,
   } = req.query as unknown as PropertyQueryInput;
 
-  // TODO:   add controller cache-aside if service cache is removed.
-
   const result = await PropertyService.getAll(
     { page, limit },
     { city, type, amenities, minPrice, maxPrice, maxGuests, sort, checkIn, checkOut },
@@ -75,8 +73,6 @@ export async function getPropertyById(req: Request, res: Response) {
  */
 export async function createProperty(req: AuthenticatedRequest, res: Response) {
   const ownerId = req.user!.id;
-
-  // TODO:   add per-owner listing rate limit.
 
   const property = await PropertyService.create({ ...req.body, ownerId });
 

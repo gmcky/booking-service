@@ -95,5 +95,6 @@ jobs:
             git pull origin main
             cd server
             docker compose pull app workers
+            docker compose run --rm --no-deps app node_modules/.bin/prisma migrate deploy
             docker compose up -d
             docker image prune -f
