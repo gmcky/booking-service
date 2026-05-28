@@ -89,6 +89,7 @@
     "@faker-js/faker": "^10.4.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "7.3.0",
+    "@sentry/node": "^10.54.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.67.3",
     "compression": "^1.8.1",

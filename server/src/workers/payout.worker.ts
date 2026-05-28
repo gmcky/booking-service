@@ -1,3 +1,4 @@
+import "../instrument.js";
 import { Worker, type Job } from "bullmq";
 import { prisma } from "../shared/lib/prisma.js";
 import { logger } from "../shared/lib/logger.js";

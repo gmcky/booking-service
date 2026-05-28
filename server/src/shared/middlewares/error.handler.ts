@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { MulterError } from "multer";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/node";
 import { logger } from "../lib/logger.js";
 
 export class AppError extends Error {
@@ -47,6 +48,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
     return res.status(err.statusCode).json({ error: err.message });
   }
 
+  Sentry.captureException(err);
   logger.error(err, "Unhandled error");
   return res.status(500).json({ error: "Internal server error" });
 }

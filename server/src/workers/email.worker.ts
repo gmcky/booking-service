@@ -4,6 +4,7 @@
  * Runs in a dedicated process via `pnpm worker:email`.
  * Consumes jobs from the `email` BullMQ queue and dispatches transactional emails.
  */
+import "../instrument.js";
 import { Worker, type Job } from "bullmq";
 import nodemailer from "nodemailer";
 import { redisConnection } from "../shared/lib/redis.js";
