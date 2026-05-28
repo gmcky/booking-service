@@ -9,6 +9,7 @@
  *   ENOENT  → file already gone; log a warning and treat as success.
  *   anything else (EACCES, EBUSY, …) → rethrow so BullMQ retries with backoff.
  */
+import "../instrument.js";
 import { Worker, type Job } from "bullmq";
 import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";

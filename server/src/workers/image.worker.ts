@@ -17,6 +17,7 @@
  *   3. Uploads to S3 and updates the user record.
  *   4. Deletes old S3 avatar (best-effort) and temp file.
  */
+import "../instrument.js";
 import sharp from "sharp";
 import { mkdir, unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";

@@ -8,6 +8,7 @@ import { logger, LOG_REDACT_PATHS } from "./shared/lib/logger.js";
 import rateLimit from "express-rate-limit";
 import { RedisStore, type SendCommandFn } from "rate-limit-redis";
 import { cacheClient } from "./shared/lib/cache.js";
+import * as Sentry from "@sentry/node";
 
 // pino-http v10+ work with ESM, but keeping require is safe for compatibility
 const require = createRequire(import.meta.url);
@@ -144,6 +145,7 @@ export function createApp(): Application {
 
   app.use(apiPrefix, createApiRouter());
 
+  Sentry.setupExpressErrorHandler(app);
   app.use(errorHandler);
 
   return app;

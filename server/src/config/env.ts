@@ -63,4 +63,7 @@ export const env = cleanEnv(process.env, {
   // API Documentation
   SWAGGER_ENABLED: bool({ default: true }),
   API_VERSION: str({ default: "v1" }),
+
+  // Sentry (optional — disabled if unset)
+  SENTRY_DSN: str({ default: "" }),
 });
