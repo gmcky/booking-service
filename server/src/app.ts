@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser";
 import { createRequire } from "module";
 import { logger, LOG_REDACT_PATHS } from "./shared/lib/logger.js";
 import rateLimit from "express-rate-limit";
-import { RedisStore } from "rate-limit-redis";
+import { RedisStore, type SendCommandFn } from "rate-limit-redis";
 import { cacheClient } from "./shared/lib/cache.js";
 
 // pino-http v10+ work with ESM, but keeping require is safe for compatibility
@@ -31,7 +31,8 @@ const redisStore = (prefix: string) =>
   new RedisStore({
     prefix: `rl:${prefix}:`,
     // ioredis exposes arbitrary commands via .call(command, ...args)
-    sendCommand: (...args: string[]) => (cacheClient as any).call(...args) as Promise<any>,
+    sendCommand: ((...args: string[]) =>
+      cacheClient.call(args[0]!, ...args.slice(1))) as SendCommandFn,
   });
 
 const apiLimiter = rateLimit({
