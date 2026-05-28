@@ -43,7 +43,7 @@
     "format:check": "prettier --check src",
     "clean": "rimraf dist",
     "prebuild": "pnpm clean && pnpm typecheck",
-    "prepare": "cd .. && git config core.hooksPath .husky"
+    "prepare": "cd .. && git config core.hooksPath .husky || true"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": "prettier --write"
