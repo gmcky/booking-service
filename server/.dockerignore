@@ -74,9 +74,6 @@ temp
 # Optional eslint cache
 .eslintcache
 
-# Prisma (migrations are applied separately)
-prisma/migrations
-
 # Development tools
 .prettierrc
 .prettierignore
