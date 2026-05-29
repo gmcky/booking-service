@@ -8,16 +8,43 @@ import {
 } from "@prisma/client";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
+import crypto from "node:crypto";
 import { prisma } from "../src/shared/lib/prisma.js";
 
-const users = [
+// Public demo account: intentionally shareable. Has no properties or bookings,
+// so a logged-in visitor can only create their own data and cannot destroy
+// seeded content used by other reviewers.
+const PUBLIC_DEMO_PASSWORD = "demo1234";
+
+type SeededUser = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  role: Role;
+  // Source of truth for the password:
+  //   "public"   — fixed credential exposed in README.
+  //   envVar     — read from process.env[<envVar>]; if unset, a random one is
+  //                generated, logged once, and never persisted in plaintext.
+  passwordSource: { kind: "public"; value: string } | { kind: "env"; envVar: string };
+};
+
+const users: SeededUser[] = [
+  {
+    email: "demo@booking.dev",
+    firstName: "Demo",
+    lastName: "Visitor",
+    phoneNumber: "+380501110000",
+    role: Role.USER,
+    passwordSource: { kind: "public", value: PUBLIC_DEMO_PASSWORD },
+  },
   {
     email: "owner@demo.com",
     firstName: "Alex",
     lastName: "Kovalenko",
     phoneNumber: "+380501234567",
     role: Role.USER,
-    password: "Own3r_P@ss_2026!",
+    passwordSource: { kind: "env", envVar: "SEED_OWNER1_PASSWORD" },
   },
   {
     email: "owner2@demo.com",
@@ -25,7 +52,7 @@ const users = [
     lastName: "Sirko",
     phoneNumber: "+380509998877",
     role: Role.USER,
-    password: "0wn3r2_S3cr3t#",
+    passwordSource: { kind: "env", envVar: "SEED_OWNER2_PASSWORD" },
   },
   {
     email: "admin@demo.com",
@@ -33,7 +60,7 @@ const users = [
     lastName: "Shevchenko",
     phoneNumber: "+380631234567",
     role: Role.ADMIN,
-    password: "Adm1n_Mast3rK3y!",
+    passwordSource: { kind: "env", envVar: "SEED_ADMIN_PASSWORD" },
   },
   {
     email: "user@demo.com",
@@ -41,7 +68,7 @@ const users = [
     lastName: "Petrenko",
     phoneNumber: "+380671234567",
     role: Role.USER,
-    password: "Us3r_D3mo_456*",
+    passwordSource: { kind: "env", envVar: "SEED_USER1_PASSWORD" },
   },
   {
     email: "user2@demo.com",
@@ -49,7 +76,7 @@ const users = [
     lastName: "Melnyk",
     phoneNumber: "+380672345678",
     role: Role.USER,
-    password: "Us3r_D3mo_789*",
+    passwordSource: { kind: "env", envVar: "SEED_USER2_PASSWORD" },
   },
   {
     email: "user3@demo.com",
@@ -57,9 +84,25 @@ const users = [
     lastName: "Bondarenko",
     phoneNumber: "+380673456789",
     role: Role.USER,
-    password: "Us3r_D3mo_999*",
+    passwordSource: { kind: "env", envVar: "SEED_USER3_PASSWORD" },
   },
 ];
+
+function resolvePassword(
+  source: SeededUser["passwordSource"],
+  generated: Map<string, string>,
+): { value: string; origin: "public" | "env" | "generated" } {
+  if (source.kind === "public") {
+    return { value: source.value, origin: "public" };
+  }
+  const fromEnv = process.env[source.envVar];
+  if (fromEnv && fromEnv.length > 0) {
+    return { value: fromEnv, origin: "env" };
+  }
+  const random = crypto.randomBytes(18).toString("base64url");
+  generated.set(source.envVar, random);
+  return { value: random, origin: "generated" };
+}
 
 const propertyTemplates: Array<{
   title: string;
@@ -641,8 +684,17 @@ async function main() {
   console.log("🌱 Starting seed...");
 
   const createdUsers: Record<string, { id: string }> = {};
+  const generatedPasswords = new Map<string, string>();
+  const resolvedCreds: Array<{
+    email: string;
+    role: Role;
+    password: string;
+    origin: "public" | "env" | "generated";
+  }> = [];
+
   for (const user of users) {
-    const passwordHash = await bcrypt.hash(user.password, 12);
+    const resolved = resolvePassword(user.passwordSource, generatedPasswords);
+    const passwordHash = await bcrypt.hash(resolved.value, 12);
     const created = await prisma.user.upsert({
       where: { email: user.email },
       update: {},
@@ -656,7 +708,13 @@ async function main() {
       },
     });
     createdUsers[user.email] = { id: created.id };
-    console.log(`  ✅ User: ${user.email} (${user.role})`);
+    resolvedCreds.push({
+      email: user.email,
+      role: user.role,
+      password: resolved.value,
+      origin: resolved.origin,
+    });
+    console.log(`  ✅ User: ${user.email} (${user.role}) [pwd from ${resolved.origin}]`);
   }
 
   const owner1Id = createdUsers["owner@demo.com"]!.id;
@@ -975,8 +1033,23 @@ async function main() {
     );
   }
   console.log("\nTest credentials:");
-  for (const user of users) {
-    console.log(`  ${user.role.padEnd(5)} ${user.email}  /  ${user.password}`);
+  for (const cred of resolvedCreds) {
+    if (cred.origin === "public") {
+      console.log(`  ${cred.role.padEnd(5)} ${cred.email}  /  ${cred.password}  (public demo)`);
+    } else if (cred.origin === "env") {
+      console.log(`  ${cred.role.padEnd(5)} ${cred.email}  /  <from env>`);
+    } else {
+      console.log(`  ${cred.role.padEnd(5)} ${cred.email}  /  ${cred.password}  (GENERATED — save now)`);
+    }
+  }
+
+  if (generatedPasswords.size > 0) {
+    console.log(
+      "\n Random passwords were generated for these env vars. Copy them into your .env now — they will not be shown again:",
+    );
+    for (const [envVar, value] of generatedPasswords) {
+      console.log(`  ${envVar}=${value}`);
+    }
   }
 }
 
