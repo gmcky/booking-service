@@ -1,5 +1,4 @@
-import {
-  PrismaClient,
+import prismaClientPkg, {
   Role,
   PropertyType,
   Amenity,
@@ -7,11 +6,15 @@ import {
   PaymentStatus,
   PayoutStatus,
 } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 
-const prisma = new PrismaClient();
+const { PrismaClient } = prismaClientPkg;
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 // Public demo account: intentionally shareable. Has no properties or bookings,
 // so a logged-in visitor can only create their own data and cannot destroy
