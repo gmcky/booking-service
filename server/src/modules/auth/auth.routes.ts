@@ -49,6 +49,9 @@ authRouter.post("/register", validate(registerSchema), asyncHandler(authControll
  *             properties:
  *               email: { type: string, format: email }
  *               password: { type: string }
+ *             example:
+ *               email: demo@booking.dev
+ *               password: demo1234
  *     responses:
  *       200:
  *         description: Login successful
