@@ -1,4 +1,5 @@
 import {
+  PrismaClient,
   Role,
   PropertyType,
   Amenity,
@@ -9,7 +10,8 @@ import {
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
-import { prisma } from "../src/shared/lib/prisma.js";
+
+const prisma = new PrismaClient();
 
 // Public demo account: intentionally shareable. Has no properties or bookings,
 // so a logged-in visitor can only create their own data and cannot destroy
