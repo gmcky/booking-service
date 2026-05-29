@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <a href="#live-demo">Live demo</a> •
   <a href="#design-decisions">Design decisions</a> •
   <a href="#tech-stack">Stack</a> •
   <a href="#getting-started">Quick start</a> •
@@ -29,6 +30,29 @@
 
 Property rental API built as a portfolio project. Covers property listings, bookings with overlap prevention, Stripe payments with webhook idempotency, JWT rotation with reuse detection, and async email/image processing via BullMQ workers. Everything runs in Docker.
 
+## Live demo
+
+- **API base:** https://booking-api.gmcky.dev/api/v1
+- **Interactive docs (Swagger):** https://booking-api.gmcky.dev/api-docs
+- **Health check:** https://booking-api.gmcky.dev/health
+
+### Demo credentials
+
+| Role | Email | Password | Notes |
+|------|-------|----------|-------|
+| USER | `demo@booking.dev` | `demo1234` | Empty account — create your own properties and bookings here. |
+
+The database is seeded with ~20 properties across Kyiv, Lviv, Odesa and a few EU cities, plus ~9 bookings covering every status (pending, confirmed, refund-requested, cancelled, completed). Only the demo user above is public; the seeded host/admin accounts use private passwords.
+
+### Try it
+
+Everything below happens inside Swagger UI — no terminal required.
+
+1. Open the [interactive docs](https://booking-api.gmcky.dev/api-docs).
+2. Expand `POST /auth/login`. The demo credentials are pre-filled — click **Try it out → Execute** and copy the `accessToken` from the response.
+3. Click the **Authorize** button at the top of the page, paste the token, then close the dialog. Every protected endpoint is now unlocked.
+4. From there: browse properties, create a booking, leave a review, etc. Public endpoints like `GET /properties` work without logging in.
+
 ## Design decisions
 
 - **Double-booking prevention** — Serializable transaction isolation on booking creation ensures concurrent requests for the same dates resolve correctly.
@@ -36,6 +60,7 @@ Property rental API built as a portfolio project. Covers property listings, book
 - **Stripe payment flow** — PaymentIntent lifecycle, webhook signature verification, and idempotent event processing via a processed-events table.
 - **Background workers** — email, image resizing, payouts, and cleanup run as separate BullMQ processes with retry and exponential backoff.
 - **Brute-force protection** — failed login attempts tracked in Redis; account locks after 5 failures for 15 minutes.
+- **Error monitoring** — Sentry captures unhandled exceptions and 5xx responses in production with full stack traces, request context, and trace sampling for performance insights.
 
 ## Tech stack
 
@@ -52,6 +77,7 @@ Property rental API built as a portfolio project. Covers property listings, book
 | Storage | AWS S3 |
 | Email | Nodemailer via BullMQ worker |
 | Logging | Pino (structured JSON) |
+| Monitoring | Sentry (errors + performance) |
 | Testing | Vitest, Testcontainers, Supertest |
 | Infra | Docker, Docker Compose (dev + prod) |
 
