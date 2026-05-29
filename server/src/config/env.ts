@@ -63,6 +63,7 @@ export const env = cleanEnv(process.env, {
   // API Documentation
   SWAGGER_ENABLED: bool({ default: true }),
   API_VERSION: str({ default: "v1" }),
+  PUBLIC_URL: url({ default: "http://localhost:3000" }),
 
   // Sentry (optional — disabled if unset)
   SENTRY_DSN: str({ default: "" }),

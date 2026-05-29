@@ -19,8 +19,9 @@ export const swaggerOptions: Options = {
     },
     servers: [
       {
-        url: `http://localhost:${env.PORT}/api/${env.API_VERSION}`,
-        description: "Local development server",
+        url: `${env.PUBLIC_URL}/api/${env.API_VERSION}`,
+        description:
+          env.NODE_ENV === "production" ? "Production server" : "Local development server",
       },
     ],
     tags: [
@@ -83,5 +84,10 @@ export const swaggerOptions: Options = {
     ],
   },
   // Path to the API docs
-  apis: ["./src/modules/**/*.routes.ts", "./src/api.routes.ts"],
+  apis: [
+    "./src/modules/**/*.routes.ts",
+    "./src/api.routes.ts",
+    "./dist/modules/**/*.routes.js",
+    "./dist/api.routes.js",
+  ],
 };
