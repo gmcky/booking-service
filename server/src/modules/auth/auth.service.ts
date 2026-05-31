@@ -259,6 +259,7 @@ export class AuthService {
     let payload;
     try {
       const verification = await jwtVerify(refreshToken, REFRESH_SECRET, {
+        algorithms: ["HS256"],
         issuer: "booking-service",
         audience: "booking-api",
       });
@@ -348,6 +349,7 @@ export class AuthService {
     let payload;
     try {
       const verification = await jwtVerify(refreshToken, REFRESH_SECRET, {
+        algorithms: ["HS256"],
         issuer: "booking-service",
         audience: "booking-api",
       });
