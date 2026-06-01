@@ -1,2 +1,2 @@
 #!/bin/sh
-cd server && pnpm lint-staged
+cd server && pnpm lint-staged && pnpm typecheck

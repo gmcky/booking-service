@@ -5,7 +5,7 @@ import { stripe } from "../../shared/lib/stripe.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import type { CreateBookingInput, UpdateBookingDatesInput } from "./booking.types.js";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { BookingStatus } from "@prisma/client";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { calculateNights, formatDate } from "../../shared/utils/date.helpers.js";
@@ -113,7 +113,6 @@ export class BookingService {
     return booking;
   }
 
-  // TODO:   return public booking DTO.
   /**
    * Enforce policy guards and serialize overlap check + insert.
    */
@@ -149,32 +148,52 @@ export class BookingService {
     }
 
     // Serializable tx closes race window on concurrent bookings.
-    const booking = await prisma.$transaction(
-      async (tx) => {
-        const isAvailable = await this.checkAvailability(propertyId, checkIn, checkOut, tx);
+    const runCreateTx = () =>
+      prisma.$transaction(
+        async (tx) => {
+          const isAvailable = await this.checkAvailability(propertyId, checkIn, checkOut, tx);
 
-        if (!isAvailable) {
-          throw new AppError(409, "Property not available for selected dates");
+          if (!isAvailable) {
+            throw new AppError(409, "Property not available for selected dates");
+          }
+
+          const totalPrice = property.pricePerNight.mul(nights);
+
+          return tx.booking.create({
+            data: {
+              propertyId,
+              userId,
+              checkIn,
+              checkOut,
+              guests,
+              totalPrice,
+            },
+            include: {
+              property: { select: BOOKING_PROPERTY_SELECT },
+            },
+          });
+        },
+        { isolationLevel: "Serializable" },
+      );
+
+    // Loop always assigns booking or throws; ! suppresses the definite-assignment error.
+    let booking!: Awaited<ReturnType<typeof runCreateTx>>;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        booking = await runCreateTx();
+        break;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2034" &&
+          attempt < 3
+        ) {
+          await sleep(50 * attempt);
+          continue;
         }
-
-        const totalPrice = Number(property.pricePerNight) * nights;
-
-        return tx.booking.create({
-          data: {
-            propertyId,
-            userId,
-            checkIn,
-            checkOut,
-            guests,
-            totalPrice,
-          },
-          include: {
-            property: { select: BOOKING_PROPERTY_SELECT },
-          },
-        });
-      },
-      { isolationLevel: "Serializable" },
-    );
+        throw err;
+      }
+    }
 
     // Async enqueue for predictable API latency.
     this.enqueueBookingCreatedEmails(booking, userId).catch((err) =>
@@ -275,7 +294,6 @@ export class BookingService {
     return updated;
   }
 
-  // TODO:   execute Stripe refund via PaymentService.
   /**
    * Unified cancellation path with idempotency and refund-policy snapshot.
    */
@@ -602,7 +620,7 @@ export class BookingService {
           throw new AppError(409, "Property not available for selected dates");
         }
 
-        const totalPrice = Number(property.pricePerNight) * nights;
+        const totalPrice = property.pricePerNight.mul(nights);
 
         return tx.booking.update({
           where: { id },
