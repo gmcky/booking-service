@@ -23,7 +23,8 @@
   <a href="#project-structure">Structure</a> •
   <a href="#api-documentation--testing">API docs</a> •
   <a href="#testing">Testing</a> •
-  <a href="#cicd">CI/CD</a>
+  <a href="#cicd">CI/CD</a> •
+  <a href="#known-limitations">Limitations</a>
 </p>
 
 ---
@@ -189,6 +190,17 @@ Copy `.env.example` to `.env`. Key variables:
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe API
 - `SMTP_*` — email sending
 - `S3_BUCKET`, `AWS_REGION` — image storage
+
+## Known limitations
+
+These are deliberate scope decisions for a portfolio project, not oversights.
+
+- **No email verification** — accounts are active immediately on registration.
+- **No password reset** — no forgot-password flow; users can change their password only while logged in.
+- **No host KYC** — any registered user can list a property.
+- **Partial refunds** — `charge.refunded` webhooks only flip payment status to `REFUNDED` on a full refund. A partial refund issued from the Stripe dashboard is logged but leaves the booking status unchanged until the full amount is returned.
+- **Login lockout is per-email, not per-IP** — a distributed brute-force attack across IPs is not blocked.
+- **Pagination is offset-based** — consistent ordering isn't guaranteed under concurrent inserts on high-traffic listings.
 
 ## License
 
