@@ -12,24 +12,55 @@ export const authRouter: IRouter = Router();
  *   post:
  *     tags: [Auth]
  *     summary: Register a new user
+ *     description: |
+ *       Creates a new account. Passwords are scored with zxcvbn; anything
+ *       below score 3 (common, short, predictable) is rejected even if it
+ *       meets the 8-character minimum. `phoneNumber` is optional, but when
+ *       supplied it must be a valid international number parseable by
+ *       libphonenumber-js — typically E.164 with a leading `+` and country
+ *       code. Reserved test ranges (e.g. US `555-01xx`) are rejected.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, password, firstName, lastName, phoneNumber]
+ *             required: [email, password, firstName, lastName]
  *             properties:
- *               email: { type: string, format: email }
- *               password: { type: string, minLength: 8 }
- *               firstName: { type: string }
- *               lastName: { type: string }
- *               phoneNumber: { type: string }
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Lowercased and trimmed server-side.
+ *                 example: jane.doe@example.com
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 maxLength: 128
+ *                 description: Must pass zxcvbn strength check (score ≥ 3). Avoid common words, keyboard patterns, and personal info.
+ *                 example: Tr0ub4dor&3-Purge!
+ *               firstName:
+ *                 type: string
+ *                 minLength: 1
+ *                 example: Jane
+ *               lastName:
+ *                 type: string
+ *                 minLength: 1
+ *                 example: Doe
+ *               phoneNumber:
+ *                 type: string
+ *                 minLength: 10
+ *                 maxLength: 20
+ *                 description: Optional. International format (E.164 recommended). Validated with libphonenumber-js.
+ *                 example: "+14155552671"
  *     responses:
  *       201:
  *         description: User registered successfully
  *       400:
- *         description: Validation error
+ *         description: Validation error (weak password, invalid phone, malformed email, etc.)
+ *       409:
+ *         description: Registration conflict (typically email already in use; deliberately generic to avoid account enumeration)
+ *       429:
+ *         description: Too many registration attempts (rate limited)
  */
 authRouter.post("/register", validate(registerSchema), asyncHandler(authController.register));
 
