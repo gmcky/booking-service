@@ -67,4 +67,8 @@ export const env = cleanEnv(process.env, {
 
   // Sentry (optional — disabled if unset)
   SENTRY_DSN: str({ default: "" }),
+
+  // Demo cleanup cron — flip to false + restart workers to drop the schedule.
+  DEMO_CLEANUP_ENABLED: bool({ default: false }),
+  DEMO_CLEANUP_CRON: str({ default: "0 3 * * *" }),
 });
