@@ -1,11 +1,16 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "../lib/redis.js";
 
-export type CleanupJobName = "unlink-property-images";
+export type CleanupJobName = "unlink-property-images" | "purge-demo-data";
 
-export interface CleanupJobData {
+export interface UnlinkPropertyImagesJobData {
   paths: string[];
 }
+
+// Empty payload — handler reads PROTECTED_USER_IDS and live DB state.
+export type PurgeDemoDataJobData = Record<string, never>;
+
+export type CleanupJobData = UnlinkPropertyImagesJobData | PurgeDemoDataJobData;
 
 export const cleanupQueue = new Queue<CleanupJobData, void, CleanupJobName>("cleanup", {
   connection: redisConnection,

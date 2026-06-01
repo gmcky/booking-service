@@ -1,13 +1,9 @@
 /**
- * Cleanup Worker
- *
- * Runs as a separate process: `pnpm worker:cleanup`
- * Picks up jobs from the "cleanup" BullMQ queue and removes files from the
- * local filesystem (e.g. uploaded images that are no longer referenced).
- *
- * Error strategy:
- *   ENOENT  → file already gone; log a warning and treat as success.
- *   anything else (EACCES, EBUSY, …) → rethrow so BullMQ retries with backoff.
+ * Cleanup worker. Run via `pnpm worker:cleanup`.
+ * Handles two queue jobs:
+ *   - unlink-property-images: orphan upload files.
+ *   - purge-demo-data: gated by DEMO_CLEANUP_ENABLED. Demo user row stays,
+ *     data wiped; all other non-origin users get hard-deleted.
  */
 import "../instrument.js";
 import { Worker, type Job } from "bullmq";
@@ -15,30 +11,34 @@ import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { redisConnection } from "../shared/lib/redis.js";
 import { logger } from "../shared/lib/logger.js";
-import type { CleanupJobData, CleanupJobName } from "../shared/queues/cleanup.queue.js";
+import { prisma } from "../shared/lib/prisma.js";
+import { env } from "../config/env.js";
+import {
+  cleanupQueue,
+  type CleanupJobData,
+  type CleanupJobName,
+  type UnlinkPropertyImagesJobData,
+} from "../shared/queues/cleanup.queue.js";
+import {
+  PROTECTED_USER_IDS,
+  DEMO_USER_ID,
+  DEMO_CLEANUP_REPEATABLE_JOB_ID,
+} from "../shared/constants/demo-cleanup.js";
 
 // ---------------------------------------------------------------------------
-// Security: Path Traversal guard
+// Path traversal guard
 // ---------------------------------------------------------------------------
 
-/** Absolute path to the only directory the worker is allowed to delete from. */
 const UPLOADS_ROOT = resolve(process.cwd(), "uploads");
 
-/**
- * Resolves `relativePath` against CWD and verifies the result sits strictly
- * inside UPLOADS_ROOT.  Throws if the resolved path escapes the boundary
- * (e.g. `../../etc/passwd`, absolute paths, null-byte injections).
- */
 function safeResolve(relativePath: string): string {
-  // Null-byte injection guard — Node's fs rejects them, but we reject early.
   if (relativePath.includes("\0")) {
     throw new Error(`Null byte in path: ${relativePath}`);
   }
 
   const absolute = resolve(process.cwd(), relativePath);
 
-  // Ensure the resolved path starts with UPLOADS_ROOT + separator so that a
-  // directory named "uploadsfoo" doesn't pass the check.
+  // Trailing-sep check rejects sibling dirs like "uploadsfoo" that share the prefix.
   if (!absolute.startsWith(UPLOADS_ROOT + sep) && absolute !== UPLOADS_ROOT) {
     throw new Error(
       `Path traversal attempt blocked: "${relativePath}" resolves to "${absolute}" which is outside "${UPLOADS_ROOT}"`,
@@ -49,15 +49,12 @@ function safeResolve(relativePath: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Handlers per job name
+// unlink-property-images
 // ---------------------------------------------------------------------------
 
 async function unlinkPropertyImages(paths: string[]): Promise<void> {
   const results = await Promise.allSettled(
-    paths.map((relativePath) => {
-      const absolutePath = safeResolve(relativePath);
-      return unlink(absolutePath);
-    }),
+    paths.map((relativePath) => unlink(safeResolve(relativePath))),
   );
 
   const failures: unknown[] = [];
@@ -67,7 +64,7 @@ async function unlinkPropertyImages(paths: string[]): Promise<void> {
 
     const err = result.reason as NodeJS.ErrnoException;
 
-    // Path traversal or null-byte: poisoned job data — do not retry.
+    // No errno = path-traversal/null-byte reject. Poison pill, don't retry.
     if (!err.code) {
       logger.error({ path: paths[i], error: err }, "Unsafe path rejected — discarding job");
       throw err;
@@ -83,8 +80,95 @@ async function unlinkPropertyImages(paths: string[]): Promise<void> {
   });
 
   if (failures.length > 0) {
-    throw failures[0]; // Trigger BullMQ backoff + retry for the whole job.
+    throw failures[0];
   }
+}
+
+// ---------------------------------------------------------------------------
+// purge-demo-data
+// ---------------------------------------------------------------------------
+
+interface PurgeStats {
+  hostReplies: number;
+  reviews: number;
+  reviewReports: number;
+  bookings: number;
+  properties: number;
+  userDeleted: 0 | 1;
+}
+
+async function purgeUserData(userId: string, deleteRow: boolean): Promise<PurgeStats> {
+  return prisma.$transaction(async (tx) => {
+    // Order matters: nullable/no-cascade FKs to User cleared first, then the
+    // big cascades (bookings → payment+review, properties → all) fire.
+    const hostReplies = await tx.review.updateMany({
+      where: { hostReplyById: userId },
+      data: { hostReplyById: null },
+    });
+    const reviewReports = await tx.reviewReport.deleteMany({ where: { reporterId: userId } });
+    const reviews = await tx.review.deleteMany({ where: { userId } });
+    const bookings = await tx.booking.deleteMany({ where: { userId } });
+    const properties = await tx.property.deleteMany({ where: { ownerId: userId } });
+
+    let userDeleted: 0 | 1 = 0;
+    if (deleteRow) {
+      await tx.user.delete({ where: { id: userId } });
+      userDeleted = 1;
+    }
+
+    return {
+      hostReplies: hostReplies.count,
+      reviews: reviews.count,
+      reviewReports: reviewReports.count,
+      bookings: bookings.count,
+      properties: properties.count,
+      userDeleted,
+    };
+  });
+}
+
+async function purgeDemoData(): Promise<void> {
+  // Defense in depth: even if a stale repeatable job fires, env flag short-circuits.
+  if (!env.DEMO_CLEANUP_ENABLED) {
+    logger.warn("purge-demo-data fired but DEMO_CLEANUP_ENABLED=false — skipping");
+    return;
+  }
+
+  const targets = await prisma.user.findMany({
+    where: { id: { notIn: [...PROTECTED_USER_IDS] } },
+    select: { id: true, email: true },
+  });
+
+  const totals = {
+    hostReplies: 0,
+    reviews: 0,
+    reviewReports: 0,
+    bookings: 0,
+    properties: 0,
+    usersDeleted: 0,
+  };
+
+  for (const user of targets) {
+    const isDemo = user.id === DEMO_USER_ID;
+    try {
+      const stats = await purgeUserData(user.id, !isDemo);
+      totals.hostReplies += stats.hostReplies;
+      totals.reviews += stats.reviews;
+      totals.reviewReports += stats.reviewReports;
+      totals.bookings += stats.bookings;
+      totals.properties += stats.properties;
+      totals.usersDeleted += stats.userDeleted;
+      logger.info({ userId: user.id, email: user.email, isDemo, stats }, "Purged user data");
+    } catch (err) {
+      // Per-user tx isolated — one bad row shouldn't abort the whole pass.
+      logger.error(
+        { userId: user.id, email: user.email, err },
+        "Failed to purge user — continuing with remaining users",
+      );
+    }
+  }
+
+  logger.info({ scanned: targets.length, totals }, "Demo cleanup pass complete");
 }
 
 // ---------------------------------------------------------------------------
@@ -95,16 +179,56 @@ async function processCleanup(job: Job<CleanupJobData, void, CleanupJobName>): P
   logger.info({ jobId: job.id, name: job.name }, "Processing cleanup job");
 
   switch (job.name) {
-    case "unlink-property-images":
-      await unlinkPropertyImages(job.data.paths);
+    case "unlink-property-images": {
+      const data = job.data as UnlinkPropertyImagesJobData;
+      await unlinkPropertyImages(data.paths);
+      break;
+    }
+    case "purge-demo-data":
+      await purgeDemoData();
       break;
     default: {
-      // Exhaustiveness guard — TypeScript will warn if CleanupJobName is extended
-      // without a matching case.
       const _exhaustive: never = job.name;
       logger.warn({ name: _exhaustive }, "Unknown cleanup job name — skipping");
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Repeatable job lifecycle
+// ---------------------------------------------------------------------------
+
+// Idempotent on startup: reconciles the repeatable job with DEMO_CLEANUP_ENABLED.
+async function syncDemoCleanupSchedule(): Promise<void> {
+  const existing = await cleanupQueue.getRepeatableJobs();
+  const stale = existing.filter((j) => j.id === DEMO_CLEANUP_REPEATABLE_JOB_ID);
+
+  for (const job of stale) {
+    await cleanupQueue.removeRepeatableByKey(job.key);
+  }
+
+  if (!env.DEMO_CLEANUP_ENABLED) {
+    if (stale.length > 0) {
+      logger.info({ removed: stale.length }, "DEMO_CLEANUP_ENABLED=false — schedule removed");
+    } else {
+      logger.info("Demo cleanup disabled");
+    }
+    return;
+  }
+
+  await cleanupQueue.add(
+    "purge-demo-data",
+    {},
+    {
+      repeat: { pattern: env.DEMO_CLEANUP_CRON },
+      jobId: DEMO_CLEANUP_REPEATABLE_JOB_ID,
+    },
+  );
+
+  logger.info(
+    { cron: env.DEMO_CLEANUP_CRON, jobId: DEMO_CLEANUP_REPEATABLE_JOB_ID },
+    "Demo cleanup schedule registered",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -116,11 +240,13 @@ const worker = new Worker<CleanupJobData, void, CleanupJobName>("cleanup", proce
 });
 
 worker.on("completed", (job) => {
-  logger.info({ jobId: job.id, name: job.name, paths: job.data.paths }, "Cleanup job completed");
+  logger.info({ jobId: job.id, name: job.name }, "Cleanup job completed");
 });
 
 worker.on("failed", (job, error) => {
   logger.error({ jobId: job?.id, name: job?.name, error }, "Cleanup job failed");
 });
+
+await syncDemoCleanupSchedule();
 
 logger.info("Cleanup worker started");
