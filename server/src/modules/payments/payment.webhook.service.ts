@@ -1,4 +1,5 @@
 import { prisma } from "../../shared/lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
@@ -314,6 +315,20 @@ export class PaymentWebhookService {
       logger.info(
         { paymentId: payment.id, paymentIntentId, chargeId: charge?.id },
         "Skipping charge.refunded sync because payment is already refunded",
+      );
+      return;
+    }
+
+    const amountRefunded = new Prisma.Decimal(charge?.amount_refunded ?? 0).div(100);
+    if (amountRefunded.lt(payment.amount)) {
+      logger.info(
+        {
+          paymentId: payment.id,
+          paymentIntentId,
+          amountRefunded: amountRefunded.toFixed(2),
+          paymentAmount: payment.amount.toFixed(2),
+        },
+        "charge.refunded is a partial refund; leaving payment status unchanged",
       );
       return;
     }
