@@ -29,6 +29,10 @@ import {
 
 export const userRouter: IRouter = Router();
 
+// Whitelist raster formats only. Sharp can DoS on crafted SVG/XML, and
+// formats like AVIF/HEIC don't add value for a 512x512 avatar.
+const ALLOWED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -36,8 +40,8 @@ const avatarUpload = multer({
     files: 1,
   },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new AppError(400, "Only image files are allowed"));
+    if (!ALLOWED_AVATAR_MIME_TYPES.has(file.mimetype)) {
+      cb(new AppError(400, "Only JPEG, PNG, or WebP images are allowed"));
       return;
     }
 
