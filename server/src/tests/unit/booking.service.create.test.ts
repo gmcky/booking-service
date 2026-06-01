@@ -103,7 +103,8 @@ describe("BookingService.create", () => {
       }),
     );
 
-    const passedTotal: Prisma.Decimal = mockPrisma.booking.create.mock.calls[0][0].data.totalPrice;
+    const passedTotal = mockPrisma.booking.create.mock.calls[0]![0].data
+      .totalPrice as Prisma.Decimal;
     // 100.00 * 3 nights = 300.00
     expect(passedTotal.equals(new Prisma.Decimal("300.00"))).toBe(true);
   });
