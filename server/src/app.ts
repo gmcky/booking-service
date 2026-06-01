@@ -153,7 +153,12 @@ export function createApp(): Application {
   });
   app.use(express.urlencoded({ extended: true, limit: "25kb" }));
 
-  app.use(apiPrefix, apiLimiter);
+  // Stripe webhooks retry aggressively on incidents; exempting them from
+  // the IP-bucketed apiLimiter avoids dropping events during a backlog.
+  app.use(apiPrefix, (req, res, next) => {
+    if (req.path === "/payments/webhook") return next();
+    return apiLimiter(req, res, next);
+  });
   app.use(`${apiPrefix}/auth/register`, registerLimiter);
   app.use(`${apiPrefix}/auth/login`, loginLimiter);
   app.use(`${apiPrefix}/properties`, writeMethodLimiter);
