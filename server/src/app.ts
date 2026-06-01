@@ -66,6 +66,27 @@ const registerLimiter = rateLimit({
   message: { error: "Too many accounts created from this IP." },
 });
 
+/**
+ * Caps write traffic on resource modules (properties, bookings, reviews).
+ * The global apiLimiter (100/15m) covers reads, but a single IP creating
+ * 20 properties/hour is more than any real user; this keeps the demo DB
+ * from getting flooded between the daily cleanup runs.
+ */
+const writeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: redisStore("write"),
+  message: { error: "Too many write requests. Please try again later." },
+});
+
+const writeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const writeMethodLimiter: express.RequestHandler = (req, res, next) => {
+  if (!writeMethods.has(req.method)) return next();
+  return writeLimiter(req, res, next);
+};
+
 export function createApp(): Application {
   const app = express();
   const apiPrefix = `/api/${env.API_VERSION}`;
@@ -135,6 +156,9 @@ export function createApp(): Application {
   app.use(apiPrefix, apiLimiter);
   app.use(`${apiPrefix}/auth/register`, registerLimiter);
   app.use(`${apiPrefix}/auth/login`, loginLimiter);
+  app.use(`${apiPrefix}/properties`, writeMethodLimiter);
+  app.use(`${apiPrefix}/bookings`, writeMethodLimiter);
+  app.use(`${apiPrefix}/reviews`, writeMethodLimiter);
 
   const specs = swaggerJsdoc(swaggerOptions);
   app.get("/api-docs.json", (_req, res) => {
