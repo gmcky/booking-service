@@ -558,10 +558,6 @@ export class AuthService {
     return crypto.createHash("sha256").update(token).digest("hex");
   }
 
-  // TODO: implement password-reset flow methods.
-
-  // TODO: implement email-verification methods.
-
   // Fixed-window lockout key; TTL anchored to first failure (non-sliding window).
   private static lockoutKey(email: string): string {
     return `auth:lockout:${email}`;

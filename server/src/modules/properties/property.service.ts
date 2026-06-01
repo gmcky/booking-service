@@ -170,7 +170,6 @@ export class PropertyService {
     return property;
   }
 
-  // TODO:   add configurable listing moderation.
   /**
    * Persist listing and fan out async image/notification jobs.
    */

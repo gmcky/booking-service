@@ -89,8 +89,6 @@ export async function refreshToken(req: Request, res: Response) {
   res.json(responsePayload);
 }
 
-// TODO:   add password-reset and email-verification endpoints.
-
 function setRefreshTokenCookie(res: Response, token: string) {
   res.cookie(REFRESH_TOKEN_COOKIE_NAME, token, REFRESH_TOKEN_COOKIE_OPTIONS);
 }
