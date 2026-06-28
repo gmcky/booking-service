@@ -72,17 +72,37 @@ function buildQuery(query: PropertyQuery): string {
   return qs ? `?${qs}` : "";
 }
 
-async function get<T>(path: string): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = useAuthStore.getState().accessToken;
   const res = await fetch(`${BASE_URL}${path}`, {
+    method,
     credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
   });
-  const json = await res.json();
+  const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error((json as { message?: string }).message ?? "Request failed");
   }
   return json as T;
+}
+
+const get = <T>(path: string) => request<T>("GET", path);
+
+export type HostProperty = Omit<Property, "owner">;
+
+export interface CreatePropertyInput {
+  title: string;
+  description: string;
+  type: PropertyType;
+  city: string;
+  address: string;
+  pricePerNight: number;
+  maxGuests: number;
+  amenities: string[];
 }
 
 export const propertyApi = {
@@ -90,6 +110,16 @@ export const propertyApi = {
     get<Paginated<Property>>(`/properties${buildQuery(query)}`),
 
   byId: (id: string) => get<PropertyDetail>(`/properties/${id}`),
+
+  mine: () => get<Paginated<HostProperty>>("/properties/my"),
+
+  create: (input: CreatePropertyInput) =>
+    request<HostProperty>("POST", "/properties", { ...input, rawImagePaths: [] }),
+
+  setActive: (id: string, active: boolean) =>
+    request<HostProperty>("POST", `/properties/${id}/${active ? "activate" : "deactivate"}`),
+
+  remove: (id: string) => request<unknown>("DELETE", `/properties/${id}`),
 };
 
 export function formatPrice(value: string | number): string {
