@@ -4,7 +4,8 @@ import { create } from "zustand";
 
 export interface AuthUser {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: "USER" | "ADMIN";
   avatarUrl: string | null;

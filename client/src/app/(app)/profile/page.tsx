@@ -24,14 +24,8 @@ const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "payments", label: "Payments", icon: CreditCard },
 ];
 
-function splitName(name: string): { first: string; last: string } {
-  const parts = name.trim().split(/\s+/);
-  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
-}
-
-function initials(name: string): string {
-  const { first, last } = splitName(name);
-  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase() || "U";
+function initials(firstName: string, lastName: string): string {
+  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase() || "U";
 }
 
 export default function AccountPage() {
@@ -67,7 +61,11 @@ export default function AccountPage() {
 
           <div className="min-w-0 max-w-[640px]">
             {section === "profile" ? (
-              <ProfileSection name={user.name} email={user.email} />
+              <ProfileSection
+                firstNameInit={user.firstName}
+                lastNameInit={user.lastName}
+                email={user.email}
+              />
             ) : section === "security" ? (
               <SecuritySection />
             ) : (
@@ -89,11 +87,18 @@ export default function AccountPage() {
   );
 }
 
-function ProfileSection({ name, email }: { name: string; email: string }) {
+function ProfileSection({
+  firstNameInit,
+  lastNameInit,
+  email,
+}: {
+  firstNameInit: string;
+  lastNameInit: string;
+  email: string;
+}) {
   const router = useRouter();
-  const initial = splitName(name);
-  const [firstName, setFirstName] = React.useState(initial.first);
-  const [lastName, setLastName] = React.useState(initial.last);
+  const [firstName, setFirstName] = React.useState(firstNameInit);
+  const [lastName, setLastName] = React.useState(lastNameInit);
   const setAuth = useAuthStore((s) => s.setAuth);
   const clear = useAuthStore((s) => s.clear);
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -113,7 +118,7 @@ function ProfileSection({ name, email }: { name: string; email: string }) {
     mutationFn: () => userApi.updateProfile({ firstName, lastName }),
     onSuccess: () => {
       if (accessToken && user) {
-        setAuth(accessToken, { ...user, name: `${firstName} ${lastName}`.trim() });
+        setAuth(accessToken, { ...user, firstName, lastName });
       }
     },
     onError: (err) => toast.error((err as Error).message),
@@ -128,7 +133,7 @@ function ProfileSection({ name, email }: { name: string; email: string }) {
 
       <div className="mb-[22px] flex items-center gap-4 border-b border-border pb-[22px]">
         <Avatar className="size-16 text-lg">
-          <AvatarFallback>{initials(name)}</AvatarFallback>
+          <AvatarFallback>{initials(firstName, lastName)}</AvatarFallback>
         </Avatar>
       </div>
 

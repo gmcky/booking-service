@@ -4,7 +4,8 @@ import type { AuthUser } from "@/lib/auth/store";
 
 const mockUser: AuthUser = {
   id: "1",
-  name: "Test User",
+  firstName: "Test",
+  lastName: "User",
   email: "test@example.com",
   role: "USER",
   avatarUrl: null,
