@@ -40,8 +40,8 @@ const propertyImageUpload = multer({
  *     summary: Search properties with filters
  *     parameters:
  *       - { in: query, name: city, schema: { type: string } }
- *       - { in: query, name: type, schema: { type: string } }
- *       - { in: query, name: amenities, schema: { type: string }, description: 'CSV of amenity enums' }
+ *       - { in: query, name: type, schema: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] } }
+ *       - { in: query, name: amenities, schema: { type: string }, description: 'CSV of Amenity enum values' }
  *       - { in: query, name: minPrice, schema: { type: number } }
  *       - { in: query, name: maxPrice, schema: { type: number } }
  *       - { in: query, name: maxGuests, schema: { type: integer } }
@@ -51,7 +51,19 @@ const propertyImageUpload = multer({
  *       - { in: query, name: checkIn, schema: { type: string, format: date-time } }
  *       - { in: query, name: checkOut, schema: { type: string, format: date-time } }
  *     responses:
- *       200: { description: Paginated property list }
+ *       200:
+ *         description: Paginated property list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/PropertyWithOwner' }
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
  *       400: { $ref: '#/components/responses/ValidationError' }
  */
 propertyRouter.get(
@@ -68,7 +80,19 @@ propertyRouter.get(
  *     summary: List properties owned by current user
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: List of owned properties }
+ *       200:
+ *         description: List of owned properties
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Property' }
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 propertyRouter.get("/my", authenticate, asyncHandler(propertyController.getMyProperties));
@@ -82,7 +106,12 @@ propertyRouter.get("/my", authenticate, asyncHandler(propertyController.getMyPro
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Property detail }
+ *       200:
+ *         description: Property detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PropertyDetail'
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 propertyRouter.get("/:id", optionalAuth, asyncHandler(propertyController.getPropertyById));
@@ -108,7 +137,17 @@ propertyRouter.use(authenticate);
  *                 type: array
  *                 items: { type: string, format: binary }
  *     responses:
- *       201: { description: Raw image paths saved, ready for rawImagePaths on create/update }
+ *       201:
+ *         description: Raw image paths saved, ready for rawImagePaths on create/update
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 paths:
+ *                   type: array
+ *                   items: { type: string }
+ *               required: [paths]
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
@@ -135,15 +174,20 @@ propertyRouter.post(
  *             properties:
  *               title: { type: string, minLength: 5, maxLength: 200 }
  *               description: { type: string, minLength: 20 }
- *               type: { type: string }
+ *               type: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] }
  *               city: { type: string }
  *               address: { type: string }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
- *               amenities: { type: array, items: { type: string }, maxItems: 20 }
+ *               amenities: { type: array, items: { $ref: '#/components/schemas/Amenity' }, maxItems: 20 }
  *               rawImagePaths: { type: array, items: { type: string }, maxItems: 10 }
  *     responses:
- *       201: { description: Property created }
+ *       201:
+ *         description: Property created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PropertyWithOwner'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
@@ -171,15 +215,20 @@ propertyRouter.post(
  *             properties:
  *               title: { type: string }
  *               description: { type: string }
- *               type: { type: string }
+ *               type: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] }
  *               city: { type: string }
  *               address: { type: string }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
- *               amenities: { type: array, items: { type: string } }
+ *               amenities: { type: array, items: { $ref: '#/components/schemas/Amenity' } }
  *               images: { type: array, items: { type: string, format: uri } }
  *     responses:
- *       200: { description: Property updated }
+ *       200:
+ *         description: Property updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Property'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -217,7 +266,12 @@ propertyRouter.delete("/:id", asyncHandler(propertyController.deleteProperty));
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Property activated }
+ *       200:
+ *         description: Property activated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Property'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -234,7 +288,12 @@ propertyRouter.post("/:id/activate", asyncHandler(propertyController.activatePro
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Property deactivated }
+ *       200:
+ *         description: Property deactivated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Property'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }

@@ -55,6 +55,10 @@ export const authRouter: IRouter = Router();
  *     responses:
  *       201:
  *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
  *       400:
  *         description: Validation error (weak password, invalid phone, malformed email, etc.)
  *       409:
@@ -86,6 +90,10 @@ authRouter.post("/register", validate(registerSchema), asyncHandler(authControll
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
  *       401:
  *         description: Invalid credentials
  */
@@ -114,6 +122,13 @@ authRouter.post("/logout", asyncHandler(authController.logout));
  *     responses:
  *       200:
  *         description: Token refreshed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken: { type: string }
+ *               required: [accessToken]
  *       401:
  *         description: Refresh token missing or invalid
  */

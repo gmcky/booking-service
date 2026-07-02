@@ -1,49 +1,16 @@
-import { BASE_URL } from "./client";
-import { useAuthStore } from "@/lib/auth/store";
-import type { Paginated, PropertyType } from "./properties";
+import { apiClient } from "./client";
+import { unwrap } from "./unwrap";
+import { toISODateTime } from "@/lib/utils/dates";
+import type { components, paths } from "./schema";
+import type { Paginated } from "./properties";
 
-export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+export type BookingStatus = components["schemas"]["BookingStatus"];
+export type BookingListItem = components["schemas"]["BookingListItem"];
+export type BookingWithProperty = components["schemas"]["BookingWithProperty"];
+export type BookingDetail = components["schemas"]["BookingDetail"];
 
-export interface BookingListItem {
-  id: string;
-  propertyId: string;
-  checkIn: string;
-  checkOut: string;
-  totalPrice: string;
-  guests: number;
-  status: BookingStatus;
-  createdAt: string;
-  property: { id: string; title: string; city: string; images: string[] };
-}
-
-export interface BookingDetail {
-  id: string;
-  propertyId: string;
-  userId: string;
-  checkIn: string;
-  checkOut: string;
-  totalPrice: string;
-  guests: number;
-  status: BookingStatus;
-  createdAt: string;
-  property: {
-    id: string;
-    title: string;
-    type: PropertyType;
-    city: string;
-    address: string;
-    images: string[];
-    pricePerNight: string;
-    averageRating: string | null;
-    reviewCount: number;
-  };
-  payment: {
-    id: string;
-    amount: string;
-    currency: string;
-    status: string;
-  } | null;
-}
+export type CancelBookingResult =
+  paths["/bookings/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
 export interface CreateBookingInput {
   propertyId: string;
@@ -52,44 +19,42 @@ export interface CreateBookingInput {
   guests: number;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    credentials: "include",
-    headers: {
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error((json as { message?: string }).message ?? "Request failed");
-  }
-  return json as T;
-}
-
-/** Backend expects ISO datetime; query params carry date-only strings. */
-function toISODateTime(date: string): string {
-  return new Date(`${date}T00:00:00.000Z`).toISOString();
-}
-
 export const bookingApi = {
-  list: () => request<Paginated<BookingListItem>>("GET", "/bookings"),
+  list: async (): Promise<Paginated<BookingListItem>> => {
+    const { data, error, response } = await apiClient.GET("/bookings");
+    return unwrap({ data, error, response });
+  },
 
-  byId: (id: string) => request<BookingDetail>("GET", `/bookings/${id}`),
+  byId: async (id: string): Promise<BookingDetail> => {
+    const { data, error, response } = await apiClient.GET("/bookings/{id}", {
+      params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
 
-  create: (input: CreateBookingInput) =>
-    request<BookingDetail>("POST", "/bookings", {
-      propertyId: input.propertyId,
-      checkIn: toISODateTime(input.checkIn),
-      checkOut: toISODateTime(input.checkOut),
-      guests: input.guests,
-    }),
+  create: async (input: CreateBookingInput): Promise<BookingWithProperty> => {
+    const { data, error, response } = await apiClient.POST("/bookings", {
+      body: {
+        propertyId: input.propertyId,
+        checkIn: toISODateTime(input.checkIn),
+        checkOut: toISODateTime(input.checkOut),
+        guests: input.guests,
+      },
+    });
+    return unwrap({ data, error, response });
+  },
 
-  createPaymentIntent: (bookingId: string) =>
-    request<{ clientSecret: string }>("POST", "/payments/intent", { bookingId }),
+  createPaymentIntent: async (bookingId: string): Promise<{ clientSecret: string }> => {
+    const { data, error, response } = await apiClient.POST("/payments/intent", {
+      body: { bookingId },
+    });
+    return unwrap({ data, error, response });
+  },
 
-  cancel: (id: string) => request<unknown>("DELETE", `/bookings/${id}`),
+  cancel: async (id: string): Promise<CancelBookingResult> => {
+    const { data, error, response } = await apiClient.DELETE("/bookings/{id}", {
+      params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
 };

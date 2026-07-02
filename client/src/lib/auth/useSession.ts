@@ -19,7 +19,7 @@ export function useSession() {
           setStatus("anon");
           return;
         }
-        const user = await endpoints.me(result.accessToken);
+        const user = await endpoints.me();
         setAuth(result.accessToken, user);
       })
       .catch(() => setStatus("anon"));

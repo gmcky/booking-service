@@ -27,7 +27,19 @@ export const reviewRouter: IRouter = Router();
  *       - { in: query, name: rating, schema: { type: integer, minimum: 1, maximum: 5 } }
  *       - { in: query, name: hasHostReply, schema: { type: boolean } }
  *     responses:
- *       200: { description: Paginated review list }
+ *       200:
+ *         description: Paginated review list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Review' }
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 reviewRouter.get(
@@ -45,7 +57,12 @@ reviewRouter.get(
  *     parameters:
  *       - { in: path, name: propertyId, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Average rating + distribution }
+ *       200:
+ *         description: Average rating + distribution
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ReviewStats'
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 reviewRouter.get(
@@ -74,7 +91,12 @@ reviewRouter.use(authenticate);
  *               rating: { type: integer, minimum: 1, maximum: 5 }
  *               comment: { type: string, minLength: 10, maxLength: 1000 }
  *     responses:
- *       201: { description: Review created }
+ *       201:
+ *         description: Review created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Review'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
@@ -100,7 +122,12 @@ reviewRouter.post("/", validate(createReviewSchema), asyncHandler(reviewControll
  *               rating: { type: integer, minimum: 1, maximum: 5 }
  *               comment: { type: string, minLength: 10, maxLength: 1000 }
  *     responses:
- *       200: { description: Review updated }
+ *       200:
+ *         description: Review updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Review'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -130,7 +157,12 @@ reviewRouter.patch(
  *             properties:
  *               text: { type: string, minLength: 1, maxLength: 2000 }
  *     responses:
- *       200: { description: Reply saved }
+ *       200:
+ *         description: Reply saved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Review'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -160,7 +192,21 @@ reviewRouter.patch(
  *             properties:
  *               reason: { type: string, minLength: 10, maxLength: 1000 }
  *     responses:
- *       201: { description: Report submitted }
+ *       201:
+ *         description: Report submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 reviewId: { type: string }
+ *                 reporterId: { type: string }
+ *                 reason: { type: string }
+ *                 status: { $ref: '#/components/schemas/ReviewReportStatus' }
+ *                 createdAt: { type: string, format: date-time }
+ *                 updatedAt: { type: string, format: date-time }
+ *               required: [id, reviewId, reporterId, reason, status, createdAt, updatedAt]
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       404: { $ref: '#/components/responses/NotFound' }
