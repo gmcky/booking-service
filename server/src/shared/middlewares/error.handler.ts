@@ -28,8 +28,9 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
 
   if (err instanceof MulterError) {
     logger.warn({ code: err.code }, "Multer error");
-    const message =
-      err.code === "LIMIT_FILE_SIZE" ? "File is too large. Maximum size is 2MB." : err.message;
+    // Size limits differ per route (2MB avatars, 5MB property images) —
+    // don't bake a number into the message.
+    const message = err.code === "LIMIT_FILE_SIZE" ? "File is too large." : err.message;
     return res.status(400).json({ error: message });
   }
 

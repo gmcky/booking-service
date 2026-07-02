@@ -41,10 +41,12 @@ vi.mock("../../modules/users/user.stats.cache.js", () => ({
 }));
 
 import { mkdir, writeFile } from "node:fs/promises";
+import { cleanupQueue } from "../../shared/queues/cleanup.queue.js";
 import { PropertyService } from "../../modules/properties/property.service.js";
 
 const mockMkdir = mkdir as unknown as ReturnType<typeof vi.fn>;
 const mockWriteFile = writeFile as unknown as ReturnType<typeof vi.fn>;
+const mockCleanupAdd = cleanupQueue.add as unknown as ReturnType<typeof vi.fn>;
 
 function makeFile(originalname: string, buffer = Buffer.from("data")): Express.Multer.File {
   return {
@@ -74,13 +76,26 @@ describe("PropertyService.saveRawImages", () => {
     }
   });
 
-  it("returns relative paths matching uploads/properties/temp/<userId>-<uuid>", async () => {
+  it("returns relative paths matching uploads/property-temp/<userId>-<uuid>", async () => {
     const files = [makeFile("a.jpg")];
 
     const paths = await PropertyService.saveRawImages("user-42", files);
 
     expect(paths).toHaveLength(1);
-    expect(paths[0]).toBe("uploads/properties/temp/user-42-11111111-1111-1111-1111-111111111111");
+    expect(paths[0]).toBe("uploads/property-temp/user-42-11111111-1111-1111-1111-111111111111");
+  });
+
+  it("schedules a delayed orphan-cleanup job for the written paths", async () => {
+    const files = [makeFile("a.jpg")];
+
+    const paths = await PropertyService.saveRawImages("user-1", files);
+
+    expect(mockCleanupAdd).toHaveBeenCalledTimes(1);
+    expect(mockCleanupAdd).toHaveBeenCalledWith(
+      "unlink-property-images",
+      { paths },
+      { delay: 24 * 60 * 60 * 1000 },
+    );
   });
 
   it("passes each file's buffer to writeFile", async () => {
@@ -100,5 +115,51 @@ describe("PropertyService.saveRawImages", () => {
     expect(paths).toEqual([]);
     expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockMkdir).not.toHaveBeenCalled();
+    expect(mockCleanupAdd).not.toHaveBeenCalled();
+  });
+});
+
+describe("PropertyService.create rawImagePaths ownership guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function makeCreateInput(rawImagePaths: string[]) {
+    return {
+      title: "Test listing title",
+      description: "A description long enough to pass validation checks",
+      type: "APARTMENT",
+      city: "Kyiv",
+      address: "1 Test Street",
+      pricePerNight: 100,
+      maxGuests: 2,
+      amenities: [],
+      rawImagePaths,
+      ownerId: "owner-1",
+    };
+  }
+
+  it("rejects paths not owned by the caller with 400", async () => {
+    const { prisma } = await import("../../shared/lib/prisma.js");
+
+    await expect(
+      PropertyService.create(
+        makeCreateInput(["uploads/property-temp/other-user-some-uuid"]) as never,
+      ),
+    ).rejects.toMatchObject({ statusCode: 400, message: "Invalid image path" });
+
+    expect(prisma.property.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects processed-image paths outside the temp prefix", async () => {
+    const { prisma } = await import("../../shared/lib/prisma.js");
+
+    await expect(
+      PropertyService.create(
+        makeCreateInput(["uploads/properties/existing-prop/image.webp"]) as never,
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(prisma.property.create).not.toHaveBeenCalled();
   });
 });
