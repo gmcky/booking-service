@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { authenticate, optionalAuth } from "../../shared/middlewares/auth.js";
+import { AppError } from "../../shared/middlewares/error.handler.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as propertyController from "./property.controller.js";
@@ -10,6 +12,25 @@ import {
 } from "./property.validators.js";
 
 export const propertyRouter: IRouter = Router();
+
+// Whitelist raster formats only, mirroring the avatar upload guard.
+const ALLOWED_PROPERTY_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+const propertyImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 10,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_PROPERTY_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      cb(new AppError(400, "Only JPEG, PNG, or WebP images are allowed"));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
 
 /**
  * @openapi
@@ -67,6 +88,35 @@ propertyRouter.get("/my", authenticate, asyncHandler(propertyController.getMyPro
 propertyRouter.get("/:id", optionalAuth, asyncHandler(propertyController.getPropertyById));
 
 propertyRouter.use(authenticate);
+
+/**
+ * @openapi
+ * /properties/images:
+ *   post:
+ *     tags: [Properties]
+ *     summary: Upload raw property image files (owner only, pre-create)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [images]
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 items: { type: string, format: binary }
+ *     responses:
+ *       201: { description: Raw image paths saved, ready for rawImagePaths on create/update }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+propertyRouter.post(
+  "/images",
+  propertyImageUpload.array("images", 10),
+  asyncHandler(propertyController.uploadPropertyImages),
+);
 
 /**
  * @openapi

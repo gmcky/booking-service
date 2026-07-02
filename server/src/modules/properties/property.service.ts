@@ -2,10 +2,14 @@ import { prisma } from "../../shared/lib/prisma.js";
 import prismaClientPkg from "@prisma/client";
 const { BookingStatus } = prismaClientPkg;
 import { AppError } from "../../shared/middlewares/error.handler.js";
+import { logger } from "../../shared/lib/logger.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import { imageQueue } from "../../shared/queues/image.queue.js";
+import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve, dirname } from "node:path";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { cleanupQueue, type CleanupJobName } from "../../shared/queues/cleanup.queue.js";
 import {
@@ -27,6 +31,11 @@ type PropertyViewer = {
   id: string;
   role: string;
 };
+
+// Outside uploads/properties so express.static never serves raw uploads.
+const RAW_UPLOAD_PREFIX = "uploads/property-temp/";
+// Orphaned raw uploads are reaped after this window.
+const RAW_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 
 export class PropertyService {
   /**
@@ -171,10 +180,44 @@ export class PropertyService {
   }
 
   /**
+   * Writes raw multipart uploads to disk; returns relative paths for
+   * rawImagePaths on create/update. Files land outside the statically
+   * served uploads/properties tree — raw bytes are never public.
+   */
+  static async saveRawImages(userId: string, files: Express.Multer.File[]): Promise<string[]> {
+    const paths: string[] = [];
+
+    for (const file of files) {
+      const relPath = `${RAW_UPLOAD_PREFIX}${userId}-${randomUUID()}`;
+      const absPath = resolve(process.cwd(), relPath);
+      await mkdir(dirname(absPath), { recursive: true });
+      await writeFile(absPath, file.buffer);
+      paths.push(relPath);
+    }
+
+    // Orphan reaper: if these are never attached to a property the delayed
+    // job unlinks them; already-processed files are ENOENT no-ops.
+    if (paths.length > 0) {
+      await cleanupQueue.add("unlink-property-images", { paths }, { delay: RAW_UPLOAD_TTL_MS });
+    }
+
+    logger.info({ userId, count: paths.length }, "Raw property images saved");
+
+    return paths;
+  }
+
+  /**
    * Persist listing and fan out async image/notification jobs.
    */
   static async create(data: CreatePropertyInput) {
     const { rawImagePaths, ...propertyData } = data;
+
+    // rawImagePaths may only reference the caller's own uploads — the worker
+    // guards against escaping uploads/, not against cross-tenant reuse.
+    const ownedPrefix = `${RAW_UPLOAD_PREFIX}${data.ownerId}-`;
+    if (rawImagePaths.some((p) => !p.startsWith(ownedPrefix))) {
+      throw new AppError(400, "Invalid image path");
+    }
 
     const property = await prisma.property.create({
       data: {
