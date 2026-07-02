@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { propertyApi } from "@/lib/api/properties";
 import { bookingApi } from "@/lib/api/bookings";
 import { formatPrice } from "@/lib/utils/money";
-import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { nightsBetween, formatRange } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -265,7 +265,7 @@ function CheckoutInner() {
                   {property?.images[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={property.images[0]}
+                      src={photoUrl(property.images[0])}
                       alt={property.title}
                       className="size-full rounded-lg object-cover"
                     />

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { propertyApi, type HostProperty } from "@/lib/api/properties";
 import { formatPrice } from "@/lib/utils/money";
-import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { queryKeys } from "@/lib/query/keys";
 import {
   AlertDialog,
@@ -129,7 +129,7 @@ function ListingCard({
       >
         {property.images[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={property.images[0]} alt={property.title} className="size-full object-cover" />
+          <img src={photoUrl(property.images[0])} alt={property.title} className="size-full object-cover" />
         ) : (
           <span className="font-mono text-[11px] text-muted-foreground">no photo</span>
         )}
