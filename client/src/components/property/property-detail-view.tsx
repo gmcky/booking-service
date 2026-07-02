@@ -31,7 +31,11 @@ function nightsBetween(checkIn?: Date, checkOut?: Date): number {
 }
 
 function toISODate(date?: Date): string | undefined {
-  return date ? date.toISOString().slice(0, 10) : undefined;
+  return date
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate(),
+      ).padStart(2, "0")}`
+    : undefined;
 }
 
 export function PropertyDetailView({ id }: { id: string }) {
@@ -256,11 +260,15 @@ function BookingCard({
       router.push("/login");
       return;
     }
+    const parsedGuests = Number(guests);
+    const effectiveGuests = Number.isFinite(parsedGuests)
+      ? Math.min(Math.max(Math.round(parsedGuests), 1), maxGuests)
+      : 1;
     const params = new URLSearchParams({
       propertyId,
       checkIn: toISODate(checkIn)!,
       checkOut: toISODate(checkOut)!,
-      guests: guests || "1",
+      guests: String(effectiveGuests),
     });
     router.push(`/checkout?${params.toString()}`);
   }
@@ -307,6 +315,14 @@ function BookingCard({
             max={maxGuests}
             value={guests}
             onChange={(e) => setGuests(e.target.value)}
+            onBlur={() => {
+              const n = Number(guests);
+              if (!Number.isFinite(n)) {
+                setGuests("1");
+                return;
+              }
+              setGuests(String(Math.min(Math.max(Math.round(n), 1), maxGuests)));
+            }}
           />
         </div>
       </div>

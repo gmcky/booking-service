@@ -122,8 +122,25 @@ export const propertyApi = {
   remove: (id: string) => request<unknown>("DELETE", `/properties/${id}`),
 };
 
+const wholePriceFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+const centPriceFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 export function formatPrice(value: string | number): string {
-  return `$${Math.round(Number(value)).toLocaleString("en-US")}`;
+  const amount = Number(value);
+  return Number.isInteger(amount)
+    ? wholePriceFormatter.format(amount)
+    : centPriceFormatter.format(amount);
 }
 
 export function formatRating(value: string | null): string | null {

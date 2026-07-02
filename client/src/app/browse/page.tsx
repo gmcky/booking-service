@@ -42,14 +42,20 @@ const SORTS: { value: PropertySort; label: string }[] = [
   { value: "price_desc", label: "Price: high to low" },
 ];
 
+function parseNumber(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function parseFilters(params: URLSearchParams): PropertyQuery {
   const amenities = params.get("amenities");
   return {
     city: params.get("city") ?? undefined,
     type: (params.get("type") as PropertyType | null) ?? undefined,
-    minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : undefined,
-    maxPrice: params.get("maxPrice") ? Number(params.get("maxPrice")) : undefined,
-    maxGuests: params.get("maxGuests") ? Number(params.get("maxGuests")) : undefined,
+    minPrice: parseNumber(params.get("minPrice")),
+    maxPrice: parseNumber(params.get("maxPrice")),
+    maxGuests: parseNumber(params.get("maxGuests")),
     amenities: amenities ? amenities.split(",") : undefined,
     sort: (params.get("sort") as PropertySort | null) ?? "newest",
     checkIn: params.get("checkIn") ?? undefined,

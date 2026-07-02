@@ -7,7 +7,11 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
 
 function toISODate(date?: Date): string | undefined {
-  return date ? date.toISOString().slice(0, 10) : undefined;
+  return date
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate(),
+      ).padStart(2, "0")}`
+    : undefined;
 }
 
 export function SearchBar() {

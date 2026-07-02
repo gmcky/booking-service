@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Lock,
@@ -74,13 +74,29 @@ function CheckoutInner() {
     enabled: Boolean(propertyId),
   });
 
+  const property = propertyQuery.data;
+
+  React.useEffect(() => {
+    if (!property) return;
+    setGuests((g) => Math.min(Math.max(g, 1), property.maxGuests));
+  }, [property]);
+
+  const queryClient = useQueryClient();
+
   const mutation = useMutation({
     mutationFn: async () => {
-      const booking = await bookingApi.create({ propertyId, checkIn, checkOut, guests });
+      const effectiveGuests = property ? Math.min(Math.max(guests, 1), property.maxGuests) : guests;
+      const booking = await bookingApi.create({
+        propertyId,
+        checkIn,
+        checkOut,
+        guests: effectiveGuests,
+      });
       await bookingApi.createPaymentIntent(booking.id).catch(() => null);
       return booking;
     },
     onSuccess: (booking) => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
       router.push(`/confirmation?bookingId=${booking.id}`);
     },
   });
@@ -96,7 +112,6 @@ function CheckoutInner() {
     );
   }
 
-  const property = propertyQuery.data;
   const nights = nightsBetween(checkIn, checkOut);
   const subtotal = property ? nights * Number(property.pricePerNight) : 0;
 
