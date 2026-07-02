@@ -1,51 +1,19 @@
-import { BASE_URL } from "./client";
-import { useAuthStore } from "@/lib/auth/store";
+import { apiClient } from "./client";
+import { unwrap, unwrapVoid } from "./unwrap";
+import type { components } from "./schema";
 
-export type PropertyType = "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
-
+export type PropertyType = components["schemas"]["PropertyType"];
+export type Amenity = components["schemas"]["Amenity"];
 export type PropertySort = "price_asc" | "price_desc" | "newest";
 
-export interface PropertyOwner {
-  id: string;
-  firstName: string;
-  lastName: string;
-}
-
-export interface Property {
-  id: string;
-  title: string;
-  description: string;
-  type: PropertyType;
-  city: string;
-  address: string;
-  pricePerNight: string;
-  maxGuests: number;
-  amenities: string[];
-  images: string[];
-  ownerId: string;
-  isActive: boolean;
-  averageRating: string | null;
-  reviewCount: number;
-  createdAt: string;
-  updatedAt: string;
-  owner: PropertyOwner;
-}
-
-export interface PropertyReview {
-  id: string;
-  rating: number;
-  comment: string | null;
-  hostReplyText: string | null;
-  createdAt: string;
-  user: { firstName: string; lastName: string };
-  hostReplyBy: { firstName: string; lastName: string } | null;
-}
-
-export type PropertyDetail = Property & { reviews: PropertyReview[] };
+export type Property = components["schemas"]["PropertyWithOwner"];
+export type PropertyDetail = components["schemas"]["PropertyDetail"];
+export type PropertyReview = components["schemas"]["PropertyReview"];
+export type HostProperty = components["schemas"]["Property"];
 
 export interface Paginated<T> {
   data: T[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
+  pagination: components["schemas"]["Pagination"];
 }
 
 export interface PropertyQuery {
@@ -62,38 +30,6 @@ export interface PropertyQuery {
   checkOut?: string;
 }
 
-function buildQuery(query: PropertyQuery): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null || value === "") continue;
-    params.set(key, Array.isArray(value) ? value.join(",") : String(value));
-  }
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
-}
-
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    credentials: "include",
-    headers: {
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error((json as { message?: string }).message ?? "Request failed");
-  }
-  return json as T;
-}
-
-const get = <T>(path: string) => request<T>("GET", path);
-
-export type HostProperty = Omit<Property, "owner">;
-
 export interface CreatePropertyInput {
   title: string;
   description: string;
@@ -106,60 +42,57 @@ export interface CreatePropertyInput {
 }
 
 export const propertyApi = {
-  search: (query: PropertyQuery = {}) =>
-    get<Paginated<Property>>(`/properties${buildQuery(query)}`),
+  search: async (query: PropertyQuery = {}): Promise<Paginated<Property>> => {
+    const { data, error, response } = await apiClient.GET("/properties", {
+      params: {
+        query: {
+          city: query.city,
+          type: query.type,
+          amenities: query.amenities?.length ? query.amenities.join(",") : undefined,
+          minPrice: query.minPrice,
+          maxPrice: query.maxPrice,
+          maxGuests: query.maxGuests,
+          sort: query.sort,
+          page: query.page,
+          limit: query.limit,
+          checkIn: query.checkIn,
+          checkOut: query.checkOut,
+        },
+      },
+    });
+    return unwrap({ data, error, response });
+  },
 
-  byId: (id: string) => get<PropertyDetail>(`/properties/${id}`),
+  byId: async (id: string): Promise<PropertyDetail> => {
+    const { data, error, response } = await apiClient.GET("/properties/{id}", {
+      params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
 
-  mine: () => get<Paginated<HostProperty>>("/properties/my"),
+  mine: async (): Promise<Paginated<HostProperty>> => {
+    const { data, error, response } = await apiClient.GET("/properties/my");
+    return unwrap({ data, error, response });
+  },
 
-  create: (input: CreatePropertyInput) =>
-    request<HostProperty>("POST", "/properties", { ...input, rawImagePaths: [] }),
+  create: async (input: CreatePropertyInput): Promise<HostProperty> => {
+    const { data, error, response } = await apiClient.POST("/properties", {
+      body: { ...input, amenities: input.amenities as Amenity[], rawImagePaths: [] },
+    });
+    return unwrap({ data, error, response });
+  },
 
-  setActive: (id: string, active: boolean) =>
-    request<HostProperty>("POST", `/properties/${id}/${active ? "activate" : "deactivate"}`),
+  setActive: async (id: string, active: boolean): Promise<HostProperty> => {
+    const { data, error, response } = active
+      ? await apiClient.POST("/properties/{id}/activate", { params: { path: { id } } })
+      : await apiClient.POST("/properties/{id}/deactivate", { params: { path: { id } } });
+    return unwrap({ data, error, response });
+  },
 
-  remove: (id: string) => request<unknown>("DELETE", `/properties/${id}`),
+  remove: async (id: string): Promise<void> => {
+    const { error, response } = await apiClient.DELETE("/properties/{id}", {
+      params: { path: { id } },
+    });
+    unwrapVoid({ error, response });
+  },
 };
-
-const wholePriceFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
-const centPriceFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-export function formatPrice(value: string | number): string {
-  const amount = Number(value);
-  return Number.isInteger(amount)
-    ? wholePriceFormatter.format(amount)
-    : centPriceFormatter.format(amount);
-}
-
-export function formatRating(value: string | null): string | null {
-  return value === null ? null : Number(value).toFixed(2);
-}
-
-export function amenityLabel(value: string): string {
-  const lower = value.replace(/_/g, " ").toLowerCase();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
-}
-
-const TYPE_LABELS: Record<PropertyType, string> = {
-  HOTEL_ROOM: "Hotel room",
-  APARTMENT: "Apartment",
-  HOUSE: "House",
-  MEETING_ROOM: "Meeting room",
-};
-
-export function typeLabel(value: PropertyType): string {
-  return TYPE_LABELS[value];
-}
-

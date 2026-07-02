@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 import type { Property } from "@/lib/api/properties";
-import { formatPrice, formatRating } from "@/lib/api/properties";
-
-const PHOTO_STRIPES =
-  "repeating-linear-gradient(135deg,var(--muted),var(--muted) 11px,var(--background) 11px,var(--background) 22px)";
+import { formatPrice, formatRating } from "@/lib/utils/money";
+import { PHOTO_STRIPES } from "@/lib/utils/photo";
 
 export function PropertyCard({ property }: { property: Property }) {
   const rating = formatRating(property.averageRating);

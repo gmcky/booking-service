@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { propertyApi, type PropertyQuery } from "@/lib/api/properties";
+import { queryKeys } from "@/lib/query/keys";
 import { PropertyCard } from "./property-card";
 
 export function PropertyGrid({
@@ -12,7 +13,7 @@ export function PropertyGrid({
   emptyLabel?: string;
 }) {
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ["properties", query],
+    queryKey: queryKeys.properties.list(query),
     queryFn: () => propertyApi.search(query),
   });
 

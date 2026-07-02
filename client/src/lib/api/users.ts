@@ -1,5 +1,6 @@
-import { BASE_URL } from "./client";
-import { useAuthStore } from "@/lib/auth/store";
+import { apiClient } from "./client";
+import { unwrapVoid } from "./unwrap";
+import type { paths } from "./schema";
 
 export interface UpdateProfileInput {
   firstName?: string;
@@ -12,49 +13,37 @@ export interface ChangePasswordInput {
   confirmPassword: string;
 }
 
-function authHeaders(): Record<string, string> {
-  const token = useAuthStore.getState().accessToken;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function ensureOk(res: Response): Promise<void> {
-  if (res.ok) return;
-  const json = (await res.json().catch(() => ({}))) as { message?: string };
-  throw new Error(json.message ?? "Request failed");
-}
+type UpdateProfileBody = paths["/users/me"]["patch"]["requestBody"]["content"]["multipart/form-data"];
 
 export const userApi = {
-  /** PATCH /users/me is multipart (optional avatar); send text fields as FormData. */
-  updateProfile: async (input: UpdateProfileInput) => {
+  /**
+   * PATCH /users/me is multipart (optional avatar). openapi-fetch passes a
+   * FormData body straight through at runtime (see its defaultBodySerializer),
+   * but the generated type only describes the plain-object field shape —
+   * cast through that shape so this stays on the typed client (Authorization
+   * + refresh-retry middleware still apply) instead of a parallel raw fetch.
+   */
+  updateProfile: async (input: UpdateProfileInput): Promise<void> => {
     const form = new FormData();
     if (input.firstName) form.set("firstName", input.firstName);
     if (input.lastName) form.set("lastName", input.lastName);
-    const res = await fetch(`${BASE_URL}/users/me`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: authHeaders(),
-      body: form,
+    const { error, response } = await apiClient.PATCH("/users/me", {
+      body: form as unknown as UpdateProfileBody,
     });
-    await ensureOk(res);
+    unwrapVoid({ error, response });
   },
 
-  changePassword: async (input: ChangePasswordInput) => {
-    const res = await fetch(`${BASE_URL}/users/me/change-password`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify(input),
+  changePassword: async (input: ChangePasswordInput): Promise<void> => {
+    const { error, response } = await apiClient.POST("/users/me/change-password", {
+      body: input,
     });
-    await ensureOk(res);
+    unwrapVoid({ error, response });
   },
 
-  deleteAccount: async (password: string) => {
-    const res = await fetch(`${BASE_URL}/users/me`, {
-      method: "DELETE",
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ password }),
+  deleteAccount: async (password: string): Promise<void> => {
+    const { error, response } = await apiClient.DELETE("/users/me", {
+      body: { password },
     });
-    await ensureOk(res);
+    unwrapVoid({ error, response });
   },
 };

@@ -7,22 +7,22 @@ import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { propertyApi, formatPrice, type HostProperty } from "@/lib/api/properties";
-
-const PHOTO_STRIPES =
-  "repeating-linear-gradient(135deg,var(--muted),var(--muted) 11px,var(--background) 11px,var(--background) 22px)";
+import { propertyApi, type HostProperty } from "@/lib/api/properties";
+import { formatPrice } from "@/lib/utils/money";
+import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { queryKeys } from "@/lib/query/keys";
 
 export default function HostPropertiesPage() {
   const queryClient = useQueryClient();
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ["host-properties"],
+    queryKey: queryKeys.properties.mine,
     queryFn: () => propertyApi.mine(),
   });
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       propertyApi.setActive(id, active),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["host-properties"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.properties.mine }),
     onError: (err) => toast.error((err as Error).message),
   });
 
@@ -30,7 +30,7 @@ export default function HostPropertiesPage() {
     mutationFn: (id: string) => propertyApi.remove(id),
     onSuccess: () => {
       toast.success("Listing removed");
-      queryClient.invalidateQueries({ queryKey: ["host-properties"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.properties.mine });
     },
     onError: (err) => toast.error((err as Error).message),
   });

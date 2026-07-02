@@ -17,24 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { propertyApi, formatPrice } from "@/lib/api/properties";
+import { propertyApi } from "@/lib/api/properties";
 import { bookingApi } from "@/lib/api/bookings";
-
-const PHOTO_STRIPES =
-  "repeating-linear-gradient(135deg,var(--muted),var(--muted) 11px,var(--background) 11px,var(--background) 22px)";
-
-function nightsBetween(checkIn?: string, checkOut?: string): number {
-  if (!checkIn || !checkOut) return 0;
-  const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
-  return ms > 0 ? Math.round(ms / 86_400_000) : 0;
-}
-
-function formatRange(checkIn: string, checkOut: string): string {
-  const a = new Date(checkIn);
-  const b = new Date(checkOut);
-  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${month(a)} – ${month(b)}, ${b.getFullYear()}`;
-}
+import { formatPrice } from "@/lib/utils/money";
+import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { nightsBetween, formatRange } from "@/lib/utils/dates";
+import { queryKeys } from "@/lib/query/keys";
 
 export default function CheckoutPage() {
   return (
@@ -69,7 +57,7 @@ function CheckoutInner() {
   const [forcedDecline, setForcedDecline] = React.useState(false);
 
   const propertyQuery = useQuery({
-    queryKey: ["property", propertyId],
+    queryKey: queryKeys.properties.detail(propertyId),
     queryFn: () => propertyApi.byId(propertyId),
     enabled: Boolean(propertyId),
   });
@@ -96,7 +84,7 @@ function CheckoutInner() {
       return booking;
     },
     onSuccess: (booking) => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
       router.push(`/confirmation?bookingId=${booking.id}`);
     },
   });

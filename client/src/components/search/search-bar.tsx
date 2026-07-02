@@ -5,14 +5,7 @@ import { useRouter } from "next/navigation";
 import { MapPin, Search, Users } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
-
-function toISODate(date?: Date): string | undefined {
-  return date
-    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-        date.getDate(),
-      ).padStart(2, "0")}`
-    : undefined;
-}
+import { toISODate } from "@/lib/utils/dates";
 
 export function SearchBar() {
   const router = useRouter();
