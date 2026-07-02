@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { LoginForm } from "@/components/auth/LoginForm";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("sonner", () => ({

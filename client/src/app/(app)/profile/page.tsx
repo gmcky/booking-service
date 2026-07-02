@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { User, Lock, CreditCard, Check, Loader2 } from "lucide-react";
+import { User, Lock, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
@@ -11,17 +11,26 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuthStore } from "@/lib/auth/store";
 import { endpoints } from "@/lib/api/endpoints";
 import { userApi } from "@/lib/api/users";
 
-type Section = "profile" | "security" | "payments";
+type Section = "profile" | "security";
 
 const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: Lock },
-  { id: "payments", label: "Payments", icon: CreditCard },
 ];
 
 function initials(firstName: string, lastName: string): string {
@@ -66,10 +75,8 @@ export default function AccountPage() {
                 lastNameInit={user.lastName}
                 email={user.email}
               />
-            ) : section === "security" ? (
-              <SecuritySection />
             ) : (
-              <PaymentsSection />
+              <SecuritySection />
             )}
           </div>
         </div>
@@ -188,6 +195,8 @@ function SecuritySection() {
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deletePassword, setDeletePassword] = React.useState("");
 
   const pwMutation = useMutation({
     mutationFn: () => userApi.changePassword({ currentPassword, newPassword, confirmPassword }),
@@ -206,7 +215,6 @@ function SecuritySection() {
       clear();
       router.push("/");
     },
-    onError: (err) => toast.error((err as Error).message),
   });
 
   return (
@@ -268,59 +276,57 @@ function SecuritySection() {
               Permanently remove your account, bookings, and saved places. This can&apos;t be undone.
             </p>
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={deleteMutation.isPending}
-            onClick={() => {
-              const password = prompt("Enter your password to confirm deletion:");
-              if (password) deleteMutation.mutate(password);
+          <AlertDialog
+            open={deleteOpen}
+            onOpenChange={(open) => {
+              setDeleteOpen(open);
+              if (!open) {
+                setDeletePassword("");
+                deleteMutation.reset();
+              }
             }}
           >
-            Delete account
-          </Button>
+            <AlertDialogTrigger render={<Button variant="destructive" size="sm" />}>
+              Delete account
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently removes your account, bookings, and saved places. This
+                  can&apos;t be undone. Enter your password to confirm.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="delete-password">Password</Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  autoFocus
+                />
+                {deleteMutation.isError ? (
+                  <p className="text-sm text-destructive">
+                    {(deleteMutation.error as Error).message}
+                  </p>
+                ) : null}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={!deletePassword || deleteMutation.isPending}
+                  onClick={() => deleteMutation.mutate(deletePassword)}
+                >
+                  {deleteMutation.isPending ? "Deleting…" : "Delete account"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>
-  );
-}
-
-function PaymentsSection() {
-  const cards = [
-    { brand: "Visa", last4: "4242", exp: "08 / 27", isDefault: true },
-    { brand: "Mastercard", last4: "8801", exp: "01 / 26", isDefault: false },
-  ];
-  return (
-    <Card className="p-6">
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-[17px] font-semibold tracking-tight">Payment methods</h2>
-          <p className="text-sm text-muted-foreground">Cards used for bookings and payouts.</p>
-        </div>
-        <Button variant="outline" size="sm">
-          Add card
-        </Button>
-      </div>
-      <div className="flex flex-col gap-2.5">
-        {cards.map((c) => (
-          <div
-            key={c.last4}
-            className="flex items-center gap-3.5 rounded-lg border border-border p-3.5"
-          >
-            <CreditCard className="size-[22px] text-muted-foreground" />
-            <div className="flex-1">
-              <div className="text-sm font-medium">
-                {c.brand} ending {c.last4}
-              </div>
-              <div className="font-mono text-xs text-muted-foreground">Expires {c.exp}</div>
-            </div>
-            {c.isDefault ? <Badge variant="secondary">Default</Badge> : null}
-            <Button variant="ghost" size="sm">
-              Edit
-            </Button>
-          </div>
-        ))}
-      </div>
-    </Card>
   );
 }
