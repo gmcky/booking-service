@@ -8,6 +8,7 @@ export type BookingStatus = components["schemas"]["BookingStatus"];
 export type BookingListItem = components["schemas"]["BookingListItem"];
 export type BookingWithProperty = components["schemas"]["BookingWithProperty"];
 export type BookingDetail = components["schemas"]["BookingDetail"];
+export type HostBooking = components["schemas"]["HostBooking"];
 
 export type CancelBookingResult =
   paths["/bookings/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
@@ -17,6 +18,13 @@ export interface CreateBookingInput {
   checkIn: string;
   checkOut: string;
   guests: number;
+}
+
+export interface HostBookingQuery {
+  page?: number;
+  limit?: number;
+  status?: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  propertyId?: string;
 }
 
 export const bookingApi = {
@@ -54,6 +62,31 @@ export const bookingApi = {
   cancel: async (id: string): Promise<CancelBookingResult> => {
     const { data, error, response } = await apiClient.DELETE("/bookings/{id}", {
       params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  host: async (query: HostBookingQuery = {}): Promise<Paginated<HostBooking>> => {
+    const { data, error, response } = await apiClient.GET("/bookings/host", {
+      params: {
+        query: {
+          page: query.page,
+          limit: query.limit,
+          status: query.status,
+          propertyId: query.propertyId,
+        },
+      },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  updateStatus: async (
+    id: string,
+    status: "CONFIRMED" | "COMPLETED",
+  ): Promise<components["schemas"]["Booking"]> => {
+    const { data, error, response } = await apiClient.PATCH("/bookings/{id}/status", {
+      params: { path: { id } },
+      body: { status },
     });
     return unwrap({ data, error, response });
   },

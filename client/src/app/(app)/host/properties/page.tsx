@@ -63,10 +63,15 @@ export default function HostPropertiesPage() {
                 : `${listings.length} ${listings.length === 1 ? "property" : "properties"}`}
             </p>
           </div>
-          <Button nativeButton={false} render={<Link href="/host/listing" />}>
-            <Plus />
-            Add property
-          </Button>
+          <div className="flex items-center gap-2.5">
+            <Button nativeButton={false} variant="outline" render={<Link href="/host/bookings" />}>
+              Reservations
+            </Button>
+            <Button nativeButton={false} render={<Link href="/host/listing" />}>
+              <Plus />
+              Add property
+            </Button>
+          </div>
         </div>
 
         {isError ? (
@@ -167,6 +172,14 @@ function ListingCard({
             render={<Link href={`/properties/${property.id}`} />}
           >
             View
+          </Button>
+          <Button
+            nativeButton={false}
+            variant="outline"
+            size="sm"
+            render={<Link href={`/host/properties/${property.id}/edit`} />}
+          >
+            Edit
           </Button>
           <Button variant="ghost" size="sm" onClick={onToggle} disabled={busy}>
             {busy ? (

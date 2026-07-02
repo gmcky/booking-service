@@ -11,6 +11,7 @@ export const queryKeys = {
   bookings: {
     all: ["bookings"] as const,
     detail: (id: string) => ["bookings", "detail", id] as const,
+    host: (query: Record<string, unknown>) => ["bookings", "host", query] as const,
   },
   users: {
     me: ["users", "me"] as const,
