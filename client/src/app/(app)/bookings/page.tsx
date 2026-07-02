@@ -14,6 +14,17 @@ import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Tab = "upcoming" | "past" | "cancelled";
 
@@ -97,9 +108,7 @@ export default function BookingsPage() {
                 key={b.id}
                 booking={b}
                 tab={tab}
-                onCancel={() => {
-                  if (confirm("Cancel this booking?")) cancelMutation.mutate(b.id);
-                }}
+                onCancel={() => cancelMutation.mutate(b.id)}
                 cancelling={cancelMutation.isPending && cancelMutation.variables === b.id}
               />
             ))}
@@ -198,16 +207,30 @@ function BookingRow({
             View
           </Button>
           {tab === "upcoming" ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="w-[100px]"
-              onClick={onCancel}
-              disabled={cancelling}
-            >
-              {cancelling ? <Loader2 className="animate-spin" /> : <X />}
-              Cancel
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger
+                render={
+                  <Button variant="destructive" size="sm" className="w-[100px]" disabled={cancelling} />
+                }
+              >
+                {cancelling ? <Loader2 className="animate-spin" /> : <X />}
+                Cancel
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will cancel your reservation at {booking.property.title}. This can&apos;t be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep booking</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={onCancel}>
+                    Cancel booking
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           ) : tab === "past" ? (
             <Button
               nativeButton={false}

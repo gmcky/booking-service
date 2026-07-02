@@ -11,6 +11,17 @@ import { propertyApi, type HostProperty } from "@/lib/api/properties";
 import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES } from "@/lib/utils/photo";
 import { queryKeys } from "@/lib/query/keys";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function HostPropertiesPage() {
   const queryClient = useQueryClient();
@@ -74,9 +85,7 @@ export default function HostPropertiesPage() {
                 key={p.id}
                 property={p}
                 onToggle={() => toggleMutation.mutate({ id: p.id, active: !p.isActive })}
-                onRemove={() => {
-                  if (confirm(`Remove "${p.title}"?`)) removeMutation.mutate(p.id);
-                }}
+                onRemove={() => removeMutation.mutate(p.id)}
                 busy={
                   (toggleMutation.isPending && toggleMutation.variables?.id === p.id) ||
                   (removeMutation.isPending && removeMutation.variables === p.id)
@@ -166,9 +175,23 @@ function ListingCard({
               "Activate"
             )}
           </Button>
-          <Button variant="destructive" size="sm" onClick={onRemove} disabled={busy}>
-            Remove
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger render={<Button variant="destructive" size="sm" disabled={busy} />}>
+              Remove
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove &quot;{property.title}&quot;?</AlertDialogTitle>
+                <AlertDialogDescription>This can&apos;t be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={onRemove}>
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>
