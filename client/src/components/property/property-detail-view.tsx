@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { addDays } from "date-fns";
 import { ArrowLeft, MapPin, Star, Check } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
@@ -13,10 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/lib/auth/store";
 import { propertyApi, type PropertyReview } from "@/lib/api/properties";
+import { bookingApi } from "@/lib/api/bookings";
 import { amenityLabel, typeLabel } from "@/lib/api/labels";
 import { formatPrice, formatRating } from "@/lib/utils/money";
 import { PHOTO_STRIPES } from "@/lib/utils/photo";
-import { nightsBetween, toISODate } from "@/lib/utils/dates";
+import { isoToLocalDate, nightsBetween, toISODate } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
 
 export function PropertyDetailView({ id }: { id: string }) {
@@ -231,27 +233,87 @@ function BookingCard({
   const [checkIn, setCheckIn] = React.useState<Date | undefined>();
   const [checkOut, setCheckOut] = React.useState<Date | undefined>();
   const [guests, setGuests] = React.useState("1");
+  const [conflict, setConflict] = React.useState<string | null>(null);
+
+  const { data: blocked } = useQuery({
+    queryKey: queryKeys.bookings.blockedDates(propertyId),
+    queryFn: () => bookingApi.blockedDates(propertyId),
+  });
+
+  const today = React.useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
+
+  // Booked ranges occupy nights [checkIn, checkOut) — the checkout day itself
+  // is free for a new arrival. Host-blocked ranges are inclusive on both ends.
+  const blockedMatchers = React.useMemo(() => {
+    if (!blocked) return [];
+    return [
+      ...blocked.bookedRanges.map((r) => ({
+        from: isoToLocalDate(r.checkIn),
+        to: addDays(isoToLocalDate(r.checkOut), -1),
+      })),
+      ...blocked.blockedRanges.map((r) => ({
+        from: isoToLocalDate(r.startDate),
+        to: isoToLocalDate(r.endDate),
+      })),
+    ].filter((r) => r.to >= r.from);
+  }, [blocked]);
 
   const nights = nightsBetween(checkIn, checkOut);
   const subtotal = nights * Number(pricePerNight);
   const canReserve = nights > 0;
 
+  const availability = useMutation({
+    mutationFn: () =>
+      bookingApi.checkAvailability({
+        propertyId,
+        checkIn: toISODate(checkIn)!,
+        checkOut: toISODate(checkOut)!,
+      }),
+    onSuccess: (available) => {
+      if (!available) {
+        setConflict("Those dates are no longer available. Please pick different dates.");
+        return;
+      }
+      const parsedGuests = Number(guests);
+      const effectiveGuests = Number.isFinite(parsedGuests)
+        ? Math.min(Math.max(Math.round(parsedGuests), 1), maxGuests)
+        : 1;
+      const params = new URLSearchParams({
+        propertyId,
+        checkIn: toISODate(checkIn)!,
+        checkOut: toISODate(checkOut)!,
+        guests: String(effectiveGuests),
+      });
+      router.push(`/checkout?${params.toString()}`);
+    },
+    onError: (error) => {
+      setConflict((error as Error).message);
+    },
+  });
+
   function onReserve() {
     if (status !== "authed") {
-      router.push("/login");
+      const returnTo = encodeURIComponent(`/properties/${propertyId}`);
+      router.push(`/login?returnTo=${returnTo}`);
       return;
     }
-    const parsedGuests = Number(guests);
-    const effectiveGuests = Number.isFinite(parsedGuests)
-      ? Math.min(Math.max(Math.round(parsedGuests), 1), maxGuests)
-      : 1;
-    const params = new URLSearchParams({
-      propertyId,
-      checkIn: toISODate(checkIn)!,
-      checkOut: toISODate(checkOut)!,
-      guests: String(effectiveGuests),
-    });
-    router.push(`/checkout?${params.toString()}`);
+    setConflict(null);
+    availability.mutate();
+  }
+
+  function onCheckInChange(date?: Date) {
+    setCheckIn(date);
+    setConflict(null);
+    if (date && checkOut && checkOut <= date) setCheckOut(undefined);
+  }
+
+  function onCheckOutChange(date?: Date) {
+    setCheckOut(date);
+    setConflict(null);
   }
 
   return (
@@ -273,13 +335,27 @@ function BookingCard({
             <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
               Check in
             </Label>
-            <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Add date" />
+            <DatePicker
+              value={checkIn}
+              onChange={onCheckInChange}
+              placeholder="Add date"
+              disabledDates={[{ before: today }, ...blockedMatchers]}
+            />
           </div>
           <div>
             <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
               Check out
             </Label>
-            <DatePicker value={checkOut} onChange={setCheckOut} placeholder="Add date" />
+            <DatePicker
+              value={checkOut}
+              onChange={onCheckOutChange}
+              placeholder="Add date"
+              disabledDates={[
+                { before: addDays(checkIn ?? today, 1) },
+                ...blockedMatchers,
+              ]}
+              defaultMonth={checkOut ?? checkIn}
+            />
           </div>
         </div>
         <div>
@@ -308,12 +384,23 @@ function BookingCard({
         </div>
       </div>
 
-      <Button size="lg" className="mt-3 w-full" disabled={!canReserve} onClick={onReserve}>
-        Reserve
+      <Button
+        size="lg"
+        className="mt-3 w-full"
+        disabled={!canReserve || availability.isPending}
+        onClick={onReserve}
+      >
+        {availability.isPending ? "Checking availability…" : "Reserve"}
       </Button>
-      <p className="mt-3 text-center text-[13px] text-muted-foreground">
-        You won&apos;t be charged yet
-      </p>
+      {conflict ? (
+        <p className="mt-3 text-center text-[13px] text-destructive" role="alert">
+          {conflict}
+        </p>
+      ) : (
+        <p className="mt-3 text-center text-[13px] text-muted-foreground">
+          You won&apos;t be charged yet
+        </p>
+      )}
 
       {nights > 0 ? (
         <div className="mt-[18px] flex flex-col gap-2.5 text-sm">

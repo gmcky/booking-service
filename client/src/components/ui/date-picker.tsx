@@ -18,11 +18,15 @@ function DatePicker({
   onChange,
   placeholder = "Pick a date",
   disabled,
+  disabledDates,
+  defaultMonth,
 }: {
   value?: Date;
   onChange?: (date?: Date) => void;
   placeholder?: string;
   disabled?: boolean;
+  disabledDates?: React.ComponentProps<typeof Calendar>["disabled"];
+  defaultMonth?: Date;
 }) {
   return (
     <Popover>
@@ -46,6 +50,8 @@ function DatePicker({
           mode="single"
           selected={value}
           onSelect={onChange}
+          disabled={disabledDates}
+          defaultMonth={defaultMonth ?? value}
           autoFocus
         />
       </PopoverContent>
