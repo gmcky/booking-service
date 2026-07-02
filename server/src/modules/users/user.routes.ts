@@ -57,7 +57,12 @@ const avatarUpload = multer({
  *     summary: Get current authenticated user
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: Current user profile }
+ *       200:
+ *         description: Current user profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CurrentUser'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 userRouter.get("/me", authenticate, asyncHandler(getCurrentUser));
@@ -70,7 +75,12 @@ userRouter.get("/me", authenticate, asyncHandler(getCurrentUser));
  *     summary: Get aggregated stats for current user
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: User stats (bookings, properties, reviews counts) }
+ *       200:
+ *         description: User stats (bookings, properties, reviews counts)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserStats'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 userRouter.get("/me/stats", authenticate, asyncHandler(getCurrentUserStats));
@@ -96,7 +106,12 @@ userRouter.get("/me/stats", authenticate, asyncHandler(getCurrentUserStats));
  *               bio: { type: string, maxLength: 500 }
  *               avatar: { type: string, format: binary }
  *     responses:
- *       200: { description: Profile updated }
+ *       200:
+ *         description: Profile updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserProfile'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
@@ -167,7 +182,16 @@ userRouter.delete(
  *               newPassword: { type: string, minLength: 12 }
  *               confirmPassword: { type: string }
  *     responses:
- *       204: { description: Password changed }
+ *       200:
+ *         description: Password changed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 message: { type: string }
+ *               required: [success, message]
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
@@ -195,7 +219,15 @@ userRouter.post(
  *             properties:
  *               newEmail: { type: string, format: email }
  *     responses:
- *       202: { description: OTP queued to new email }
+ *       200:
+ *         description: OTP queued to new email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *               required: [message]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 userRouter.post(
@@ -222,7 +254,15 @@ userRouter.post(
  *             properties:
  *               otp: { type: string, pattern: '^\d{6}$' }
  *     responses:
- *       200: { description: Email updated }
+ *       200:
+ *         description: Email updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *               required: [message]
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
@@ -249,7 +289,31 @@ userRouter.post(
  *       - { in: query, name: search, schema: { type: string } }
  *       - { in: query, name: isDeleted, schema: { type: boolean } }
  *     responses:
- *       200: { description: Paginated user list }
+ *       200:
+ *         description: Paginated user list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       email: { type: string }
+ *                       firstName: { type: string }
+ *                       lastName: { type: string }
+ *                       avatarUrl: { type: string, nullable: true }
+ *                       isDeleted: { type: boolean }
+ *                       isSuspended: { type: boolean }
+ *                       role: { $ref: '#/components/schemas/Role' }
+ *                       createdAt: { type: string, format: date-time }
+ *                     required: [id, email, firstName, lastName, avatarUrl, isDeleted, isSuspended, role, createdAt]
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
@@ -271,7 +335,21 @@ userRouter.get(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: User suspended }
+ *       200:
+ *         description: User suspended
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 email: { type: string }
+ *                 firstName: { type: string }
+ *                 lastName: { type: string }
+ *                 isDeleted: { type: boolean }
+ *                 isSuspended: { type: boolean }
+ *                 role: { $ref: '#/components/schemas/Role' }
+ *               required: [id, email, firstName, lastName, isDeleted, isSuspended, role]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -288,7 +366,21 @@ userRouter.patch("/:id/suspend", authenticate, authorize("ADMIN"), asyncHandler(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: User restored }
+ *       200:
+ *         description: User restored
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 email: { type: string }
+ *                 firstName: { type: string }
+ *                 lastName: { type: string }
+ *                 isDeleted: { type: boolean }
+ *                 isSuspended: { type: boolean }
+ *                 role: { $ref: '#/components/schemas/Role' }
+ *               required: [id, email, firstName, lastName, isDeleted, isSuspended, role]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -304,7 +396,12 @@ userRouter.patch("/:id/restore", authenticate, authorize("ADMIN"), asyncHandler(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Public user profile }
+ *       200:
+ *         description: Public user profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PublicUserProfile'
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 userRouter.get("/:id", asyncHandler(getUserById));

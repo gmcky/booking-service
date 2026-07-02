@@ -31,7 +31,15 @@ export const bookingRouter: IRouter = Router();
  *               checkIn: { type: string, format: date-time }
  *               checkOut: { type: string, format: date-time }
  *     responses:
- *       200: { description: Availability result }
+ *       200:
+ *         description: Availability result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 available: { type: boolean }
+ *               required: [available]
  *       400: { $ref: '#/components/responses/ValidationError' }
  */
 bookingRouter.post(
@@ -49,7 +57,12 @@ bookingRouter.post(
  *     parameters:
  *       - { in: path, name: propertyId, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Blocked date list }
+ *       200:
+ *         description: Blocked date list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BlockedDates'
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 // TODO: move blocked-dates route under /properties.
@@ -65,7 +78,19 @@ bookingRouter.use(authenticate);
  *     summary: List bookings owned by current user (guest or host)
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: User booking list }
+ *       200:
+ *         description: User booking list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/BookingListItem' }
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 bookingRouter.get("/", asyncHandler(bookingController.getUserBookings));
@@ -83,7 +108,19 @@ bookingRouter.get("/", asyncHandler(bookingController.getUserBookings));
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED] } }
  *       - { in: query, name: propertyId, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Host booking list }
+ *       200:
+ *         description: Host booking list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/HostBooking' }
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 bookingRouter.get(
@@ -102,7 +139,12 @@ bookingRouter.get(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Booking detail }
+ *       200:
+ *         description: Booking detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BookingDetail'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -129,7 +171,12 @@ bookingRouter.get("/:id", asyncHandler(bookingController.getBookingById));
  *               checkOut: { type: string, format: date-time }
  *               guests: { type: integer, minimum: 1 }
  *     responses:
- *       201: { description: Booking created (PENDING) }
+ *       201:
+ *         description: Booking created (PENDING)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BookingWithProperty'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       409: { description: Date range conflict }
@@ -159,7 +206,12 @@ bookingRouter.post(
  *             properties:
  *               status: { type: string, enum: [CONFIRMED, COMPLETED] }
  *     responses:
- *       200: { description: Booking status updated }
+ *       200:
+ *         description: Booking status updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Booking'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -190,7 +242,12 @@ bookingRouter.patch(
  *               checkOut: { type: string, format: date-time }
  *               guests: { type: integer, minimum: 1 }
  *     responses:
- *       200: { description: Booking dates updated }
+ *       200:
+ *         description: Booking dates updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BookingWithProperty'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409: { description: Date range conflict }
@@ -211,7 +268,12 @@ bookingRouter.patch(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Early checkout recorded }
+ *       200:
+ *         description: Early checkout recorded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Booking'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
@@ -227,7 +289,37 @@ bookingRouter.post("/:id/early-checkout", asyncHandler(bookingController.earlyCh
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Booking cancelled }
+ *       200:
+ *         description: Booking cancelled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 booking:
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/Booking'
+ *                     - type: object
+ *                       properties:
+ *                         property:
+ *                           $ref: '#/components/schemas/Property'
+ *                       required: [property]
+ *                 cancellation:
+ *                   type: object
+ *                   nullable: true
+ *                   properties:
+ *                     refundPercent: { type: number }
+ *                     refundAmount: { type: number }
+ *                     hoursUntilCheckIn: { type: number }
+ *                     policy:
+ *                       type: object
+ *                       properties:
+ *                         fullRefundAfterHours: { type: number }
+ *                         partialRefundAfterHours: { type: number }
+ *                         partialRefundPercent: { type: number }
+ *                       required: [fullRefundAfterHours, partialRefundAfterHours, partialRefundPercent]
+ *                   required: [refundPercent, refundAmount, hoursUntilCheckIn, policy]
+ *               required: [booking, cancellation]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }

@@ -55,7 +55,12 @@ paymentRouter.use(authenticate);
  *               provider: { type: string, enum: [STRIPE] }
  *               currency: { type: string, default: USD, minLength: 3, maxLength: 3 }
  *     responses:
- *       201: { description: Payment created }
+ *       201:
+ *         description: Payment created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
@@ -82,7 +87,15 @@ paymentRouter.post(
  *             properties:
  *               bookingId: { type: string, format: uuid }
  *     responses:
- *       200: { description: PaymentIntent client secret }
+ *       201:
+ *         description: PaymentIntent client secret
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 clientSecret: { type: string }
+ *               required: [clientSecret]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 paymentRouter.post(
@@ -119,7 +132,24 @@ paymentRouter.post(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Payment detail }
+ *       200:
+ *         description: Payment detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Payment'
+ *                 - type: object
+ *                   properties:
+ *                     booking:
+ *                       allOf:
+ *                         - $ref: '#/components/schemas/Booking'
+ *                         - type: object
+ *                           properties:
+ *                             property:
+ *                               $ref: '#/components/schemas/Property'
+ *                           required: [property]
+ *                   required: [booking]
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
@@ -135,7 +165,12 @@ paymentRouter.get("/:id", asyncHandler(paymentController.getPaymentById));
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Payment marked processed }
+ *       200:
+ *         description: Payment marked processed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -165,7 +200,12 @@ paymentRouter.post(
  *             properties:
  *               reason: { type: string, maxLength: 1000 }
  *     responses:
- *       200: { description: Refund requested }
+ *       200:
+ *         description: Refund requested
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
@@ -185,7 +225,12 @@ paymentRouter.post(
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: Refund approved and issued }
+ *       200:
+ *         description: Refund approved and issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -214,7 +259,12 @@ paymentRouter.post(
  *             properties:
  *               reason: { type: string, maxLength: 1000 }
  *     responses:
- *       200: { description: Refund rejected }
+ *       200:
+ *         description: Refund rejected
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
