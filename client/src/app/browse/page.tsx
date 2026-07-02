@@ -15,6 +15,7 @@ import {
   type PropertySort,
   type PropertyType,
 } from "@/lib/api/properties";
+import { queryKeys } from "@/lib/query/keys";
 
 const PAGE_SIZE = 12;
 
@@ -91,14 +92,15 @@ function BrowseResults() {
   const [panelOpen, setPanelOpen] = React.useState(false);
 
   const query = useInfiniteQuery({
-    queryKey: ["browse", filters],
+    queryKey: queryKeys.properties.browse(filters),
     queryFn: ({ pageParam }) =>
       propertyApi.search({ ...filters, page: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 1,
-    getNextPageParam: (last) =>
-      last.pagination.page < last.pagination.totalPages
-        ? last.pagination.page + 1
-        : undefined,
+    getNextPageParam: (last) => {
+      const page = last.pagination.page ?? 1;
+      const totalPages = last.pagination.totalPages ?? page;
+      return page < totalPages ? page + 1 : undefined;
+    },
   });
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];

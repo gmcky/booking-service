@@ -12,35 +12,16 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/lib/auth/store";
-import {
-  propertyApi,
-  amenityLabel,
-  formatPrice,
-  formatRating,
-  typeLabel,
-  type PropertyReview,
-} from "@/lib/api/properties";
-
-const PHOTO_STRIPES =
-  "repeating-linear-gradient(135deg,var(--muted),var(--muted) 11px,var(--background) 11px,var(--background) 22px)";
-
-function nightsBetween(checkIn?: Date, checkOut?: Date): number {
-  if (!checkIn || !checkOut) return 0;
-  const ms = checkOut.getTime() - checkIn.getTime();
-  return ms > 0 ? Math.round(ms / 86_400_000) : 0;
-}
-
-function toISODate(date?: Date): string | undefined {
-  return date
-    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-        date.getDate(),
-      ).padStart(2, "0")}`
-    : undefined;
-}
+import { propertyApi, type PropertyReview } from "@/lib/api/properties";
+import { amenityLabel, typeLabel } from "@/lib/api/labels";
+import { formatPrice, formatRating } from "@/lib/utils/money";
+import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { nightsBetween, toISODate } from "@/lib/utils/dates";
+import { queryKeys } from "@/lib/query/keys";
 
 export function PropertyDetailView({ id }: { id: string }) {
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ["property", id],
+    queryKey: queryKeys.properties.detail(id),
     queryFn: () => propertyApi.byId(id),
   });
 

@@ -10,19 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { bookingApi, type BookingListItem } from "@/lib/api/bookings";
-import { formatPrice } from "@/lib/api/properties";
-
-const PHOTO_STRIPES =
-  "repeating-linear-gradient(135deg,var(--muted),var(--muted) 11px,var(--background) 11px,var(--background) 22px)";
+import { formatPrice } from "@/lib/utils/money";
+import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { formatRange } from "@/lib/utils/dates";
+import { queryKeys } from "@/lib/query/keys";
 
 type Tab = "upcoming" | "past" | "cancelled";
-
-function formatRange(checkIn: string, checkOut: string): string {
-  const a = new Date(checkIn);
-  const b = new Date(checkOut);
-  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${month(a)} – ${month(b)}, ${b.getFullYear()}`;
-}
 
 function categorize(b: BookingListItem): Tab {
   if (b.status === "CANCELLED") return "cancelled";
@@ -35,7 +28,7 @@ export default function BookingsPage() {
   const queryClient = useQueryClient();
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ["bookings"],
+    queryKey: queryKeys.bookings.all,
     queryFn: () => bookingApi.list(),
   });
 
@@ -43,7 +36,7 @@ export default function BookingsPage() {
     mutationFn: (id: string) => bookingApi.cancel(id),
     onSuccess: () => {
       toast.success("Booking cancelled");
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
     },
     onError: (err) => toast.error((err as Error).message),
   });

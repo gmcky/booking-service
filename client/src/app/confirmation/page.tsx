@@ -8,17 +8,10 @@ import { Check, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { bookingApi } from "@/lib/api/bookings";
-import { formatPrice } from "@/lib/api/properties";
-
-const PHOTO_STRIPES =
-  "repeating-linear-gradient(135deg,var(--muted),var(--muted) 11px,var(--background) 11px,var(--background) 22px)";
-
-function formatRange(checkIn: string, checkOut: string): string {
-  const a = new Date(checkIn);
-  const b = new Date(checkOut);
-  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${month(a)} – ${month(b)}, ${b.getFullYear()}`;
-}
+import { formatPrice } from "@/lib/utils/money";
+import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { formatRange } from "@/lib/utils/dates";
+import { queryKeys } from "@/lib/query/keys";
 
 export default function ConfirmationPage() {
   return (
@@ -38,7 +31,7 @@ function ConfirmationInner() {
   const bookingId = useSearchParams().get("bookingId") ?? "";
 
   const { data: booking, isPending, isError } = useQuery({
-    queryKey: ["booking", bookingId],
+    queryKey: queryKeys.bookings.detail(bookingId),
     queryFn: () => bookingApi.byId(bookingId),
     enabled: Boolean(bookingId),
   });
