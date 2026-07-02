@@ -1,4 +1,6 @@
 import { z } from "zod";
+import prismaClientPkg from "@prisma/client";
+const { BookingStatus } = prismaClientPkg;
 import { calculateNights } from "../../shared/utils/date.helpers.js";
 import {
   MAX_BOOKING_ADVANCE_YEARS,
@@ -66,6 +68,13 @@ export const availabilitySchema = z
   .refine((data) => data.checkOut > data.checkIn, {
     message: "Invalid date range",
   });
+
+export const hostBookingsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  status: z.nativeEnum(BookingStatus).optional(),
+  propertyId: z.string().uuid().optional(),
+});
 
 export const updateBookingDatesSchema = z
   .object({

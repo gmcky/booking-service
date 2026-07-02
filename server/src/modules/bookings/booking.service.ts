@@ -78,6 +78,53 @@ export class BookingService {
   }
 
   /**
+   * List bookings on properties owned by the given host, with optional
+   * status/property filters. Guest identity is exposed without email.
+   */
+  static async getHostBookings(
+    ownerId: string,
+    params: PaginationParams,
+    filters: { status?: BookingStatus; propertyId?: string },
+  ) {
+    const { skip, take } = calculatePagination(params.page, params.limit);
+
+    const where = {
+      property: { ownerId },
+      ...(filters.status && { status: filters.status }),
+      ...(filters.propertyId && { propertyId: filters.propertyId }),
+    };
+
+    const [bookings, total] = await Promise.all([
+      prisma.booking.findMany({
+        where,
+        skip,
+        take,
+        include: {
+          property: {
+            select: {
+              id: true,
+              title: true,
+              city: true,
+              images: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.booking.count({ where }),
+    ]);
+
+    return createPaginatedResponse(bookings, total, params);
+  }
+
+  /**
    * RBAC gate for booking and payment snapshot access.
    */
   static async getById(id: string, userId: string, userRole: string) {

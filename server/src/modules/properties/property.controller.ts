@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
+import { AppError } from "../../shared/middlewares/error.handler.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PropertyService } from "./property.service.js";
 import type { PropertyQueryInput } from "./property.types.js";
@@ -63,6 +64,25 @@ export async function getPropertyById(req: Request, res: Response) {
       : undefined,
   );
   res.json(property);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route POST /api/v1/properties/images
+ * @access Private
+ * @security Bearer token required. Files are written to disk; caller passes returned paths as rawImagePaths on create/update.
+ */
+export async function uploadPropertyImages(req: AuthenticatedRequest, res: Response) {
+  const files = req.files as Express.Multer.File[] | undefined;
+
+  if (!files || files.length === 0) {
+    throw new AppError(400, "At least one image file is required");
+  }
+
+  const userId = req.user!.id;
+  const paths = await PropertyService.saveRawImages(userId, files);
+
+  res.status(201).json({ paths });
 }
 
 /**

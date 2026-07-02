@@ -8,6 +8,7 @@ import {
   updateBookingStatusSchema,
   availabilitySchema,
   updateBookingDatesSchema,
+  hostBookingsQuerySchema,
 } from "./booking.validators.js";
 
 export const bookingRouter: IRouter = Router();
@@ -68,6 +69,28 @@ bookingRouter.use(authenticate);
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 bookingRouter.get("/", asyncHandler(bookingController.getUserBookings));
+
+/**
+ * @openapi
+ * /bookings/host:
+ *   get:
+ *     tags: [Bookings]
+ *     summary: List bookings on properties owned by current user (host)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 100 } }
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED] } }
+ *       - { in: query, name: propertyId, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: Host booking list }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+bookingRouter.get(
+  "/host",
+  validate(hostBookingsQuerySchema, "query"),
+  asyncHandler(bookingController.getHostBookings),
+);
 
 /**
  * @openapi

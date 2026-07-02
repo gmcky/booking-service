@@ -3,6 +3,7 @@ import type {
   createBookingSchema,
   availabilitySchema,
   updateBookingDatesSchema,
+  hostBookingsQuerySchema,
 } from "./booking.validators.js";
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema> & {
@@ -12,3 +13,5 @@ export type CreateBookingInput = z.infer<typeof createBookingSchema> & {
 export type AvailabilityInput = z.infer<typeof availabilitySchema>;
 
 export type UpdateBookingDatesInput = z.infer<typeof updateBookingDatesSchema>;
+
+export type HostBookingsQueryInput = z.infer<typeof hostBookingsQuerySchema>;
