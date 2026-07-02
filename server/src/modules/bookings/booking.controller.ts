@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { BookingService } from "./booking.service.js";
 import { logger } from "../../shared/lib/logger.js";
+import type { HostBookingsQueryInput } from "./booking.types.js";
 
 /**
  * @server\src\api.routes.ts
@@ -16,6 +17,24 @@ export async function getUserBookings(req: AuthenticatedRequest, res: Response) 
   const limit = parseInt(req.query.limit as string) || 10;
 
   const result = await BookingService.getUserBookings(userId, { page, limit });
+  res.json(result);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/bookings/host
+ * @access Private
+ * @security Bearer token required.
+ */
+export async function getHostBookings(req: AuthenticatedRequest, res: Response) {
+  const ownerId = req.user!.id;
+  const { page, limit, status, propertyId } = req.query as unknown as HostBookingsQueryInput;
+
+  const result = await BookingService.getHostBookings(
+    ownerId,
+    { page, limit },
+    { status, propertyId },
+  );
   res.json(result);
 }
 
