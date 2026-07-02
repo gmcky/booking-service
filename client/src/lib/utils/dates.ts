@@ -32,3 +32,12 @@ export function formatRange(checkIn: string, checkOut: string): string {
 export function toISODateTime(date: string): string {
   return new Date(`${date}T00:00:00.000Z`).toISOString();
 }
+
+/**
+ * Date part of an ISO datetime as local midnight. new Date(iso) would land
+ * on the previous calendar day in negative UTC offsets.
+ */
+export function isoToLocalDate(iso: string): Date {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
