@@ -2337,7 +2337,8 @@ export interface components {
             pricePerNight: string;
             maxGuests: number;
             amenities: components["schemas"]["Amenity"][];
-            averageRating: number | null;
+            /** @description Decimal serialized as string */
+            averageRating: string | null;
             reviewCount: number;
             ownerId: string;
             isActive: boolean;
@@ -2394,7 +2395,8 @@ export interface components {
             pricePerNight: string;
             maxGuests: number;
             amenities: components["schemas"]["Amenity"][];
-            averageRating: number | null;
+            /** @description Decimal serialized as string */
+            averageRating: string | null;
             reviewCount: number;
             ownerId: string;
         };
