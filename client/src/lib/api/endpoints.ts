@@ -23,21 +23,6 @@ function toAuthUser(user: {
   return { ...user, avatarUrl: null };
 }
 
-/**
- * RegisterInput collects a single "name" field, but the backend wants
- * firstName/lastName separately. Split on the first space; single-word
- * names reuse the same word for both (backend requires non-empty lastName).
- */
-function splitName(name: string): { firstName: string; lastName: string } {
-  const trimmed = name.trim();
-  const spaceIndex = trimmed.indexOf(" ");
-  if (spaceIndex === -1) return { firstName: trimmed, lastName: trimmed };
-  return {
-    firstName: trimmed.slice(0, spaceIndex),
-    lastName: trimmed.slice(spaceIndex + 1).trim() || trimmed.slice(0, spaceIndex),
-  };
-}
-
 export const endpoints = {
   login: async (input: LoginInput): Promise<AuthResult> => {
     const { data, error, response } = await apiClient.POST("/auth/login", {
@@ -49,9 +34,8 @@ export const endpoints = {
   },
 
   register: async (input: RegisterInput): Promise<AuthResult> => {
-    const { firstName, lastName } = splitName(input.name);
     const { data, error, response } = await apiClient.POST("/auth/register", {
-      body: { email: input.email, password: input.password, firstName, lastName },
+      body: input,
       credentials: "include",
     });
     const result = unwrap({ data, error, response });
