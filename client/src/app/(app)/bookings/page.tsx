@@ -153,6 +153,7 @@ function BookingRow({
   cancelling: boolean;
 }) {
   const badge = statusBadge(booking);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   return (
     <Card className="p-3.5 transition-[border-color,box-shadow] hover:border-ring hover:shadow-sm">
       <div className="flex items-stretch gap-[18px] max-sm:flex-col">
@@ -207,7 +208,7 @@ function BookingRow({
             View
           </Button>
           {tab === "upcoming" ? (
-            <AlertDialog>
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger
                 render={
                   <Button variant="destructive" size="sm" className="w-[100px]" disabled={cancelling} />
@@ -225,7 +226,15 @@ function BookingRow({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Keep booking</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={onCancel}>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => {
+                      // AlertDialogAction is a plain Button (no Close): close
+                      // explicitly so a pending mutation can't be double-fired.
+                      setConfirmOpen(false);
+                      onCancel();
+                    }}
+                  >
                     Cancel booking
                   </AlertDialogAction>
                 </AlertDialogFooter>

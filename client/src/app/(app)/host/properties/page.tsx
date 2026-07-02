@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, MapPin, Tag, Home, Loader2 } from "lucide-react";
@@ -119,6 +120,7 @@ function ListingCard({
   onRemove: () => void;
   busy: boolean;
 }) {
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card transition-[border-color,box-shadow] hover:border-ring hover:shadow-sm">
       <div
@@ -175,7 +177,7 @@ function ListingCard({
               "Activate"
             )}
           </Button>
-          <AlertDialog>
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
             <AlertDialogTrigger render={<Button variant="destructive" size="sm" disabled={busy} />}>
               Remove
             </AlertDialogTrigger>
@@ -186,7 +188,15 @@ function ListingCard({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" onClick={onRemove}>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={() => {
+                    // AlertDialogAction is a plain Button (no Close): close
+                    // explicitly so a pending mutation can't be double-fired.
+                    setConfirmOpen(false);
+                    onRemove();
+                  }}
+                >
                   Remove
                 </AlertDialogAction>
               </AlertDialogFooter>
