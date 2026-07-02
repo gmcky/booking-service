@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,11 @@ import {
 import { loginSchema, type LoginInput } from "@/lib/auth/schemas";
 import { useAuthStore } from "@/lib/auth/store";
 import { endpoints } from "@/lib/api/endpoints";
+import { safeReturnTo } from "@/lib/utils/return-to";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const form = useForm<LoginInput>({
@@ -31,7 +33,7 @@ export function LoginForm() {
     try {
       const { accessToken, user } = await endpoints.login(values);
       setAuth(accessToken, user);
-      router.push("/profile");
+      router.replace(safeReturnTo(searchParams.get("returnTo")));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Login failed");
     }

@@ -7,12 +7,13 @@ test.describe("auth flow", () => {
     const email = uniqueEmail();
 
     await page.goto("/register");
-    await page.getByLabel("Name").fill("E2E User");
+    await page.getByLabel("First name").fill("E2E");
+    await page.getByLabel("Last name").fill("User");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("password123");
+    await page.getByLabel("Password").fill("Tr0ub4dor&3xyz");
     await page.getByRole("button", { name: /create account/i }).click();
 
-    await page.waitForURL("/profile");
+    await page.waitForURL("/");
     await expect(page.getByText("E2E User")).toBeVisible();
 
     await page.getByRole("button", { name: /sign out/i }).click();
@@ -26,7 +27,7 @@ test.describe("auth flow", () => {
     await page.getByLabel("Password").fill("password123");
     await page.getByRole("button", { name: /sign in/i }).click();
 
-    await page.waitForURL("/profile");
+    await page.waitForURL("/");
     await expect(page.getByText("test@example.com")).toBeVisible();
   });
 
