@@ -2,10 +2,14 @@ import { prisma } from "../../shared/lib/prisma.js";
 import prismaClientPkg from "@prisma/client";
 const { BookingStatus } = prismaClientPkg;
 import { AppError } from "../../shared/middlewares/error.handler.js";
+import { logger } from "../../shared/lib/logger.js";
 import type { PaginationParams } from "../../shared/types/index.js";
 import { calculatePagination, createPaginatedResponse } from "../../shared/utils/pagination.js";
 import { omitUndefined } from "../../shared/utils/prisma.helpers.js";
 import { imageQueue } from "../../shared/queues/image.queue.js";
+import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve, dirname } from "node:path";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { cleanupQueue, type CleanupJobName } from "../../shared/queues/cleanup.queue.js";
 import {
@@ -168,6 +172,27 @@ export class PropertyService {
     }
 
     return property;
+  }
+
+  /**
+   * Writes raw multipart uploads to disk; returns relative paths for
+   * rawImagePaths on create/update. No queue interaction — the caller
+   * (create/update) enqueues image processing once the property exists.
+   */
+  static async saveRawImages(userId: string, files: Express.Multer.File[]): Promise<string[]> {
+    const paths: string[] = [];
+
+    for (const file of files) {
+      const relPath = `uploads/properties/temp/${userId}-${randomUUID()}`;
+      const absPath = resolve(process.cwd(), relPath);
+      await mkdir(dirname(absPath), { recursive: true });
+      await writeFile(absPath, file.buffer);
+      paths.push(relPath);
+    }
+
+    logger.info({ userId, count: paths.length }, "Raw property images saved");
+
+    return paths;
   }
 
   /**
