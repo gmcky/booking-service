@@ -13,6 +13,7 @@ import { bookingApi, type BookingListItem } from "@/lib/api/bookings";
 import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
+import { calculateRefundPreview } from "@/lib/utils/refund";
 import { queryKeys } from "@/lib/query/keys";
 import {
   AlertDialog,
@@ -45,8 +46,18 @@ export default function BookingsPage() {
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => bookingApi.cancel(id),
-    onSuccess: () => {
-      toast.success("Booking cancelled");
+    onSuccess: (result, id) => {
+      const wasPaid = data?.data.find((b) => b.id === id)?.status === "CONFIRMED";
+      const { cancellation } = result;
+      if (wasPaid && cancellation && cancellation.refundPercent > 0) {
+        toast.success(
+          `Booking cancelled — ${cancellation.refundPercent}% refund (${formatPrice(cancellation.refundAmount)}) is on its way.`,
+        );
+      } else if (wasPaid && cancellation) {
+        toast.success("Booking cancelled. No refund applies this close to check-in.");
+      } else {
+        toast.success("Booking cancelled");
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
     },
     onError: (err) => toast.error((err as Error).message),
@@ -154,6 +165,10 @@ function BookingRow({
 }) {
   const badge = statusBadge(booking);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const preview =
+    booking.status === "CONFIRMED"
+      ? calculateRefundPreview(booking.checkIn, booking.totalPrice)
+      : null;
   return (
     <Card className="p-3.5 transition-[border-color,box-shadow] hover:border-ring hover:shadow-sm">
       <div className="flex items-stretch gap-[18px] max-sm:flex-col">
@@ -222,6 +237,14 @@ function BookingRow({
                   <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will cancel your reservation at {booking.property.title}. This can&apos;t be undone.
+                    {preview ? (
+                      <>
+                        {" "}
+                        {preview.refundPercent > 0
+                          ? `You'll receive a ${preview.refundPercent}% refund (${formatPrice(preview.refundAmount)}).`
+                          : "This is within 24 hours of check-in, so no refund applies."}
+                      </>
+                    ) : null}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
