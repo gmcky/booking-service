@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays } from "date-fns";
 import { ArrowLeft, MapPin, Star, Check } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -12,14 +12,40 @@ import { Card } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ReviewItem } from "@/components/reviews/review-item";
 import { useAuthStore } from "@/lib/auth/store";
-import { propertyApi, type PropertyReview } from "@/lib/api/properties";
+import { propertyApi } from "@/lib/api/properties";
 import { bookingApi } from "@/lib/api/bookings";
+import { reviewApi, type ReviewQuery, type ReviewSort, type ReviewStats } from "@/lib/api/reviews";
 import { amenityLabel, typeLabel } from "@/lib/api/labels";
 import { formatPrice, formatRating } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { isoToLocalDate, nightsBetween, toISODate } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
+
+const REVIEW_PAGE_SIZE = 10;
+
+const REVIEW_SORTS: { value: ReviewSort; label: string }[] = [
+  { value: "recent", label: "Most recent" },
+  { value: "highest", label: "Highest rated" },
+  { value: "lowest", label: "Lowest rated" },
+];
+
+const REVIEW_RATING_FILTERS = [
+  { value: "all", label: "All ratings" },
+  { value: "5", label: "5 stars" },
+  { value: "4", label: "4 stars" },
+  { value: "3", label: "3 stars" },
+  { value: "2", label: "2 stars" },
+  { value: "1", label: "1 star" },
+];
 
 export function PropertyDetailView({ id }: { id: string }) {
   const { data, isPending, isError, error } = useQuery({
@@ -129,22 +155,7 @@ export function PropertyDetailView({ id }: { id: string }) {
               </div>
             ) : null}
 
-            <div className="py-6 pb-1">
-              <h2 className="mb-[18px] flex items-center gap-2 text-[19px] font-semibold tracking-tight">
-                <Star className="size-[17px] fill-current" />
-                {rating ? `${rating} · ` : ""}
-                {property.reviewCount} {property.reviewCount === 1 ? "review" : "reviews"}
-              </h2>
-              {property.reviews.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No reviews yet.</p>
-              ) : (
-                <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
-                  {property.reviews.map((r) => (
-                    <ReviewItem key={r.id} review={r} />
-                  ))}
-                </div>
-              )}
-            </div>
+            <PropertyReviews propertyId={property.id} propertyOwnerId={property.owner.id} />
           </div>
 
           <aside className="lg:sticky lg:top-22">
@@ -192,27 +203,145 @@ function Gallery({ images, title }: { images: string[]; title: string }) {
   );
 }
 
-function ReviewItem({ review }: { review: PropertyReview }) {
-  const date = new Date(review.createdAt).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
+function PropertyReviews({
+  propertyId,
+  propertyOwnerId,
+}: {
+  propertyId: string;
+  propertyOwnerId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [sort, setSort] = React.useState<ReviewSort>("recent");
+  const [ratingFilter, setRatingFilter] = React.useState("all");
+
+  const filters: ReviewQuery = {
+    sort,
+    rating: ratingFilter === "all" ? undefined : Number(ratingFilter),
+    limit: REVIEW_PAGE_SIZE,
+  };
+
+  const statsQuery = useQuery({
+    queryKey: queryKeys.reviews.stats(propertyId),
+    queryFn: () => reviewApi.stats(propertyId),
   });
+
+  const listQuery = useInfiniteQuery({
+    queryKey: queryKeys.reviews.list(propertyId, filters),
+    queryFn: ({ pageParam }) => reviewApi.list(propertyId, { ...filters, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      const page = last.pagination.page ?? 1;
+      const totalPages = last.pagination.totalPages ?? page;
+      return page < totalPages ? page + 1 : undefined;
+    },
+  });
+
+  const reviews = listQuery.data?.pages.flatMap((p) => p.data) ?? [];
+  const stats = statsQuery.data;
+  const statsRating = formatRating(stats?.averageRating ?? null);
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["reviews", "list", propertyId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.reviews.stats(propertyId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(propertyId) });
+  }
+
   return (
-    <div>
-      <div className="mb-2 flex items-center gap-2.5">
-        <span className="size-[34px] rounded-full border border-border bg-muted" />
-        <div>
-          <div className="text-sm font-medium">{review.user.firstName}</div>
-          <div className="font-mono text-[11px] text-muted-foreground">{date}</div>
-        </div>
-        <span className="ml-auto inline-flex items-center gap-1 text-[13px]">
-          <Star className="size-3.5 fill-current" />
-          {review.rating}
-        </span>
+    <div className="py-6 pb-1">
+      <h2 className="mb-[18px] flex items-center gap-2 text-[19px] font-semibold tracking-tight">
+        <Star className="size-[17px] fill-current" />
+        {statsRating ? `${statsRating} · ` : ""}
+        {stats?.totalReviews ?? 0} {stats?.totalReviews === 1 ? "review" : "reviews"}
+      </h2>
+
+      {stats ? <RatingBreakdown stats={stats} /> : null}
+
+      <div className="mb-5 flex flex-wrap items-center gap-2.5">
+        <Select value={sort} onValueChange={(v) => setSort(v as ReviewSort)}>
+          <SelectTrigger size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {REVIEW_SORTS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={ratingFilter} onValueChange={(v) => setRatingFilter(v as string)}>
+          <SelectTrigger size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {REVIEW_RATING_FILTERS.map((r) => (
+              <SelectItem key={r.value} value={r.value}>
+                {r.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      {review.comment ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
-      ) : null}
+
+      {listQuery.isError ? (
+        <p className="text-sm text-destructive">{(listQuery.error as Error).message}</p>
+      ) : listQuery.isPending ? (
+        <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />
+          ))}
+        </div>
+      ) : reviews.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No reviews yet.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
+            {reviews.map((r) => (
+              <ReviewItem
+                key={r.id}
+                review={r}
+                propertyOwnerId={propertyOwnerId}
+                onChanged={invalidate}
+              />
+            ))}
+          </div>
+          {listQuery.hasNextPage ? (
+            <div className="flex justify-center py-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => listQuery.fetchNextPage()}
+                disabled={listQuery.isFetchingNextPage}
+              >
+                {listQuery.isFetchingNextPage ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function RatingBreakdown({ stats }: { stats: ReviewStats }) {
+  if (stats.totalReviews === 0) return null;
+  return (
+    <div className="mb-6 flex flex-col gap-1.5">
+      {([5, 4, 3, 2, 1] as const).map((n) => {
+        const count = stats.breakdown[n] ?? 0;
+        const pct = (count / stats.totalReviews) * 100;
+        return (
+          <div key={n} className="flex items-center gap-2.5 text-sm">
+            <span className="w-8 shrink-0 text-muted-foreground">{n}★</span>
+            <div className="h-1.5 flex-1 rounded-full bg-muted">
+              <div className="h-1.5 rounded-full bg-foreground" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="w-6 shrink-0 text-right font-mono text-[11px] text-muted-foreground">
+              {count}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
