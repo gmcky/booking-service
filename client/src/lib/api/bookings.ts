@@ -12,6 +12,8 @@ export type BookingDetail = components["schemas"]["BookingDetail"];
 export type CancelBookingResult =
   paths["/bookings/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
+export type BlockedDates = components["schemas"]["BlockedDates"];
+
 export interface CreateBookingInput {
   propertyId: string;
   checkIn: string;
@@ -42,6 +44,24 @@ export const bookingApi = {
       },
     });
     return unwrap({ data, error, response });
+  },
+
+  blockedDates: async (propertyId: string): Promise<BlockedDates> => {
+    const { data, error, response } = await apiClient.GET("/bookings/{propertyId}/blocked-dates", {
+      params: { path: { propertyId } },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  checkAvailability: async (input: Omit<CreateBookingInput, "guests">): Promise<boolean> => {
+    const { data, error, response } = await apiClient.POST("/bookings/check-availability", {
+      body: {
+        propertyId: input.propertyId,
+        checkIn: toISODateTime(input.checkIn),
+        checkOut: toISODateTime(input.checkOut),
+      },
+    });
+    return unwrap({ data, error, response }).available;
   },
 
   createPaymentIntent: async (bookingId: string): Promise<{ clientSecret: string }> => {
