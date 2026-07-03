@@ -140,10 +140,10 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
       expect.objectContaining({ data: { status: "CONFIRMED" } }),
     );
     expect(mockEmailQueue.add).toHaveBeenCalledWith("payment-success-guest", expect.any(Object), {
-      jobId: `payment-success-guest:${eventId}`,
+      jobId: `payment-success-guest-${eventId}`,
     });
     expect(mockEmailQueue.add).toHaveBeenCalledWith("payment-success-host", expect.any(Object), {
-      jobId: `payment-success-host:${eventId}`,
+      jobId: `payment-success-host-${eventId}`,
     });
   });
 
@@ -192,7 +192,7 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     );
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(1);
     expect(mockEmailQueue.add).toHaveBeenCalledWith("refund-processed-host", expect.any(Object), {
-      jobId: `refund-processed-host:${eventId}`,
+      jobId: `refund-processed-host-${eventId}`,
     });
   });
 });
