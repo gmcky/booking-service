@@ -27,10 +27,11 @@ test.describe("auth flow", () => {
   });
 
   test("login with valid credentials", async ({ page }) => {
-    // Requires a seeded user: test@example.com / password123
+    // Public seeded account (demo@booking.dev / demo1234, see server/prisma/seed.ts) —
+    // has no bookings/properties, safe for e2e to log into repeatedly.
     await page.goto("/login");
-    await page.getByLabel("Email").fill("test@example.com");
-    await page.getByLabel("Password").fill("password123");
+    await page.getByLabel("Email").fill("demo@booking.dev");
+    await page.getByLabel("Password").fill("demo1234");
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await page.waitForURL("/");
@@ -41,8 +42,8 @@ test.describe("auth flow", () => {
     await page.goto("/bookings");
     await page.waitForURL(/\/login\?returnTo=%2Fbookings/);
 
-    await page.getByLabel("Email").fill("test@example.com");
-    await page.getByLabel("Password").fill("password123");
+    await page.getByLabel("Email").fill("demo@booking.dev");
+    await page.getByLabel("Password").fill("demo1234");
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await page.waitForURL("/bookings");
