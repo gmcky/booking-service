@@ -165,14 +165,10 @@ describe("PropertyDetailView reserve card blocked dates", () => {
     renderView();
     await screen.findByText("Pine Ridge Cabin");
 
-    // Note: the check-in/check-out DatePicker triggers are each wrapped in a
-    // <Label> (see BookingCard in property-detail-view.tsx). Because <button>
-    // is a labelable element, that makes the *label's* text ("Check in" /
-    // "Check out") the button's accessible name — its own visible text
-    // ("Add date") is not exposed to assistive tech at all. Querying by the
-    // label text here reflects the actual (arguably unintended) a11y
-    // behavior; see the report note about this.
-    const checkInTrigger = await screen.findByRole("button", { name: "Check in" });
+    // The trigger's accessible name composes the field name with the current
+    // value ("Check in, Add date" / "Check in, Jul 13, 2026") via aria-label,
+    // which wins over the layout <Label> wrapping the picker.
+    const checkInTrigger = await screen.findByRole("button", { name: "Check in, Add date" });
     await userEvent.click(checkInTrigger);
 
     // The calendar opens showing the current month; if the target day

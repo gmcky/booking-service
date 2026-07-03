@@ -501,6 +501,7 @@ function BookingCard({
                 value={checkIn}
                 onChange={onCheckInChange}
                 placeholder="Add date"
+                label="Check in"
                 disabledDates={[{ before: today }, ...blockedMatchers]}
               />
             </Label>
@@ -512,6 +513,7 @@ function BookingCard({
                 value={checkOut}
                 onChange={onCheckOutChange}
                 placeholder="Add date"
+                label="Check out"
                 disabledDates={[
                   { before: addDays(checkIn ?? today, 1) },
                   ...checkoutMatchers,
