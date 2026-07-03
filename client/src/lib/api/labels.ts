@@ -2,6 +2,16 @@ import type { components } from "./schema";
 
 export type PropertyType = components["schemas"]["PropertyType"];
 export type Amenity = components["schemas"]["Amenity"];
+export type PaymentStatus = components["schemas"]["PaymentStatus"];
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  PENDING: "Payment pending",
+  SUCCESS: "Payment successful",
+  REFUND_PROCESSING: "Refund processing",
+  REFUND_REQUESTED: "Refund requested",
+  FAILED: "Payment failed",
+  REFUNDED: "Refunded",
+};
 
 export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   HOTEL_ROOM: "Hotel room",
@@ -64,4 +74,8 @@ export function typeLabel(value: string): string {
 
 export function amenityLabel(value: string): string {
   return (AMENITY_LABELS as Record<string, string>)[value] ?? titleCase(value);
+}
+
+export function paymentStatusLabel(value: string): string {
+  return (PAYMENT_STATUS_LABELS as Record<string, string>)[value] ?? titleCase(value);
 }
