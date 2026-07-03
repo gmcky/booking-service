@@ -15,8 +15,8 @@ import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
 
-/** Stop polling a still-pending booking after this many refetches (~30s). */
-const MAX_POLLS = 15;
+/** Stop polling a still-pending booking after this window. */
+const POLL_WINDOW_MS = 30_000;
 
 export default function ConfirmationPage() {
   return (
@@ -34,19 +34,25 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function ConfirmationInner() {
   const bookingId = useSearchParams().get("bookingId") ?? "";
-  const pollCountRef = React.useRef(0);
+  // Wall-clock timeout, flipped via state so the UI re-renders when it
+  // expires. The refetchInterval callback runs on every observer evaluation,
+  // not once per poll — a counter there over- or under-counts.
+  const [timedOut, setTimedOut] = React.useState(false);
 
-  const { data: booking, isPending, isError } = useQuery({
+  const { data: booking, isPending, isError, refetch } = useQuery({
     queryKey: queryKeys.bookings.detail(bookingId),
     queryFn: () => bookingApi.byId(bookingId),
     enabled: Boolean(bookingId),
-    refetchInterval: (query) => {
-      if (query.state.data?.status !== "PENDING") return false;
-      if (pollCountRef.current >= MAX_POLLS) return false;
-      pollCountRef.current += 1;
-      return 2000;
-    },
+    refetchInterval: (query) =>
+      query.state.data?.status === "PENDING" && !timedOut ? 2000 : false,
   });
+
+  const status = booking?.status;
+  React.useEffect(() => {
+    if (status !== "PENDING" || timedOut) return;
+    const t = setTimeout(() => setTimedOut(true), POLL_WINDOW_MS);
+    return () => clearTimeout(t);
+  }, [status, timedOut]);
 
   if (!bookingId || isError) {
     return (
@@ -73,16 +79,22 @@ function ConfirmationInner() {
   const processing = booking.status === "PENDING";
   const cancelled = booking.status === "CANCELLED";
 
+  const stalled = processing && timedOut;
+
   const heading = confirmed
     ? "Booking confirmed"
-    : processing
-      ? "Processing payment…"
-      : "Payment failed";
+    : stalled
+      ? "Still processing"
+      : processing
+        ? "Processing payment…"
+        : "Payment failed";
   const body = confirmed
     ? "We've emailed your itinerary and receipt. The host will reach out before check-in."
-    : processing
-      ? "Your payment is being confirmed. This can take a moment — it's safe to leave this page, we'll email you as soon as it's done."
-      : "Your payment couldn't be completed and this booking was cancelled. You can try booking again.";
+    : stalled
+      ? "This is taking longer than usual. Your payment is safe — we'll email you once the booking confirms, or you can check again now."
+      : processing
+        ? "Your payment is being confirmed. This can take a moment — it's safe to leave this page, we'll email you as soon as it's done."
+        : "Your payment couldn't be completed and this booking was cancelled. You can try booking again.";
 
   return (
     <Centered>
@@ -163,7 +175,18 @@ function ConfirmationInner() {
           </div>
 
           <div className="mt-6 flex flex-col gap-2.5">
-            {cancelled ? (
+            {stalled ? (
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => {
+                  setTimedOut(false); // restarts the poll window
+                  refetch();
+                }}
+              >
+                Check again
+              </Button>
+            ) : cancelled ? (
               <Button
                 nativeButton={false}
                 size="lg"

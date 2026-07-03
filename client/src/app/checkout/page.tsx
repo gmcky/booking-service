@@ -53,6 +53,11 @@ function CheckoutInner() {
   const [booking, setBooking] = React.useState<BookingWithProperty | null>(null);
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
 
+  // Booking state is component-local, so back-nav or a remount would lose the
+  // PENDING booking and a fresh create would 409 against it (own dates
+  // overlap). Remember the booking id per trip and resume it instead.
+  const resumeKey = `checkout:${propertyId}:${checkIn}:${checkOut}`;
+
   const propertyQuery = useQuery({
     queryKey: queryKeys.properties.detail(propertyId),
     queryFn: () => propertyApi.byId(propertyId),
@@ -80,10 +85,32 @@ function CheckoutInner() {
     },
     onSuccess: (b) => {
       setBooking(b);
+      sessionStorage.setItem(resumeKey, b.id);
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
       intentMutation.mutate(b.id);
     },
   });
+
+  const resumedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (resumedRef.current) return;
+    resumedRef.current = true;
+    const storedId = sessionStorage.getItem(resumeKey);
+    if (!storedId) return;
+    bookingApi
+      .byId(storedId)
+      .then((b) => {
+        if (b.status === "PENDING") {
+          setBooking(b);
+          setGuests(b.guests);
+          intentMutation.mutate(b.id); // idempotent server-side, same clientSecret
+        } else {
+          sessionStorage.removeItem(resumeKey);
+        }
+      })
+      .catch(() => sessionStorage.removeItem(resumeKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function onContinue() {
     if (booking) {
@@ -125,6 +152,7 @@ function CheckoutInner() {
 
   function goToConfirmation() {
     if (!booking) return;
+    sessionStorage.removeItem(resumeKey);
     router.push(`/confirmation?bookingId=${booking.id}`);
   }
 
