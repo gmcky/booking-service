@@ -4,14 +4,19 @@ import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Calendar, Loader2 } from "lucide-react";
+import { Check, Calendar, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { bookingApi } from "@/lib/api/bookings";
+import { paymentStatusLabel } from "@/lib/api/labels";
 import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
+
+/** Stop polling a still-pending booking after this window. */
+const POLL_WINDOW_MS = 30_000;
 
 export default function ConfirmationPage() {
   return (
@@ -29,12 +34,25 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function ConfirmationInner() {
   const bookingId = useSearchParams().get("bookingId") ?? "";
+  // Wall-clock timeout, flipped via state so the UI re-renders when it
+  // expires. The refetchInterval callback runs on every observer evaluation,
+  // not once per poll — a counter there over- or under-counts.
+  const [timedOut, setTimedOut] = React.useState(false);
 
-  const { data: booking, isPending, isError } = useQuery({
+  const { data: booking, isPending, isError, refetch } = useQuery({
     queryKey: queryKeys.bookings.detail(bookingId),
     queryFn: () => bookingApi.byId(bookingId),
     enabled: Boolean(bookingId),
+    refetchInterval: (query) =>
+      query.state.data?.status === "PENDING" && !timedOut ? 2000 : false,
   });
+
+  const status = booking?.status;
+  React.useEffect(() => {
+    if (status !== "PENDING" || timedOut) return;
+    const t = setTimeout(() => setTimedOut(true), POLL_WINDOW_MS);
+    return () => clearTimeout(t);
+  }, [status, timedOut]);
 
   if (!bookingId || isError) {
     return (
@@ -57,7 +75,26 @@ function ConfirmationInner() {
     );
   }
 
-  const confirmed = booking.status === "CONFIRMED";
+  const confirmed = booking.status === "CONFIRMED" || booking.status === "COMPLETED";
+  const processing = booking.status === "PENDING";
+  const cancelled = booking.status === "CANCELLED";
+
+  const stalled = processing && timedOut;
+
+  const heading = confirmed
+    ? "Booking confirmed"
+    : stalled
+      ? "Still processing"
+      : processing
+        ? "Processing payment…"
+        : "Payment failed";
+  const body = confirmed
+    ? "We've emailed your itinerary and receipt. The host will reach out before check-in."
+    : stalled
+      ? "This is taking longer than usual. Your payment is safe — we'll email you once the booking confirms, or you can check again now."
+      : processing
+        ? "Your payment is being confirmed. This can take a moment — it's safe to leave this page, we'll email you as soon as it's done."
+        : "Your payment couldn't be completed and this booking was cancelled. You can try booking again.";
 
   return (
     <Centered>
@@ -72,16 +109,16 @@ function ConfirmationInner() {
       <div className="w-full max-w-[440px]">
         <Card className="px-8 pt-9 pb-8 text-center">
           <div className="mx-auto mb-5 flex size-13 items-center justify-center rounded-full border border-border bg-muted">
-            <Check className="size-6" strokeWidth={1.75} />
+            {processing ? (
+              <Loader2 className="size-6 animate-spin" strokeWidth={1.75} />
+            ) : cancelled ? (
+              <X className="size-6" strokeWidth={1.75} />
+            ) : (
+              <Check className="size-6" strokeWidth={1.75} />
+            )}
           </div>
-          <h1 className="mb-1.5 text-[23px] font-semibold tracking-tight">
-            {confirmed ? "Booking confirmed" : "Booking received"}
-          </h1>
-          <p className="mb-[22px] text-sm text-muted-foreground text-pretty">
-            {confirmed
-              ? "We've emailed your itinerary and receipt. The host will reach out before check-in."
-              : "We've emailed your receipt. You'll be charged once the host confirms your stay."}
-          </p>
+          <h1 className="mb-1.5 text-[23px] font-semibold tracking-tight">{heading}</h1>
+          <p className="mb-[22px] text-sm text-muted-foreground text-pretty">{body}</p>
 
           <div className="mb-6 flex items-center justify-center gap-2">
             <span className="font-mono text-xs tracking-wide text-muted-foreground uppercase">
@@ -127,17 +164,47 @@ function ConfirmationInner() {
               </span>
               <span className="text-base font-semibold">{formatPrice(booking.totalPrice)}</span>
             </div>
+            {booking.payment ? (
+              <div className="flex items-center justify-between border-t border-border p-3.5">
+                <span className="text-sm text-muted-foreground">Payment</span>
+                <Badge variant={confirmed ? "secondary" : cancelled ? "destructive" : "outline"}>
+                  {paymentStatusLabel(booking.payment.status)}
+                </Badge>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 flex flex-col gap-2.5">
-            <Button
-              nativeButton={false}
-              size="lg"
-              className="w-full"
-              render={<Link href={`/bookings`} />}
-            >
-              View booking
-            </Button>
+            {stalled ? (
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => {
+                  setTimedOut(false); // restarts the poll window
+                  refetch();
+                }}
+              >
+                Check again
+              </Button>
+            ) : cancelled ? (
+              <Button
+                nativeButton={false}
+                size="lg"
+                className="w-full"
+                render={<Link href={`/properties/${booking.property.id}`} />}
+              >
+                Try booking again
+              </Button>
+            ) : (
+              <Button
+                nativeButton={false}
+                size="lg"
+                className="w-full"
+                render={<Link href={`/bookings`} />}
+              >
+                View booking
+              </Button>
+            )}
             <Button
               nativeButton={false}
               variant="outline"
