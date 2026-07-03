@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { bookingApi, type BookingListItem } from "@/lib/api/bookings";
+import { ReviewFormDialog } from "@/components/reviews/review-form-dialog";
 import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
 import { calculateRefundPreview } from "@/lib/utils/refund";
+import { reviewEligibility } from "@/lib/utils/reviews";
 import { queryKeys } from "@/lib/query/keys";
 import {
   AlertDialog,
@@ -169,6 +171,10 @@ function BookingRow({
     booking.status === "CONFIRMED"
       ? calculateRefundPreview(booking.checkIn, booking.totalPrice)
       : null;
+  const review =
+    booking.status === "COMPLETED"
+      ? reviewEligibility(booking.actualCheckOutAt, booking.checkOut)
+      : null;
   return (
     <Card className="p-3.5 transition-[border-color,box-shadow] hover:border-ring hover:shadow-sm">
       <div className="flex items-stretch gap-[18px] max-sm:flex-col">
@@ -264,15 +270,35 @@ function BookingRow({
               </AlertDialogContent>
             </AlertDialog>
           ) : tab === "past" ? (
-            <Button
-              nativeButton={false}
-              variant="ghost"
-              size="sm"
-              className="w-[100px]"
-              render={<Link href={`/properties/${booking.propertyId}`} />}
-            >
-              Book again
-            </Button>
+            <>
+              {review?.eligible ? (
+                <>
+                  <ReviewFormDialog
+                    mode="create"
+                    bookingId={booking.id}
+                    propertyId={booking.propertyId}
+                    propertyTitle={booking.property.title}
+                    trigger={<Button variant="outline" size="sm" className="w-[100px]" />}
+                  >
+                    Leave a review
+                  </ReviewFormDialog>
+                  {review.daysRemaining <= 7 ? (
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {review.daysRemaining} {review.daysRemaining === 1 ? "day" : "days"} left
+                    </span>
+                  ) : null}
+                </>
+              ) : null}
+              <Button
+                nativeButton={false}
+                variant="ghost"
+                size="sm"
+                className="w-[100px]"
+                render={<Link href={`/properties/${booking.propertyId}`} />}
+              >
+                Book again
+              </Button>
+            </>
           ) : null}
         </div>
       </div>

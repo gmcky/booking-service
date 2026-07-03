@@ -677,19 +677,10 @@ export class ReviewService {
       throw new AppError(400, "Rating must be between 1 and 5");
     }
 
-    if (error.code !== "P2002") {
-      // Unknown review constraint; let caller rethrow original Prisma error.
-      return;
-    }
-
-    const target = Array.isArray(error.meta?.target)
-      ? error.meta.target.join(",")
-      : String(error.meta?.target ?? "");
-
-    if (target.includes("bookingId")) {
+    if (error.code === "P2002") {
+      // bookingId is the only unique constraint Review can violate on create/update
+      // (besides id, which won't collide) — no need to inspect error.meta.target.
       throw new AppError(409, "This booking already has a review");
     }
-
-    // Only bookingId unique is remapped; other uniques pass through.
   }
 }
