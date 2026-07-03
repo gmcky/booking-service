@@ -32,33 +32,63 @@ function FormField<
   );
 }
 
+type FormItemContextValue = { id: string };
+
+const FormItemContext = React.createContext<FormItemContextValue>({} as FormItemContextValue);
+
 function useFormField() {
   const fieldContext = React.useContext(FormFieldContext);
+  const itemContext = React.useContext(FormItemContext);
   const { getFieldState, formState } = useFormContext();
   const fieldState = getFieldState(fieldContext.name, formState);
-  return { name: fieldContext.name, ...fieldState };
+  return {
+    name: fieldContext.name,
+    formItemId: `${itemContext.id}-form-item`,
+    formMessageId: `${itemContext.id}-form-item-message`,
+    ...fieldState,
+  };
 }
 
 function FormItem({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("space-y-1", className)} {...props} />;
+  const id = React.useId();
+  return (
+    <FormItemContext.Provider value={{ id }}>
+      <div className={cn("space-y-1", className)} {...props} />
+    </FormItemContext.Provider>
+  );
 }
 
 function FormLabel({ className, ...props }: React.ComponentPropsWithoutRef<typeof Label>) {
-  const { error } = useFormField();
-  return <Label className={cn(error && "text-destructive", className)} {...props} />;
+  const { error, formItemId } = useFormField();
+  return (
+    <Label
+      htmlFor={formItemId}
+      className={cn(error && "text-destructive", className)}
+      {...props}
+    />
+  );
 }
 
-function FormControl({ ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  const { error } = useFormField();
-  return <div aria-invalid={!!error} {...props} />;
+/**
+ * Clones its single child (the actual input) instead of wrapping it in a
+ * div — htmlFor/aria-describedby must land on the real form control, not a
+ * wrapper element, or label association silently breaks.
+ */
+function FormControl({ children }: { children: React.ReactElement<React.HTMLAttributes<HTMLElement>> }) {
+  const { error, formItemId, formMessageId } = useFormField();
+  return React.cloneElement(children, {
+    id: formItemId,
+    "aria-describedby": error ? formMessageId : undefined,
+    "aria-invalid": !!error,
+  } as React.HTMLAttributes<HTMLElement>);
 }
 
 function FormMessage({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  const { error } = useFormField();
+  const { error, formMessageId } = useFormField();
   const body = error ? String(error.message) : children;
   if (!body) return null;
   return (
-    <p className={cn("text-sm text-destructive", className)} {...props}>
+    <p id={formMessageId} className={cn("text-sm text-destructive", className)} {...props}>
       {body}
     </p>
   );
