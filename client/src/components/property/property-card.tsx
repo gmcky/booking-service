@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import type { Property } from "@/lib/api/properties";
 import { formatPrice, formatRating } from "@/lib/utils/money";
-import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 
 export function PropertyCard({ property }: { property: Property }) {
   const rating = formatRating(property.averageRating);
@@ -19,7 +19,7 @@ export function PropertyCard({ property }: { property: Property }) {
         {property.images[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={property.images[0]}
+            src={photoUrl(property.images[0])}
             alt={property.title}
             className="size-full object-cover"
           />

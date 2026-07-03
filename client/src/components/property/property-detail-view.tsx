@@ -17,7 +17,7 @@ import { propertyApi, type PropertyReview } from "@/lib/api/properties";
 import { bookingApi } from "@/lib/api/bookings";
 import { amenityLabel, typeLabel } from "@/lib/api/labels";
 import { formatPrice, formatRating } from "@/lib/utils/money";
-import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { isoToLocalDate, nightsBetween, toISODate } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -182,7 +182,7 @@ function Gallery({ images, title }: { images: string[]; title: string }) {
         >
           {src ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={src} alt={title} className="size-full object-cover" />
+            <img src={photoUrl(src)} alt={title} className="size-full object-cover" />
           ) : (
             <span className="font-mono text-[11px] text-muted-foreground">no photo</span>
           )}

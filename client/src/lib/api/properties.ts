@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import { unwrap, unwrapVoid } from "./unwrap";
-import type { components } from "./schema";
+import type { components, paths } from "./schema";
 
 export type PropertyType = components["schemas"]["PropertyType"];
 export type Amenity = components["schemas"]["Amenity"];
@@ -39,7 +39,14 @@ export interface CreatePropertyInput {
   pricePerNight: number;
   maxGuests: number;
   amenities: string[];
+  rawImagePaths?: string[];
 }
+
+/** PATCH accepts finalized image URLs only — no raw upload paths on update. */
+export type UpdatePropertyInput = Omit<Partial<CreatePropertyInput>, "rawImagePaths">;
+
+type UploadImagesBody =
+  paths["/properties/images"]["post"]["requestBody"]["content"]["multipart/form-data"];
 
 export const propertyApi = {
   search: async (query: PropertyQuery = {}): Promise<Paginated<Property>> => {
@@ -77,7 +84,32 @@ export const propertyApi = {
 
   create: async (input: CreatePropertyInput): Promise<HostProperty> => {
     const { data, error, response } = await apiClient.POST("/properties", {
-      body: { ...input, amenities: input.amenities as Amenity[], rawImagePaths: [] },
+      body: {
+        ...input,
+        amenities: input.amenities as Amenity[],
+        rawImagePaths: input.rawImagePaths ?? [],
+      },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  update: async (id: string, input: UpdatePropertyInput): Promise<HostProperty> => {
+    const { data, error, response } = await apiClient.PATCH("/properties/{id}", {
+      params: { path: { id } },
+      body: { ...input, amenities: input.amenities as Amenity[] | undefined },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  /**
+   * Multipart upload; same FormData-through-typed-client cast as
+   * userApi.updateProfile (openapi-fetch passes FormData straight through).
+   */
+  uploadImages: async (files: File[]): Promise<{ paths: string[] }> => {
+    const form = new FormData();
+    for (const file of files) form.append("images", file);
+    const { data, error, response } = await apiClient.POST("/properties/images", {
+      body: form as unknown as UploadImagesBody,
     });
     return unwrap({ data, error, response });
   },
