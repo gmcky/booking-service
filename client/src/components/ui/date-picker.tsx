@@ -20,6 +20,7 @@ function DatePicker({
   disabled,
   disabledDates,
   defaultMonth,
+  label,
 }: {
   value?: Date;
   onChange?: (date?: Date) => void;
@@ -27,6 +28,14 @@ function DatePicker({
   disabled?: boolean;
   disabledDates?: React.ComponentProps<typeof Calendar>["disabled"];
   defaultMonth?: Date;
+  /**
+   * Field name for assistive tech, e.g. "Check in". Callers wrap the picker
+   * in a <label> for layout, which would make the label text the button's
+   * entire accessible name and hide the selected date from screen readers —
+   * aria-label wins over the native label, so composing both here keeps the
+   * name and the current value audible.
+   */
+  label?: string;
 }) {
   return (
     <Popover>
@@ -35,6 +44,9 @@ function DatePicker({
           <Button
             variant="outline"
             disabled={disabled}
+            aria-label={
+              label ? `${label}, ${value ? format(value, "PP") : placeholder}` : undefined
+            }
             className={cn(
               "w-full justify-start gap-2 font-normal",
               !value && "text-muted-foreground",

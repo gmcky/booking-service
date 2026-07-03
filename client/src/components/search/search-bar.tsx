@@ -52,7 +52,7 @@ export function SearchBar() {
           <span className="mb-1.5 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
             Check in
           </span>
-          <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Add date" />
+          <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Add date" label="Check in" />
         </label>
 
         <Divider />
@@ -61,7 +61,7 @@ export function SearchBar() {
           <span className="mb-1.5 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
             Check out
           </span>
-          <DatePicker value={checkOut} onChange={setCheckOut} placeholder="Add date" />
+          <DatePicker value={checkOut} onChange={setCheckOut} placeholder="Add date" label="Check out" />
         </label>
 
         <Divider />

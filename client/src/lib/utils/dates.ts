@@ -22,8 +22,10 @@ export function nightsBetween(checkIn?: Date | string, checkOut?: Date | string)
 }
 
 export function formatRange(checkIn: string, checkOut: string): string {
-  const a = new Date(checkIn);
-  const b = new Date(checkOut);
+  // new Date(iso) is UTC midnight, but toLocaleDateString renders in the host
+  // timezone — negative UTC offsets would display the previous calendar day.
+  const a = isoToLocalDate(checkIn);
+  const b = isoToLocalDate(checkOut);
   const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return `${month(a)} – ${month(b)}, ${b.getFullYear()}`;
 }
