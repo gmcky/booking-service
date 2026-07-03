@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { bookingApi, type BookingListItem } from "@/lib/api/bookings";
 import { formatPrice } from "@/lib/utils/money";
-import { PHOTO_STRIPES } from "@/lib/utils/photo";
+import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -164,7 +164,7 @@ function BookingRow({
           {booking.property.images[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={booking.property.images[0]}
+              src={photoUrl(booking.property.images[0])}
               alt={booking.property.title}
               className="size-full rounded-lg object-cover"
             />
