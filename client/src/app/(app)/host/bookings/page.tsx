@@ -47,7 +47,7 @@ export default function HostBookingsPage() {
     propertyId: propertyId || undefined,
   };
 
-  const { data, isPending, isError, error } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: queryKeys.bookings.host({ status: query.status, propertyId: query.propertyId }),
     queryFn: () => bookingApi.host(query),
   });
@@ -117,7 +117,12 @@ export default function HostBookingsPage() {
         </div>
 
         {isError ? (
-          <p className="py-16 text-center text-sm text-destructive">{(error as Error).message}</p>
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <p className="text-sm text-destructive">{(error as Error).message}</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : isPending ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 2 }).map((_, i) => (
