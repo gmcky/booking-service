@@ -370,7 +370,11 @@ function BookingCard({
   const [guests, setGuests] = React.useState("1");
   const [conflict, setConflict] = React.useState<string | null>(null);
 
-  const { data: blocked } = useQuery({
+  const {
+    data: blocked,
+    isPending: blockedPending,
+    isError: blockedError,
+  } = useQuery({
     queryKey: queryKeys.bookings.blockedDates(propertyId),
     queryFn: () => bookingApi.blockedDates(propertyId),
   });
@@ -517,6 +521,13 @@ function BookingCard({
             />
           </div>
         </div>
+        {blockedPending ? (
+          <p className="text-xs text-muted-foreground">Checking availability…</p>
+        ) : blockedError ? (
+          <p className="text-xs text-amber-600">
+            Couldn't load availability — we'll double-check when you reserve.
+          </p>
+        ) : null}
         <div>
           <Label
             htmlFor="guests"
