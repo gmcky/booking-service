@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays } from "date-fns";
 import { ArrowLeft, MapPin, Star, Check } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -229,6 +229,7 @@ function BookingCard({
   rating: string | null;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const status = useAuthStore((s) => s.status);
   const [checkIn, setCheckIn] = React.useState<Date | undefined>();
   const [checkOut, setCheckOut] = React.useState<Date | undefined>();
@@ -262,6 +263,25 @@ function BookingCard({
     ].filter((r) => r.to >= r.from);
   }, [blocked]);
 
+  // Departure semantics differ: day D is a valid checkout iff night D-1 is
+  // free, so every range shifts one day forward. Reusing the arrival matchers
+  // would wrongly disable an existing booking's check-in day as a departure
+  // (same-day turnover). Ranges spanning a blocked gap are still possible to
+  // select here; check-availability catches those before checkout.
+  const checkoutMatchers = React.useMemo(() => {
+    if (!blocked) return [];
+    return [
+      ...blocked.bookedRanges.map((r) => ({
+        from: addDays(isoToLocalDate(r.checkIn), 1),
+        to: isoToLocalDate(r.checkOut),
+      })),
+      ...blocked.blockedRanges.map((r) => ({
+        from: addDays(isoToLocalDate(r.startDate), 1),
+        to: addDays(isoToLocalDate(r.endDate), 1),
+      })),
+    ].filter((r) => r.to >= r.from);
+  }, [blocked]);
+
   const nights = nightsBetween(checkIn, checkOut);
   const subtotal = nights * Number(pricePerNight);
   const canReserve = nights > 0;
@@ -276,6 +296,11 @@ function BookingCard({
     onSuccess: (available) => {
       if (!available) {
         setConflict("Those dates are no longer available. Please pick different dates.");
+        // Calendar was drawn from stale blocked-dates — refresh so the
+        // rejected range shows as disabled instead of inviting a retry.
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.bookings.blockedDates(propertyId),
+        });
         return;
       }
       const parsedGuests = Number(guests);
@@ -352,7 +377,7 @@ function BookingCard({
               placeholder="Add date"
               disabledDates={[
                 { before: addDays(checkIn ?? today, 1) },
-                ...blockedMatchers,
+                ...checkoutMatchers,
               ]}
               defaultMonth={checkOut ?? checkIn}
             />
