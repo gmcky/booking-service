@@ -12,3 +12,16 @@ route/schema, regenerate it with the backend running on `:3000`:
 ```bash
 pnpm gen:api
 ```
+
+## E2E tests
+
+`pnpm test:e2e` (Playwright) needs both servers running against seeded data:
+
+```bash
+# in server/
+pnpm dev:full   # infra + backend on :3000, seeded via `pnpm db:seed`
+
+# in client/
+pnpm dev        # frontend on :3001
+pnpm test:e2e
+```
