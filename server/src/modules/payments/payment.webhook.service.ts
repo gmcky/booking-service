@@ -193,7 +193,7 @@ export class PaymentWebhookService {
           amountPaid: amountInMainCurrency,
           currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
         },
-        { jobId: `payment-success-guest:${eventId}` },
+        { jobId: `payment-success-guest-${eventId}` },
       );
 
       await emailQueue.add(
@@ -211,7 +211,7 @@ export class PaymentWebhookService {
           amountPaid: amountInMainCurrency,
           currency: String(paymentIntent.currency ?? "usd").toUpperCase(),
         },
-        { jobId: `payment-success-host:${eventId}` },
+        { jobId: `payment-success-host-${eventId}` },
       );
     }
 
@@ -398,7 +398,7 @@ export class PaymentWebhookService {
         totalAmount,
         currency: payment.currency,
       },
-      { jobId: `refund-processed-host:${eventId}` },
+      { jobId: `refund-processed-host-${eventId}` },
     );
 
     logger.info(
