@@ -2,15 +2,16 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
-import { User, Lock, Check, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { User, Lock, BarChart3, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,15 +23,30 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useAuthStore } from "@/lib/auth/store";
 import { endpoints } from "@/lib/api/endpoints";
 import { userApi } from "@/lib/api/users";
+import { pollForAvatarUpdate } from "@/lib/utils/avatar-poll";
+import { formatRating } from "@/lib/utils/money";
+import { queryKeys } from "@/lib/query/keys";
 
-type Section = "profile" | "security";
+const BIO_MAX = 500;
+
+type Section = "profile" | "security" | "stats";
 
 const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: Lock },
+  { id: "stats", label: "Stats", icon: BarChart3 },
 ];
 
 function initials(firstName: string, lastName: string): string {
@@ -75,8 +91,10 @@ export default function AccountPage() {
                 lastNameInit={user.lastName}
                 email={user.email}
               />
-            ) : (
+            ) : section === "security" ? (
               <SecuritySection />
+            ) : (
+              <StatsSection />
             )}
           </div>
         </div>
@@ -106,10 +124,20 @@ function ProfileSection({
   const router = useRouter();
   const [firstName, setFirstName] = React.useState(firstNameInit);
   const [lastName, setLastName] = React.useState(lastNameInit);
+  // GET /users/me only returns the slim CurrentUser shape (no phone/dob/bio);
+  // these start blank and get filled in from the PATCH response once the
+  // user saves — there's no endpoint that returns them on initial load.
+  const [phoneNumber, setPhoneNumber] = React.useState("");
+  const [dateOfBirth, setDateOfBirth] = React.useState("");
+  const [bio, setBio] = React.useState("");
   const setAuth = useAuthStore((s) => s.setAuth);
   const clear = useAuthStore((s) => s.clear);
   const accessToken = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [avatarStatus, setAvatarStatus] = React.useState<"idle" | "uploading" | "processing">(
+    "idle",
+  );
 
   async function handleLogout() {
     try {
@@ -122,14 +150,70 @@ function ProfileSection({
   }
 
   const mutation = useMutation({
-    mutationFn: () => userApi.updateProfile({ firstName, lastName }),
-    onSuccess: () => {
-      if (accessToken && user) {
-        setAuth(accessToken, { ...user, firstName, lastName });
-      }
+    mutationFn: () =>
+      userApi.updateProfile({
+        firstName,
+        lastName,
+        phoneNumber: phoneNumber || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        bio: bio || undefined,
+      }),
+    onSuccess: (result) => {
+      if (result.status !== 200 || !accessToken || !user) return;
+      setAuth(accessToken, { ...user, firstName, lastName, avatarUrl: result.profile.avatarUrl });
+      setPhoneNumber(result.profile.phoneNumber ?? "");
+      setDateOfBirth(result.profile.dateOfBirth?.slice(0, 10) ?? "");
+      setBio(result.profile.bio ?? "");
     },
     onError: (err) => toast.error((err as Error).message),
   });
+
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => userApi.updateProfile({ avatar: file }),
+    onMutate: () => setAvatarStatus("uploading"),
+    onSuccess: async (result) => {
+      if (!accessToken || !user) return;
+      if (result.status === 200) {
+        setAuth(accessToken, { ...user, avatarUrl: result.profile.avatarUrl });
+        toast.success("Photo updated");
+        setAvatarStatus("idle");
+        return;
+      }
+      toast.message("Uploading photo…");
+      setAvatarStatus("processing");
+      try {
+        const fresh = await pollForAvatarUpdate(user.avatarUrl, endpoints.me);
+        if (fresh) {
+          setAuth(accessToken, fresh);
+          toast.success("Photo updated");
+        } else {
+          setAuth(accessToken, await endpoints.me());
+          toast.message("Still processing — check back in a moment");
+        }
+      } catch (err) {
+        toast.error((err as Error).message);
+      } finally {
+        setAvatarStatus("idle");
+      }
+    },
+    onError: (err) => {
+      setAvatarStatus("idle");
+      toast.error((err as Error).message);
+    },
+  });
+
+  const deleteAvatarMutation = useMutation({
+    mutationFn: () => userApi.deleteAvatar(),
+    onSuccess: () => {
+      if (accessToken && user) setAuth(accessToken, { ...user, avatarUrl: null });
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  function onAvatarFileChosen(files: FileList | null) {
+    const file = files?.[0];
+    if (file) avatarMutation.mutate(file);
+  }
 
   return (
     <Card className="p-6">
@@ -140,8 +224,48 @@ function ProfileSection({
 
       <div className="mb-[22px] flex items-center gap-4 border-b border-border pb-[22px]">
         <Avatar className="size-16 text-lg">
+          {user?.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
           <AvatarFallback>{initials(firstName, lastName)}</AvatarFallback>
         </Avatar>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarStatus !== "idle"}
+            >
+              {avatarStatus !== "idle" ? (
+                <>
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  {avatarStatus === "uploading" ? "Uploading…" : "Processing…"}
+                </>
+              ) : (
+                "Change photo"
+              )}
+            </Button>
+            {user?.avatarUrl ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => deleteAvatarMutation.mutate()}
+                disabled={deleteAvatarMutation.isPending}
+              >
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <span className="text-xs text-muted-foreground">JPEG, PNG or WebP</span>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={(e) => onAvatarFileChosen(e.target.files)}
+        />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -155,12 +279,43 @@ function ProfileSection({
             <Input id="last" value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
         </div>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex min-w-50 flex-1 flex-col gap-1.5">
+            <Label htmlFor="phone">Phone number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+            />
+          </div>
+          <div className="flex min-w-50 flex-1 flex-col gap-1.5">
+            <Label htmlFor="dob">Date of birth</Label>
+            <Input
+              id="dob"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="bio">Bio</Label>
+          <Textarea
+            id="bio"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="Tell hosts a bit about yourself"
+            maxLength={BIO_MAX}
+          />
+          <span className="self-end font-mono text-[11px] text-muted-foreground">
+            {bio.length}/{BIO_MAX}
+          </span>
+        </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
           <Input id="email" type="email" value={email} disabled />
-          <span className="text-xs text-muted-foreground">
-            Email changes require verification — managed separately.
-          </span>
+          <EmailChangeDialog currentEmail={email} />
         </div>
       </div>
 
@@ -186,6 +341,118 @@ function ProfileSection({
         </Button>
       </div>
     </Card>
+  );
+}
+
+function EmailChangeDialog({ currentEmail }: { currentEmail: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [step, setStep] = React.useState<"request" | "confirm">("request");
+  const [newEmail, setNewEmail] = React.useState("");
+  const [otp, setOtp] = React.useState("");
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const user = useAuthStore((s) => s.user);
+
+  function reset() {
+    setStep("request");
+    setNewEmail("");
+    setOtp("");
+  }
+
+  const requestMutation = useMutation({
+    mutationFn: () => userApi.requestEmailChange(newEmail),
+    onSuccess: () => {
+      toast.success("Verification code sent");
+      setStep("confirm");
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: () => userApi.confirmEmailChange(otp),
+    onSuccess: () => {
+      if (accessToken && user) setAuth(accessToken, { ...user, email: newEmail });
+      toast.success("Email updated");
+      setOpen(false);
+      reset();
+    },
+    onError: (err) => {
+      const message = (err as Error).message;
+      toast.error(message);
+      // 5 wrong attempts kills the whole OTP — no point staying on step 2.
+      if (message.toLowerCase().includes("too many")) reset();
+    },
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          reset();
+          requestMutation.reset();
+          confirmMutation.reset();
+        }
+      }}
+    >
+      <DialogTrigger render={<Button variant="link" size="sm" className="h-auto w-fit p-0" />}>
+        Change email
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Change email</DialogTitle>
+          <DialogDescription>
+            {step === "request"
+              ? `Currently ${currentEmail}. We'll send a code to confirm the new address.`
+              : `Enter the 6-digit code sent to ${newEmail}.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === "request" ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-email">New email</Label>
+            <Input
+              id="new-email"
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              autoFocus
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="otp">Verification code</Label>
+            <Input
+              id="otp"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              autoFocus
+            />
+          </div>
+        )}
+
+        <DialogFooter>
+          {step === "request" ? (
+            <Button
+              onClick={() => requestMutation.mutate()}
+              disabled={!newEmail || requestMutation.isPending}
+            >
+              {requestMutation.isPending ? "Sending…" : "Send code"}
+            </Button>
+          ) : (
+            <Button
+              onClick={() => confirmMutation.mutate()}
+              disabled={otp.length !== 6 || confirmMutation.isPending}
+            >
+              {confirmMutation.isPending ? "Confirming…" : "Confirm"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -328,5 +595,43 @@ function SecuritySection() {
         </div>
       </div>
     </div>
+  );
+}
+
+function StatsSection() {
+  const { data, isPending } = useQuery({
+    queryKey: queryKeys.users.stats,
+    queryFn: () => userApi.getStats(),
+  });
+
+  const tiles = data
+    ? [
+        { label: "Completed stays", value: String(data.completedBookingsCount) },
+        { label: "Nights stayed", value: String(data.completedNights) },
+        { label: "Rating as guest", value: formatRating(data.averageRatingAsGuest) ?? "—" },
+        { label: "Rating as host", value: formatRating(data.averageRatingAsHost) ?? "—" },
+        { label: "Listings", value: String(data.listingsCount) },
+      ]
+    : [];
+
+  return (
+    <Card className="p-6">
+      <h2 className="text-[17px] font-semibold tracking-tight">Stats</h2>
+      <p className="mb-[22px] text-sm text-muted-foreground">
+        A summary of your activity as a guest and host.
+      </p>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {isPending
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-lg bg-muted" />
+            ))
+          : tiles.map((tile) => (
+              <div key={tile.label} className="rounded-lg border border-border p-4">
+                <div className="text-2xl font-semibold tracking-tight">{tile.value}</div>
+                <div className="mt-1 text-[13px] text-muted-foreground">{tile.label}</div>
+              </div>
+            ))}
+      </div>
+    </Card>
   );
 }

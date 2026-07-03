@@ -112,6 +112,14 @@ userRouter.get("/me/stats", authenticate, asyncHandler(getCurrentUserStats));
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UserProfile'
+ *       202:
+ *         description: Avatar upload accepted, processing in background
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
