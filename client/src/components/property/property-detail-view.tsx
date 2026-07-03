@@ -284,7 +284,12 @@ function PropertyReviews({
       </div>
 
       {listQuery.isError ? (
-        <p className="text-sm text-destructive">{(listQuery.error as Error).message}</p>
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <p className="text-sm text-destructive">{(listQuery.error as Error).message}</p>
+          <Button variant="outline" size="sm" onClick={() => listQuery.refetch()}>
+            Try again
+          </Button>
+        </div>
       ) : listQuery.isPending ? (
         <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (

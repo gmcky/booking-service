@@ -194,9 +194,12 @@ function BrowseResults() {
         ) : null}
 
         {query.isError ? (
-          <p className="py-16 text-center text-sm text-destructive">
-            {(query.error as Error).message}
-          </p>
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <p className="text-sm text-destructive">{(query.error as Error).message}</p>
+            <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : query.isPending ? (
           <ResultsSkeleton />
         ) : items.length === 0 ? (
