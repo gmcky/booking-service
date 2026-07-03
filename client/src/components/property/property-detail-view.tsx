@@ -284,7 +284,12 @@ function PropertyReviews({
       </div>
 
       {listQuery.isError ? (
-        <p className="text-sm text-destructive">{(listQuery.error as Error).message}</p>
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <p className="text-sm text-destructive">{(listQuery.error as Error).message}</p>
+          <Button variant="outline" size="sm" onClick={() => listQuery.refetch()}>
+            Try again
+          </Button>
+        </div>
       ) : listQuery.isPending ? (
         <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -365,7 +370,11 @@ function BookingCard({
   const [guests, setGuests] = React.useState("1");
   const [conflict, setConflict] = React.useState<string | null>(null);
 
-  const { data: blocked } = useQuery({
+  const {
+    data: blocked,
+    isPending: blockedPending,
+    isError: blockedError,
+  } = useQuery({
     queryKey: queryKeys.bookings.blockedDates(propertyId),
     queryFn: () => bookingApi.blockedDates(propertyId),
   });
@@ -486,32 +495,39 @@ function BookingCard({
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+            <Label className="mb-1.5 flex-col items-start font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
               Check in
+              <DatePicker
+                value={checkIn}
+                onChange={onCheckInChange}
+                placeholder="Add date"
+                disabledDates={[{ before: today }, ...blockedMatchers]}
+              />
             </Label>
-            <DatePicker
-              value={checkIn}
-              onChange={onCheckInChange}
-              placeholder="Add date"
-              disabledDates={[{ before: today }, ...blockedMatchers]}
-            />
           </div>
           <div>
-            <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+            <Label className="mb-1.5 flex-col items-start font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
               Check out
+              <DatePicker
+                value={checkOut}
+                onChange={onCheckOutChange}
+                placeholder="Add date"
+                disabledDates={[
+                  { before: addDays(checkIn ?? today, 1) },
+                  ...checkoutMatchers,
+                ]}
+                defaultMonth={checkOut ?? checkIn}
+              />
             </Label>
-            <DatePicker
-              value={checkOut}
-              onChange={onCheckOutChange}
-              placeholder="Add date"
-              disabledDates={[
-                { before: addDays(checkIn ?? today, 1) },
-                ...checkoutMatchers,
-              ]}
-              defaultMonth={checkOut ?? checkIn}
-            />
           </div>
         </div>
+        {blockedPending ? (
+          <p className="text-xs text-muted-foreground">Checking availability…</p>
+        ) : blockedError ? (
+          <p className="text-xs text-amber-600">
+            Couldn't load availability — we'll double-check when you reserve.
+          </p>
+        ) : null}
         <div>
           <Label
             htmlFor="guests"

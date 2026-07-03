@@ -11,6 +11,11 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Booking Service",
   description: "Find and book unique places to stay",
+  openGraph: {
+    title: "Booking Service",
+    description: "Find and book unique places to stay",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

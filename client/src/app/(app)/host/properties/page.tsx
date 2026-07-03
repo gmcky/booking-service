@@ -26,7 +26,7 @@ import {
 
 export default function HostPropertiesPage() {
   const queryClient = useQueryClient();
-  const { data, isPending, isError, error } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: queryKeys.properties.mine,
     queryFn: () => propertyApi.mine(),
   });
@@ -75,7 +75,12 @@ export default function HostPropertiesPage() {
         </div>
 
         {isError ? (
-          <p className="py-16 text-center text-sm text-destructive">{(error as Error).message}</p>
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <p className="text-sm text-destructive">{(error as Error).message}</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : isPending ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
             {Array.from({ length: 4 }).map((_, i) => (

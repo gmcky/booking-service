@@ -1,8 +1,7 @@
 import createClient from "openapi-fetch";
 import type { paths } from "./schema";
 import { useAuthStore } from "@/lib/auth/store";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+import { BASE_URL } from "./base-url";
 
 /**
  * Refresh cookie is httpOnly and path-scoped to /api/v1/auth, so only auth
