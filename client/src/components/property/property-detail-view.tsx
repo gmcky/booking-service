@@ -495,30 +495,30 @@ function BookingCard({
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+            <Label className="mb-1.5 flex-col items-start font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
               Check in
+              <DatePicker
+                value={checkIn}
+                onChange={onCheckInChange}
+                placeholder="Add date"
+                disabledDates={[{ before: today }, ...blockedMatchers]}
+              />
             </Label>
-            <DatePicker
-              value={checkIn}
-              onChange={onCheckInChange}
-              placeholder="Add date"
-              disabledDates={[{ before: today }, ...blockedMatchers]}
-            />
           </div>
           <div>
-            <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+            <Label className="mb-1.5 flex-col items-start font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
               Check out
+              <DatePicker
+                value={checkOut}
+                onChange={onCheckOutChange}
+                placeholder="Add date"
+                disabledDates={[
+                  { before: addDays(checkIn ?? today, 1) },
+                  ...checkoutMatchers,
+                ]}
+                defaultMonth={checkOut ?? checkIn}
+              />
             </Label>
-            <DatePicker
-              value={checkOut}
-              onChange={onCheckOutChange}
-              placeholder="Add date"
-              disabledDates={[
-                { before: addDays(checkIn ?? today, 1) },
-                ...checkoutMatchers,
-              ]}
-              defaultMonth={checkOut ?? checkIn}
-            />
           </div>
         </div>
         {blockedPending ? (

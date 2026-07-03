@@ -264,12 +264,15 @@ function FilterPanel({
     <div className="mb-6 rounded-xl border border-border bg-card p-5">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <Label className="text-[13px] font-medium">Price per night</Label>
-          <div className="mt-2.5 flex items-center gap-2">
+          <Label className="text-[13px] font-medium" id="price-range-label">
+            Price per night
+          </Label>
+          <div className="mt-2.5 flex items-center gap-2" role="group" aria-labelledby="price-range-label">
             <Input
               type="number"
               min={0}
               placeholder="$50"
+              aria-label="Minimum price per night"
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
             />
@@ -278,6 +281,7 @@ function FilterPanel({
               type="number"
               min={0}
               placeholder="$600"
+              aria-label="Maximum price per night"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
             />
@@ -285,8 +289,11 @@ function FilterPanel({
         </div>
 
         <div>
-          <Label className="text-[13px] font-medium">Guests</Label>
+          <Label className="text-[13px] font-medium" htmlFor="max-guests">
+            Guests
+          </Label>
           <Input
+            id="max-guests"
             type="number"
             min={1}
             placeholder="Any"
