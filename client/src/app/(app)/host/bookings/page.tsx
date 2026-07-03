@@ -135,6 +135,7 @@ export default function HostBookingsPage() {
                 onConfirm={() => statusMutation.mutate({ id: b.id, status: "CONFIRMED" })}
                 onComplete={() => statusMutation.mutate({ id: b.id, status: "COMPLETED" })}
                 busy={statusMutation.isPending && statusMutation.variables?.id === b.id}
+                disabled={statusMutation.isPending}
               />
             ))}
           </div>
@@ -171,11 +172,16 @@ function BookingRow({
   onConfirm,
   onComplete,
   busy,
+  disabled,
 }: {
   booking: HostBooking;
   onConfirm: () => void;
   onComplete: () => void;
   busy: boolean;
+  // busy drives the spinner on the acting row; disabled gates every row while
+  // any status PATCH is in flight — the mutation instance is shared, so
+  // `variables` (and thus busy) flips to the latest call mid-flight.
+  disabled: boolean;
 }) {
   const badge = statusBadge(booking);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -246,7 +252,9 @@ function BookingRow({
           {booking.status === "PENDING" ? (
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger
-                render={<Button variant="default" size="sm" className="w-[130px]" disabled={busy} />}
+                render={
+                  <Button variant="default" size="sm" className="w-[130px]" disabled={disabled} />
+                }
               >
                 {busy ? <Loader2 className="animate-spin" /> : <Check />}
                 Confirm
@@ -277,7 +285,9 @@ function BookingRow({
           ) : canComplete ? (
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger
-                render={<Button variant="outline" size="sm" className="w-[130px]" disabled={busy} />}
+                render={
+                  <Button variant="outline" size="sm" className="w-[130px]" disabled={disabled} />
+                }
               >
                 {busy ? <Loader2 className="animate-spin" /> : <Check />}
                 Mark completed

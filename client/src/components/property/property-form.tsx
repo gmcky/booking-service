@@ -143,6 +143,17 @@ export function PropertyForm({
     });
   }
 
+  // Revoke preview object URLs still held at unmount (e.g. after the
+  // post-publish redirect) — removePhoto only covers manual removal.
+  const uploadedRef = React.useRef(uploaded);
+  uploadedRef.current = uploaded;
+  React.useEffect(
+    () => () => {
+      uploadedRef.current.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    },
+    [],
+  );
+
   function toggleAmenity(value: string) {
     setAmenities((prev) =>
       prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value],
