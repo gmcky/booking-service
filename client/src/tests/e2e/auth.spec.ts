@@ -2,6 +2,11 @@ import { test, expect } from "@playwright/test";
 
 const uniqueEmail = () => `test+${Date.now()}@example.com`;
 
+// Defaults exist in the local dev seed — override via env for other
+// environments.
+const GUEST_EMAIL = process.env.E2E_GUEST_EMAIL ?? "demo@booking.dev";
+const GUEST_PASSWORD = process.env.E2E_GUEST_PASSWORD ?? "demo1234";
+
 test.describe("auth flow", () => {
   test("register → home → profile → logout", async ({ page }) => {
     const email = uniqueEmail();
@@ -30,8 +35,8 @@ test.describe("auth flow", () => {
     // Public seeded account (demo@booking.dev / demo1234, see server/prisma/seed.ts) —
     // has no bookings/properties, safe for e2e to log into repeatedly.
     await page.goto("/login");
-    await page.getByLabel("Email").fill("demo@booking.dev");
-    await page.getByLabel("Password").fill("demo1234");
+    await page.getByLabel("Email").fill(GUEST_EMAIL);
+    await page.getByLabel("Password").fill(GUEST_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await page.waitForURL("/");
@@ -42,8 +47,8 @@ test.describe("auth flow", () => {
     await page.goto("/bookings");
     await page.waitForURL(/\/login\?returnTo=%2Fbookings/);
 
-    await page.getByLabel("Email").fill("demo@booking.dev");
-    await page.getByLabel("Password").fill("demo1234");
+    await page.getByLabel("Email").fill(GUEST_EMAIL);
+    await page.getByLabel("Password").fill(GUEST_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await page.waitForURL("/bookings");

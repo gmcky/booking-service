@@ -9,8 +9,13 @@ const HAS_STRIPE_KEY = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 // Far enough out that it won't collide with seeded bookings; a different
 // property each run would also work, but a fixed low-traffic property (0
-// bookings in seed data) keeps this deterministic.
-const PROPERTY_ID = "d537c8b7-16a1-4ffd-bc33-faa6b1dd5a82"; // Trastevere Apartment with Rooftop
+// bookings in seed data) keeps this deterministic. The default id only
+// exists in the local dev seed — override via E2E_PROPERTY_ID to run
+// against another environment's data.
+const PROPERTY_ID =
+  process.env.E2E_PROPERTY_ID ?? "d537c8b7-16a1-4ffd-bc33-faa6b1dd5a82"; // Trastevere Apartment with Rooftop
+const GUEST_EMAIL = process.env.E2E_GUEST_EMAIL ?? "demo@booking.dev";
+const GUEST_PASSWORD = process.env.E2E_GUEST_PASSWORD ?? "demo1234";
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -64,8 +69,8 @@ test.describe("booking checkout with real Stripe test mode", () => {
     test.setTimeout(60000);
 
     await page.goto("/login");
-    await page.getByLabel("Email").fill("demo@booking.dev");
-    await page.getByLabel("Password").fill("demo1234");
+    await page.getByLabel("Email").fill(GUEST_EMAIL);
+    await page.getByLabel("Password").fill(GUEST_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
     await page.waitForURL("/");
 

@@ -3,10 +3,16 @@ import { test, expect } from "@playwright/test";
 
 const testPhoto = path.join(process.cwd(), "src/tests/e2e/fixtures/test-photo.jpg");
 
+// Defaults exist only in the local dev seed — override via env to run
+// against another environment (any account works; the spec creates and
+// soft-deletes its own listing).
+const HOST_EMAIL = process.env.E2E_HOST_EMAIL ?? "owner@demo.com";
+const HOST_PASSWORD = process.env.E2E_HOST_PASSWORD ?? "owner1pass";
+
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("owner@demo.com");
-  await page.getByLabel("Password").fill("owner1pass");
+  await page.getByLabel("Email").fill(HOST_EMAIL);
+  await page.getByLabel("Password").fill(HOST_PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL("/");
 }
