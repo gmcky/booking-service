@@ -1,4 +1,4 @@
-import { BASE_URL } from "@/lib/api/client";
+import { BASE_URL } from "@/lib/api/base-url";
 
 /** Placeholder background for property/booking photos with no image yet. */
 export const PHOTO_STRIPES =
