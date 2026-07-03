@@ -1823,6 +1823,17 @@ export interface paths {
                         "application/json": components["schemas"]["UserProfile"];
                     };
                 };
+                /** @description Avatar upload accepted, processing in background */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                        };
+                    };
+                };
                 400: components["responses"]["ValidationError"];
                 401: components["responses"]["Unauthorized"];
             };
