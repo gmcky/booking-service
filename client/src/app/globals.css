@@ -127,4 +127,11 @@
   html {
     @apply font-sans;
   }
+  /* Larger effective type on big desktop screens; rem-based Tailwind
+     sizes and spacing scale with it. Laptops and mobile keep 16px. */
+  @media (min-width: 1536px) {
+    html {
+      font-size: 112.5%;
+    }
+  }
 }
