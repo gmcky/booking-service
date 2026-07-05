@@ -43,3 +43,13 @@ export function isoToLocalDate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Date(y, m - 1, d);
 }
+
+/**
+ * Local midnight for "today" — the app's canonical cutoff for disabling
+ * past dates in calendars (`disabled={{ before: startOfToday() }}`).
+ */
+export function startOfToday(): Date {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return t;
+}
