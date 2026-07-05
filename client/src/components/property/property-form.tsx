@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { propertyApi, type PropertyType, type Amenity } from "@/lib/api/properties";
 import { amenityLabel } from "@/lib/api/labels";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
@@ -43,6 +44,8 @@ export interface PropertyFormValues {
   maxGuests: number;
   pricePerNight: number;
   type: PropertyType;
+  petsAllowed: boolean;
+  infantsAllowed: boolean;
   amenities: string[];
   rawImagePaths: string[];
 }
@@ -56,6 +59,8 @@ export interface PropertyFormInitial {
   maxGuests: number;
   pricePerNight: string;
   type: PropertyType;
+  petsAllowed: boolean;
+  infantsAllowed: boolean;
   amenities: Amenity[];
   images: string[];
 }
@@ -89,6 +94,9 @@ export function PropertyForm({
   const [maxGuests, setMaxGuests] = React.useState(initial ? String(initial.maxGuests) : "");
   const [price, setPrice] = React.useState(initial ? String(Number(initial.pricePerNight)) : "");
   const [type, setType] = React.useState<PropertyType>(initial?.type ?? "HOUSE");
+  // Defaults mirror the backend's create schema (petsAllowed: false, infantsAllowed: true).
+  const [petsAllowed, setPetsAllowed] = React.useState(initial?.petsAllowed ?? false);
+  const [infantsAllowed, setInfantsAllowed] = React.useState(initial?.infantsAllowed ?? true);
   const [amenities, setAmenities] = React.useState<string[]>(initial?.amenities ?? []);
   const [uploaded, setUploaded] = React.useState<UploadedPhoto[]>([]);
   const [photoError, setPhotoError] = React.useState("");
@@ -191,6 +199,8 @@ export function PropertyForm({
       maxGuests: Number(maxGuests),
       pricePerNight: Number(price),
       type,
+      petsAllowed,
+      infantsAllowed,
       amenities,
       rawImagePaths: uploaded.map((p) => p.path),
     });
@@ -302,6 +312,20 @@ export function PropertyForm({
                 <ChevronDown className="pointer-events-none absolute right-2 size-[15px] text-muted-foreground" />
               </span>
             </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="mb-4 text-[17px] font-semibold tracking-tight">House rules</h2>
+          <div className="flex flex-col gap-3">
+            <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+              Pets allowed
+              <Switch checked={petsAllowed} onCheckedChange={setPetsAllowed} />
+            </label>
+            <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+              Suitable for infants
+              <Switch checked={infantsAllowed} onCheckedChange={setInfantsAllowed} />
+            </label>
           </div>
         </Card>
 

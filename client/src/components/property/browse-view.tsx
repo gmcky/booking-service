@@ -10,6 +10,7 @@ import { SearchPill, type DetectedLocation, type SearchPillHandle } from "@/comp
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -67,6 +68,8 @@ function parseFilters(params: URLSearchParams): PropertyQuery {
     minPrice: parseNumber(params.get("minPrice")),
     maxPrice: parseNumber(params.get("maxPrice")),
     maxGuests: parseNumber(params.get("maxGuests")),
+    petsAllowed: params.get("petsAllowed") === "true" ? true : undefined,
+    infantsAllowed: params.get("infantsAllowed") === "true" ? true : undefined,
     amenities: amenities ? amenities.split(",") : undefined,
     sort: (params.get("sort") as PropertySort | null) ?? "newest",
     checkIn: params.get("checkIn") ?? undefined,
@@ -163,6 +166,8 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     if (next.minPrice) params.set("minPrice", String(next.minPrice));
     if (next.maxPrice) params.set("maxPrice", String(next.maxPrice));
     if (next.maxGuests) params.set("maxGuests", String(next.maxGuests));
+    if (next.petsAllowed) params.set("petsAllowed", "true");
+    if (next.infantsAllowed) params.set("infantsAllowed", "true");
     if (next.amenities?.length) params.set("amenities", next.amenities.join(","));
     if (next.sort && next.sort !== "newest") params.set("sort", next.sort);
     if (next.checkIn && next.checkOut) {
@@ -177,6 +182,8 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     (filters.type ? 1 : 0) +
     (filters.minPrice || filters.maxPrice ? 1 : 0) +
     (filters.maxGuests ? 1 : 0) +
+    (filters.petsAllowed ? 1 : 0) +
+    (filters.infantsAllowed ? 1 : 0) +
     (filters.amenities?.length ?? 0) +
     (filters.country || filters.city || filters.district ? 1 : 0);
 
@@ -339,6 +346,8 @@ function FilterPanel({
   const [maxPrice, setMaxPrice] = React.useState(filters.maxPrice?.toString() ?? "");
   const [maxGuests, setMaxGuests] = React.useState(filters.maxGuests?.toString() ?? "");
   const [amenities, setAmenities] = React.useState<string[]>(filters.amenities ?? []);
+  const [petsAllowed, setPetsAllowed] = React.useState(Boolean(filters.petsAllowed));
+  const [infantsAllowed, setInfantsAllowed] = React.useState(Boolean(filters.infantsAllowed));
   const [country, setCountry] = React.useState(filters.country ?? "all");
   const [city, setCity] = React.useState(filters.city ?? "all");
   const [district, setDistrict] = React.useState(filters.district ?? "all");
@@ -526,6 +535,20 @@ function FilterPanel({
         </div>
       </div>
 
+      <div className="mt-6 border-t border-border pt-5">
+        <div className="mb-2.5 text-[13px] font-medium">House rules</div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
+          <label className="flex items-center gap-2.5 text-sm">
+            <Switch checked={petsAllowed} onCheckedChange={setPetsAllowed} />
+            Pets allowed
+          </label>
+          <label className="flex items-center gap-2.5 text-sm">
+            <Switch checked={infantsAllowed} onCheckedChange={setInfantsAllowed} />
+            Suitable for infants
+          </label>
+        </div>
+      </div>
+
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
         <button
           type="button"
@@ -546,6 +569,8 @@ function FilterPanel({
               minPrice: minPrice ? Number(minPrice) : undefined,
               maxPrice: maxPrice ? Number(maxPrice) : undefined,
               maxGuests: maxGuests ? Number(maxGuests) : undefined,
+              petsAllowed: petsAllowed || undefined,
+              infantsAllowed: infantsAllowed || undefined,
               amenities: amenities.length ? amenities : undefined,
             })
           }

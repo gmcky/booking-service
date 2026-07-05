@@ -54,6 +54,8 @@ const property: PropertyDetail = {
   images: [],
   pricePerNight: "200",
   maxGuests: 4,
+  petsAllowed: false,
+  infantsAllowed: true,
   amenities: [],
   averageRating: null,
   reviewCount: 0,

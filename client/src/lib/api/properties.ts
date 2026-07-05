@@ -2,6 +2,24 @@ import { apiClient } from "./client";
 import { unwrap, unwrapVoid } from "./unwrap";
 import type { components, paths } from "./schema";
 
+/**
+ * The backend's create/update property validators accept `petsAllowed` /
+ * `infantsAllowed` (server/src/modules/properties/property.validators.ts),
+ * but the OpenAPI doc for those two request bodies hasn't been updated to
+ * declare them (only the search-query and response schemas were) — so the
+ * generated `paths[...]["post"|"patch"]["requestBody"]` types omit them.
+ * These extend the generated body types so the fields can be sent without
+ * an unsafe cast; remove once the backend's OpenAPI doc catches up.
+ */
+type CreatePropertyBody = paths["/properties"]["post"]["requestBody"]["content"]["application/json"] & {
+  petsAllowed?: boolean;
+  infantsAllowed?: boolean;
+};
+type UpdatePropertyBody = paths["/properties/{id}"]["patch"]["requestBody"]["content"]["application/json"] & {
+  petsAllowed?: boolean;
+  infantsAllowed?: boolean;
+};
+
 export type PropertyType = components["schemas"]["PropertyType"];
 export type Amenity = components["schemas"]["Amenity"];
 export type PropertySort = "price_asc" | "price_desc" | "newest";
@@ -29,6 +47,8 @@ export interface PropertyQuery {
   minPrice?: number;
   maxPrice?: number;
   maxGuests?: number;
+  petsAllowed?: boolean;
+  infantsAllowed?: boolean;
   sort?: PropertySort;
   page?: number;
   limit?: number;
@@ -46,6 +66,8 @@ export interface CreatePropertyInput {
   address: string;
   pricePerNight: number;
   maxGuests: number;
+  petsAllowed: boolean;
+  infantsAllowed: boolean;
   amenities: string[];
   rawImagePaths?: string[];
 }
@@ -69,6 +91,8 @@ export const propertyApi = {
           minPrice: query.minPrice,
           maxPrice: query.maxPrice,
           maxGuests: query.maxGuests,
+          petsAllowed: query.petsAllowed,
+          infantsAllowed: query.infantsAllowed,
           sort: query.sort,
           page: query.page,
           limit: query.limit,
@@ -98,20 +122,23 @@ export const propertyApi = {
   },
 
   create: async (input: CreatePropertyInput): Promise<HostProperty> => {
-    const { data, error, response } = await apiClient.POST("/properties", {
-      body: {
-        ...input,
-        amenities: input.amenities as Amenity[],
-        rawImagePaths: input.rawImagePaths ?? [],
-      },
-    });
+    const body: CreatePropertyBody = {
+      ...input,
+      amenities: input.amenities as Amenity[],
+      rawImagePaths: input.rawImagePaths ?? [],
+    };
+    const { data, error, response } = await apiClient.POST("/properties", { body });
     return unwrap({ data, error, response });
   },
 
   update: async (id: string, input: UpdatePropertyInput): Promise<HostProperty> => {
+    const body: UpdatePropertyBody = {
+      ...input,
+      amenities: input.amenities as Amenity[] | undefined,
+    };
     const { data, error, response } = await apiClient.PATCH("/properties/{id}", {
       params: { path: { id } },
-      body: { ...input, amenities: input.amenities as Amenity[] | undefined },
+      body,
     });
     return unwrap({ data, error, response });
   },

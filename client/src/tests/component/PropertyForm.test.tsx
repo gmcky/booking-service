@@ -87,6 +87,8 @@ describe("PropertyForm", () => {
       maxGuests: 6,
       pricePerNight: 248,
       type: "HOUSE",
+      petsAllowed: false,
+      infantsAllowed: true,
       amenities: [],
       rawImagePaths: [],
     });
@@ -102,6 +104,8 @@ describe("PropertyForm", () => {
       maxGuests: 4,
       pricePerNight: "150",
       type: "APARTMENT",
+      petsAllowed: true,
+      infantsAllowed: false,
       amenities: ["WIFI"],
       images: ["uploads/properties/a.jpg"],
     };
