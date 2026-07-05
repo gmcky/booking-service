@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PropertyDetailView } from "@/components/property/property-detail-view";
@@ -175,15 +175,25 @@ describe("PropertyDetailView reserve card blocked dates", () => {
     const checkInTrigger = await screen.findByRole("button", { name: "Check in, Add date" });
     await userEvent.click(checkInTrigger);
 
+    // Scope all queries to the picker's popover — the page also renders an
+    // inline availability calendar with its own day cells and nav buttons.
+    function popoverEl(): HTMLElement {
+      const el = document.querySelector<HTMLElement>('[data-slot="popover-content"]');
+      if (!el) throw new Error("date picker popover not found");
+      return el;
+    }
+
     // The calendar opens showing the current month; if the target day
     // isn't in view (the ~10-13-day-out range rolled into next month),
     // navigate forward once — the two target dates are only 3 days apart
     // so they can never span more than one month boundary.
     async function locateDayCell(iso: string): Promise<HTMLElement> {
-      let cell = document.querySelector<HTMLElement>(`[data-day="${iso}"]`);
+      let cell = popoverEl().querySelector<HTMLElement>(`[data-day="${iso}"]`);
       if (!cell) {
-        await userEvent.click(screen.getByRole("button", { name: "Go to the Next Month" }));
-        cell = document.querySelector<HTMLElement>(`[data-day="${iso}"]`);
+        await userEvent.click(
+          within(popoverEl()).getByRole("button", { name: "Go to the Next Month" }),
+        );
+        cell = popoverEl().querySelector<HTMLElement>(`[data-day="${iso}"]`);
       }
       if (!cell) throw new Error(`day cell ${iso} not found even after month navigation`);
       return cell;

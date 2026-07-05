@@ -3,21 +3,13 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ChevronDown, SlidersHorizontal, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
 import { SearchPill, type DetectedLocation, type SearchPillHandle } from "@/components/search/search-pill";
+import { QuickFilters } from "@/components/search/quick-filters";
+import { FiltersDialog } from "@/components/search/filters-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   propertyApi,
   type PropertyQuery,
@@ -27,24 +19,6 @@ import {
 import { queryKeys } from "@/lib/query/keys";
 
 const PAGE_SIZE = 12;
-
-const TYPES: { value: PropertyType; label: string }[] = [
-  { value: "HOUSE", label: "House" },
-  { value: "APARTMENT", label: "Apartment" },
-  { value: "HOTEL_ROOM", label: "Hotel room" },
-  { value: "MEETING_ROOM", label: "Meeting room" },
-];
-
-const AMENITIES: { value: string; label: string }[] = [
-  { value: "WIFI", label: "Wifi" },
-  { value: "KITCHEN", label: "Kitchen" },
-  { value: "PARKING", label: "Free parking" },
-  { value: "POOL", label: "Pool" },
-  { value: "AIR_CONDITIONING", label: "Air conditioning" },
-  { value: "PET_FRIENDLY", label: "Pet friendly" },
-  { value: "TV", label: "TV" },
-  { value: "WASHER", label: "Washer" },
-];
 
 const SORTS: { value: PropertySort; label: string }[] = [
   { value: "newest", label: "Recommended" },
@@ -103,7 +77,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     [searchParams],
   );
 
-  const [panelOpen, setPanelOpen] = React.useState(false);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [geoDismissed, setGeoDismissed] = React.useState(false);
 
   React.useEffect(() => {
@@ -196,8 +170,17 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       <SiteHeader />
 
       <main className="mx-auto w-full max-w-[1180px] px-6 pt-6">
+        <div className="mb-4">
+          <SearchPill ref={searchPillRef} detected={detected} initialFilters={filters} collapsible />
+        </div>
+
         <div className="mb-5">
-          <SearchPill ref={searchPillRef} detected={detected} initialFilters={filters} />
+          <QuickFilters
+            filters={filters}
+            activeFilterCount={activeFilterCount}
+            onApply={applyFilters}
+            onOpenFilters={() => setFiltersOpen(true)}
+          />
         </div>
 
         {detectedMatch ? (
@@ -236,20 +219,6 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
                 }`}
           </h1>
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPanelOpen((v) => !v)}
-              aria-expanded={panelOpen}
-            >
-              <SlidersHorizontal />
-              Filters
-              {activeFilterCount > 0 ? (
-                <span className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1.5 font-mono text-[10px] font-semibold text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              ) : null}
-            </Button>
             <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
               <span className="font-mono text-[11px] tracking-wide uppercase">Sort</span>
               <span className="relative inline-flex items-center">
@@ -272,19 +241,12 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           </div>
         </div>
 
-        {panelOpen ? (
-          <FilterPanel
-            filters={filters}
-            onApply={(next) => {
-              applyFilters(next);
-              setPanelOpen(false);
-            }}
-            onClear={() => {
-              applyFilters({ sort: filters.sort });
-              setPanelOpen(false);
-            }}
-          />
-        ) : null}
+        <FiltersDialog
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          filters={filters}
+          onApply={applyFilters}
+        />
 
         {query.isError ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -328,257 +290,6 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           </>
         )}
       </main>
-    </div>
-  );
-}
-
-function FilterPanel({
-  filters,
-  onApply,
-  onClear,
-}: {
-  filters: PropertyQuery;
-  onApply: (next: PropertyQuery) => void;
-  onClear: () => void;
-}) {
-  const [type, setType] = React.useState<PropertyType | undefined>(filters.type);
-  const [minPrice, setMinPrice] = React.useState(filters.minPrice?.toString() ?? "");
-  const [maxPrice, setMaxPrice] = React.useState(filters.maxPrice?.toString() ?? "");
-  const [maxGuests, setMaxGuests] = React.useState(filters.maxGuests?.toString() ?? "");
-  const [amenities, setAmenities] = React.useState<string[]>(filters.amenities ?? []);
-  const [petsAllowed, setPetsAllowed] = React.useState(Boolean(filters.petsAllowed));
-  const [infantsAllowed, setInfantsAllowed] = React.useState(Boolean(filters.infantsAllowed));
-  const [country, setCountry] = React.useState(filters.country ?? "all");
-  const [city, setCity] = React.useState(filters.city ?? "all");
-  const [district, setDistrict] = React.useState(filters.district ?? "all");
-
-  const locationsQuery = useQuery({
-    queryKey: queryKeys.properties.locations,
-    queryFn: propertyApi.locations,
-    staleTime: 5 * 60 * 1000,
-  });
-  const locations = locationsQuery.data ?? [];
-
-  const countryOptions = locations.map((c) => ({ value: c.country, count: c.count }));
-  const cityOptions =
-    country !== "all"
-      ? (locations.find((c) => c.country === country)?.cities ?? []).map((c) => ({
-          value: c.city,
-          count: c.count,
-        }))
-      : [];
-  const districtOptions =
-    country !== "all" && city !== "all"
-      ? (
-          locations.find((c) => c.country === country)?.cities.find((c) => c.city === city)
-            ?.districts ?? []
-        ).map((d) => ({ value: d.district, count: d.count }))
-      : [];
-
-  function toggleAmenity(value: string) {
-    setAmenities((prev) =>
-      prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value],
-    );
-  }
-
-  return (
-    <div className="mb-6 rounded-xl border border-border bg-card p-5">
-      <div className="mb-6 border-b border-border pb-6">
-        <div className="mb-2.5 text-[13px] font-medium">Location</div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Select
-            value={country}
-            onValueChange={(v) => {
-              setCountry(v ?? "all");
-              setCity("all");
-              setDistrict("all");
-            }}
-          >
-            <SelectTrigger className="w-full" aria-label="Country">
-              <SelectValue placeholder="Country" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All countries</SelectItem>
-              {countryOptions.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.value} ({c.count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={city}
-            onValueChange={(v) => {
-              setCity(v ?? "all");
-              setDistrict("all");
-            }}
-            disabled={country === "all"}
-          >
-            <SelectTrigger className="w-full" aria-label="City">
-              <SelectValue placeholder="City" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All cities</SelectItem>
-              {cityOptions.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.value} ({c.count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={district}
-            onValueChange={(v) => setDistrict(v ?? "all")}
-            disabled={city === "all"}
-          >
-            <SelectTrigger className="w-full" aria-label="District">
-              <SelectValue placeholder="District" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All districts</SelectItem>
-              {districtOptions.map((d) => (
-                <SelectItem key={d.value} value={d.value}>
-                  {d.value} ({d.count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <Label className="text-[13px] font-medium" id="price-range-label">
-            Price per night
-          </Label>
-          <div className="mt-2.5 flex items-center gap-2" role="group" aria-labelledby="price-range-label">
-            <Input
-              type="number"
-              min={0}
-              placeholder="$50"
-              aria-label="Minimum price per night"
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-            />
-            <span className="text-muted-foreground">–</span>
-            <Input
-              type="number"
-              min={0}
-              placeholder="$600"
-              aria-label="Maximum price per night"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label className="text-[13px] font-medium" htmlFor="max-guests">
-            Guests
-          </Label>
-          <Input
-            id="max-guests"
-            type="number"
-            min={1}
-            placeholder="Any"
-            value={maxGuests}
-            onChange={(e) => setMaxGuests(e.target.value)}
-            className="mt-2.5"
-          />
-        </div>
-
-        <div>
-          <div className="mb-2.5 text-[13px] font-medium">Property type</div>
-          <div className="flex flex-col gap-1.5">
-            {TYPES.map((t) => (
-              <label key={t.value} className="flex items-center gap-2.5 text-sm">
-                <input
-                  type="radio"
-                  name="property-type"
-                  className="size-4 accent-primary"
-                  checked={type === t.value}
-                  onChange={() => setType(t.value)}
-                />
-                {t.label}
-              </label>
-            ))}
-            <label className="flex items-center gap-2.5 text-sm">
-              <input
-                type="radio"
-                name="property-type"
-                className="size-4 accent-primary"
-                checked={!type}
-                onChange={() => setType(undefined)}
-              />
-              Any
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2.5 text-[13px] font-medium">Amenities</div>
-          <div className="flex flex-col gap-1.5">
-            {AMENITIES.map((a) => (
-              <label key={a.value} className="flex items-center gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={amenities.includes(a.value)}
-                  onChange={() => toggleAmenity(a.value)}
-                />
-                {a.label}
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 border-t border-border pt-5">
-        <div className="mb-2.5 text-[13px] font-medium">House rules</div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
-          <label className="flex items-center gap-2.5 text-sm">
-            <Switch checked={petsAllowed} onCheckedChange={setPetsAllowed} />
-            Pets allowed
-          </label>
-          <label className="flex items-center gap-2.5 text-sm">
-            <Switch checked={infantsAllowed} onCheckedChange={setInfantsAllowed} />
-            Suitable for infants
-          </label>
-        </div>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-[13px] text-muted-foreground underline underline-offset-2"
-        >
-          Clear all
-        </button>
-        <Button
-          size="sm"
-          onClick={() =>
-            onApply({
-              ...filters,
-              type,
-              country: country !== "all" ? country : undefined,
-              city: city !== "all" ? city : undefined,
-              district: district !== "all" ? district : undefined,
-              minPrice: minPrice ? Number(minPrice) : undefined,
-              maxPrice: maxPrice ? Number(maxPrice) : undefined,
-              maxGuests: maxGuests ? Number(maxGuests) : undefined,
-              petsAllowed: petsAllowed || undefined,
-              infantsAllowed: infantsAllowed || undefined,
-              amenities: amenities.length ? amenities : undefined,
-            })
-          }
-        >
-          <Search />
-          Apply filters
-        </Button>
-      </div>
     </div>
   );
 }
