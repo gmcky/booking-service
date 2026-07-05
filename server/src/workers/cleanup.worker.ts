@@ -201,7 +201,10 @@ async function processCleanup(job: Job<CleanupJobData, void, CleanupJobName>): P
 // Idempotent on startup: reconciles the repeatable job with DEMO_CLEANUP_ENABLED.
 async function syncDemoCleanupSchedule(): Promise<void> {
   const existing = await cleanupQueue.getRepeatableJobs();
-  const stale = existing.filter((j) => j.id === DEMO_CLEANUP_REPEATABLE_JOB_ID);
+  // Match by name, not id: entries registered by older code (or without a
+  // custom jobId) are keyed by an opts hash and would survive an id filter —
+  // one such orphan kept a */2min test cron firing in prod for weeks.
+  const stale = existing.filter((j) => j.name === "purge-demo-data");
 
   for (const job of stale) {
     await cleanupQueue.removeRepeatableByKey(job.key);
