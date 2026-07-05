@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays } from "date-fns";
-import { ArrowLeft, MapPin, Star, Check } from "lucide-react";
+import { ArrowLeft, MapPin, Star } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,14 +20,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ReviewItem } from "@/components/reviews/review-item";
+import { PhotoGallery } from "@/components/property/photo-gallery";
+import { SectionNav } from "@/components/property/section-nav";
+import { Highlights } from "@/components/property/highlights";
+import { AmenitiesSection } from "@/components/property/amenities-section";
+import { AvailabilitySection } from "@/components/property/availability-section";
+import { LocationSection } from "@/components/property/location-section";
+import { useBlockedDates } from "@/components/property/use-blocked-dates";
 import { useAuthStore } from "@/lib/auth/store";
 import { propertyApi } from "@/lib/api/properties";
 import { bookingApi } from "@/lib/api/bookings";
-import { reviewApi, type ReviewQuery, type ReviewSort, type ReviewStats } from "@/lib/api/reviews";
-import { amenityLabel, typeLabel } from "@/lib/api/labels";
+import { typeLabel } from "@/lib/api/labels";
 import { formatPrice, formatRating } from "@/lib/utils/money";
-import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
-import { isoToLocalDate, nightsBetween, toISODate } from "@/lib/utils/dates";
+import { reviewApi, type ReviewQuery, type ReviewSort, type ReviewStats } from "@/lib/api/reviews";
+import { nightsBetween, toISODate } from "@/lib/utils/dates";
 import { queryKeys } from "@/lib/query/keys";
 
 const REVIEW_PAGE_SIZE = 10;
@@ -52,6 +58,8 @@ export function PropertyDetailView({ id }: { id: string }) {
     queryKey: queryKeys.properties.detail(id),
     queryFn: () => propertyApi.byId(id),
   });
+  const gallerySentinelRef = React.useRef<HTMLDivElement>(null);
+  const bookingCardRef = React.useRef<HTMLDivElement>(null);
 
   if (isPending) {
     return (
@@ -81,11 +89,15 @@ export function PropertyDetailView({ id }: { id: string }) {
 
   const property = data;
   const rating = formatRating(property.averageRating);
-  const gallery = property.images.length > 0 ? property.images.slice(0, 5) : [];
 
   return (
     <div className="flex flex-1 flex-col">
       <SiteHeader />
+      <SectionNav
+        sentinelRef={gallerySentinelRef}
+        bookingCardRef={bookingCardRef}
+        pricePerNight={property.pricePerNight}
+      />
 
       <main className="mx-auto w-full max-w-[1120px] px-6 pt-6">
         <Link
@@ -119,7 +131,8 @@ export function PropertyDetailView({ id }: { id: string }) {
           </div>
         </div>
 
-        <Gallery images={gallery} title={property.title} />
+        <PhotoGallery images={property.images} title={property.title} />
+        <div ref={gallerySentinelRef} aria-hidden className="h-px" />
 
         <div className="grid items-start gap-16 lg:grid-cols-[1fr_372px]">
           <div className="min-w-0">
@@ -135,30 +148,22 @@ export function PropertyDetailView({ id }: { id: string }) {
               <div className="size-12 shrink-0 rounded-full border border-border bg-muted" />
             </div>
 
+            <Highlights property={property} />
+
             <div className="border-b border-border py-6">
               <p className="text-[15px] leading-relaxed text-pretty">{property.description}</p>
             </div>
 
-            {property.amenities.length > 0 ? (
-              <div className="border-b border-border py-6">
-                <h2 className="mb-[18px] text-[19px] font-semibold tracking-tight">
-                  What this place offers
-                </h2>
-                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                  {property.amenities.map((a) => (
-                    <div key={a} className="flex items-center gap-3 text-sm">
-                      <Check className="size-[18px] shrink-0 text-muted-foreground" />
-                      {amenityLabel(a)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <AmenitiesSection amenities={property.amenities} />
+
+            <AvailabilitySection propertyId={property.id} />
 
             <PropertyReviews propertyId={property.id} propertyOwnerId={property.owner.id} />
+
+            <LocationSection property={property} />
           </div>
 
-          <aside className="lg:sticky lg:top-22">
+          <aside ref={bookingCardRef} className="scroll-mt-32 lg:sticky lg:top-22">
             <BookingCard
               propertyId={property.id}
               pricePerNight={property.pricePerNight}
@@ -177,28 +182,6 @@ export function PropertyDetailView({ id }: { id: string }) {
           </nav>
         </footer>
       </main>
-    </div>
-  );
-}
-
-function Gallery({ images, title }: { images: string[]; title: string }) {
-  const cells = images.length > 0 ? images : Array.from({ length: 5 }, () => null);
-  return (
-    <div className="mb-10 grid h-[420px] grid-cols-3 grid-rows-2 gap-2 overflow-hidden rounded-xl">
-      {cells.slice(0, 5).map((src, i) => (
-        <div
-          key={i}
-          className={`flex items-center justify-center ${i === 0 ? "col-span-1 row-span-2" : ""}`}
-          style={{ backgroundImage: PHOTO_STRIPES }}
-        >
-          {src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl(src)} alt={title} className="size-full object-cover" />
-          ) : (
-            <span className="font-mono text-[11px] text-muted-foreground">no photo</span>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
@@ -247,7 +230,7 @@ function PropertyReviews({
   }
 
   return (
-    <div className="py-6 pb-1">
+    <div id="reviews" className="scroll-mt-32 py-6 pb-1">
       <h2 className="mb-[18px] flex items-center gap-2 text-[19px] font-semibold tracking-tight">
         <Star className="size-[17px] fill-current" />
         {statsRating ? `${statsRating} · ` : ""}
@@ -371,54 +354,17 @@ function BookingCard({
   const [conflict, setConflict] = React.useState<string | null>(null);
 
   const {
-    data: blocked,
     isPending: blockedPending,
     isError: blockedError,
-  } = useQuery({
-    queryKey: queryKeys.bookings.blockedDates(propertyId),
-    queryFn: () => bookingApi.blockedDates(propertyId),
-  });
+    blockedMatchers,
+    checkoutMatchers,
+  } = useBlockedDates(propertyId);
 
   const today = React.useMemo(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
     return t;
   }, []);
-
-  // Booked ranges occupy nights [checkIn, checkOut) — the checkout day itself
-  // is free for a new arrival. Host-blocked ranges are inclusive on both ends.
-  const blockedMatchers = React.useMemo(() => {
-    if (!blocked) return [];
-    return [
-      ...blocked.bookedRanges.map((r) => ({
-        from: isoToLocalDate(r.checkIn),
-        to: addDays(isoToLocalDate(r.checkOut), -1),
-      })),
-      ...blocked.blockedRanges.map((r) => ({
-        from: isoToLocalDate(r.startDate),
-        to: isoToLocalDate(r.endDate),
-      })),
-    ].filter((r) => r.to >= r.from);
-  }, [blocked]);
-
-  // Departure semantics differ: day D is a valid checkout iff night D-1 is
-  // free, so every range shifts one day forward. Reusing the arrival matchers
-  // would wrongly disable an existing booking's check-in day as a departure
-  // (same-day turnover). Ranges spanning a blocked gap are still possible to
-  // select here; check-availability catches those before checkout.
-  const checkoutMatchers = React.useMemo(() => {
-    if (!blocked) return [];
-    return [
-      ...blocked.bookedRanges.map((r) => ({
-        from: addDays(isoToLocalDate(r.checkIn), 1),
-        to: isoToLocalDate(r.checkOut),
-      })),
-      ...blocked.blockedRanges.map((r) => ({
-        from: addDays(isoToLocalDate(r.startDate), 1),
-        to: addDays(isoToLocalDate(r.endDate), 1),
-      })),
-    ].filter((r) => r.to >= r.from);
-  }, [blocked]);
 
   const nights = nightsBetween(checkIn, checkOut);
   const subtotal = nights * Number(pricePerNight);
