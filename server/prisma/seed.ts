@@ -119,6 +119,8 @@ const propertyTemplates: Array<{
   address: string;
   pricePerNight: number;
   maxGuests: number;
+  petsAllowed?: boolean;
+  infantsAllowed?: boolean;
   amenities: Amenity[];
   images: string[];
 }> = [
@@ -179,6 +181,7 @@ const propertyTemplates: Array<{
     address: "Lypska St 3, Pechersk",
     pricePerNight: 30,
     maxGuests: 1,
+    infantsAllowed: false,
     amenities: [
       Amenity.WIFI,
       Amenity.AIR_CONDITIONING,
@@ -200,6 +203,7 @@ const propertyTemplates: Array<{
     address: "Vozdvyzhenka St 10",
     pricePerNight: 120,
     maxGuests: 3,
+    infantsAllowed: false,
     amenities: [
       Amenity.WIFI,
       Amenity.KITCHEN,
@@ -223,6 +227,7 @@ const propertyTemplates: Array<{
     address: "Obolonska St 22, Obolon",
     pricePerNight: 150,
     maxGuests: 8,
+    petsAllowed: true,
     amenities: [
       Amenity.WIFI,
       Amenity.PARKING,
@@ -271,6 +276,7 @@ const propertyTemplates: Array<{
     address: "Mechnikova St 18",
     pricePerNight: 90,
     maxGuests: 4,
+    petsAllowed: true,
     amenities: [
       Amenity.WIFI,
       Amenity.FIREPLACE,
@@ -364,6 +370,7 @@ const propertyTemplates: Array<{
     address: "Fontanska Rd 40, Fontanka",
     pricePerNight: 280,
     maxGuests: 10,
+    petsAllowed: true,
     amenities: [
       Amenity.WIFI,
       Amenity.POOL,
@@ -390,6 +397,7 @@ const propertyTemplates: Array<{
     address: "Rosenthaler Str 25, Mitte",
     pricePerNight: 110,
     maxGuests: 2,
+    infantsAllowed: false,
     amenities: [
       Amenity.WIFI,
       Amenity.STANDING_DESK,
@@ -412,6 +420,7 @@ const propertyTemplates: Array<{
     address: "Oranienstr 58, Kreuzberg",
     pricePerNight: 135,
     maxGuests: 4,
+    petsAllowed: true,
     amenities: [
       Amenity.WIFI,
       Amenity.KITCHEN,

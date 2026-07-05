@@ -48,6 +48,9 @@ model Property {
   address       String
   pricePerNight Decimal      @db.Decimal(10, 2)
   maxGuests     Int
+  // House rules — filterable, distinct from display amenities.
+  petsAllowed    Boolean @default(false)
+  infantsAllowed Boolean @default(true)
   amenities     Amenity[]
   images        String[]
   ownerId       String

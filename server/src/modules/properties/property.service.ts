@@ -61,6 +61,9 @@ export class PropertyService {
         district: { contains: filters.district, mode: "insensitive" as const },
       }),
       ...(filters.type && { type: filters.type }),
+      // One-directional house-rule filters: only true narrows results.
+      ...(filters.petsAllowed && { petsAllowed: true }),
+      ...(filters.infantsAllowed && { infantsAllowed: true }),
       ...(filters.amenities?.length && {
         amenities: { hasEvery: filters.amenities },
       }),
