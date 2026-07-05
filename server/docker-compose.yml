@@ -8,6 +8,8 @@ services:
     container_name: booking-api
     env_file:
       - .env
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +41,8 @@ services:
     command: ["node", "dist/workers/index.js"]
     env_file:
       - .env
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       app:
         condition: service_healthy
@@ -90,6 +94,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  uploads_data:
     driver: local
 
 networks:

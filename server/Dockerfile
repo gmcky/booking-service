@@ -49,6 +49,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
+# Uploads mountpoint must exist before chown so the named volume
+# inherits nodejs ownership on first mount (empty-volume copy-up).
+RUN mkdir -p uploads
+
 # Change ownership to non-root user
 RUN chown -R nodejs:nodejs /app
 
