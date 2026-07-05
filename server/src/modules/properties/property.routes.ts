@@ -47,6 +47,8 @@ const propertyImageUpload = multer({
  *       - { in: query, name: minPrice, schema: { type: number } }
  *       - { in: query, name: maxPrice, schema: { type: number } }
  *       - { in: query, name: maxGuests, schema: { type: integer } }
+ *       - { in: query, name: petsAllowed, schema: { type: boolean }, description: 'true narrows to pet-friendly listings' }
+ *       - { in: query, name: infantsAllowed, schema: { type: boolean }, description: 'true narrows to infant-suitable listings' }
  *       - { in: query, name: sort, schema: { type: string, enum: [price_asc, price_desc, newest], default: newest } }
  *       - { in: query, name: page, schema: { type: integer, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 100 } }

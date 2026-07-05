@@ -62,4 +62,23 @@ describe("PropertyService.getAll location filters", () => {
     expect(whereArg.country).toBeUndefined();
     expect(whereArg.district).toBeUndefined();
   });
+
+  it("narrows to allowing listings when house-rule filters are true", async () => {
+    await PropertyService.getAll(
+      { page: 1, limit: 10 },
+      { petsAllowed: true, infantsAllowed: true },
+    );
+
+    const whereArg = mockFindMany.mock.calls[0]?.[0]?.where;
+    expect(whereArg.petsAllowed).toBe(true);
+    expect(whereArg.infantsAllowed).toBe(true);
+  });
+
+  it("imposes no house-rule constraint when filters are false or absent", async () => {
+    await PropertyService.getAll({ page: 1, limit: 10 }, { petsAllowed: false });
+
+    const whereArg = mockFindMany.mock.calls[0]?.[0]?.where;
+    expect(whereArg.petsAllowed).toBeUndefined();
+    expect(whereArg.infantsAllowed).toBeUndefined();
+  });
 });

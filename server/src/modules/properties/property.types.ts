@@ -19,6 +19,8 @@ export interface PropertyFilters {
   country?: string;
   district?: string;
   type?: PropertyType;
+  petsAllowed?: boolean;
+  infantsAllowed?: boolean;
   amenities?: Amenity[];
   minPrice?: number;
   maxPrice?: number;

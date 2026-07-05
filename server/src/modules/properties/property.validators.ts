@@ -13,6 +13,8 @@ export const createPropertySchema = z.object({
   address: z.string().min(5),
   pricePerNight: z.number().positive(),
   maxGuests: z.number().int().positive(),
+  petsAllowed: z.boolean().default(false),
+  infantsAllowed: z.boolean().default(true),
   amenities: z.array(z.nativeEnum(Amenity)).max(20).default([]),
   // Accept temp upload paths; worker resolves final URLs asynchronously.
   rawImagePaths: z.array(z.string()).max(10).default([]),
@@ -28,6 +30,8 @@ export const updatePropertySchema = z.object({
   address: z.string().min(5).optional(),
   pricePerNight: z.number().positive().optional(),
   maxGuests: z.number().int().positive().optional(),
+  petsAllowed: z.boolean().optional(),
+  infantsAllowed: z.boolean().optional(),
   amenities: z.array(z.nativeEnum(Amenity)).max(20).optional(),
   // Expects finalized CDN URLs only.
   images: z.array(z.string().url()).max(10).optional(),
@@ -49,6 +53,14 @@ export const propertyQuerySchema = z
     minPrice: z.coerce.number().positive().optional(),
     maxPrice: z.coerce.number().positive().optional(),
     maxGuests: z.coerce.number().int().positive().optional(),
+    // Filters are one-directional: true narrows to allowing listings,
+    // absent/false imposes no constraint.
+    petsAllowed: z
+      .preprocess((v) => (typeof v === "string" ? v === "true" : v), z.boolean().optional())
+      .optional(),
+    infantsAllowed: z
+      .preprocess((v) => (typeof v === "string" ? v === "true" : v), z.boolean().optional())
+      .optional(),
     sort: z.enum(["price_asc", "price_desc", "newest"]).default("newest"),
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().positive().max(100).default(10),
