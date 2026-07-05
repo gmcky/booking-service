@@ -97,6 +97,7 @@ export function PropertyDetailView({ id }: { id: string }) {
         sentinelRef={gallerySentinelRef}
         bookingCardRef={bookingCardRef}
         pricePerNight={property.pricePerNight}
+        hasAmenities={property.amenities.length > 0}
       />
 
       <main className="mx-auto w-full max-w-[1120px] px-6 pt-6">

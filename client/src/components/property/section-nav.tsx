@@ -28,13 +28,20 @@ export function SectionNav({
   sentinelRef,
   bookingCardRef,
   pricePerNight,
+  hasAmenities = true,
 }: {
   sentinelRef: React.RefObject<HTMLElement | null>;
   bookingCardRef: React.RefObject<HTMLElement | null>;
   pricePerNight: string;
+  /** AmenitiesSection renders nothing for zero amenities — drop its link too. */
+  hasAmenities?: boolean;
 }) {
   const [visible, setVisible] = React.useState(false);
   const [active, setActive] = React.useState<string | null>(null);
+  const sections = React.useMemo(
+    () => NAV_SECTIONS.filter((s) => s.id !== "amenities" || hasAmenities),
+    [hasAmenities],
+  );
 
   React.useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -45,7 +52,7 @@ export function SectionNav({
   }, [sentinelRef]);
 
   React.useEffect(() => {
-    const elements = NAV_SECTIONS.map((s) => document.getElementById(s.id)).filter(
+    const elements = sections.map((s) => document.getElementById(s.id)).filter(
       (el): el is HTMLElement => el !== null,
     );
     if (elements.length === 0) return;
@@ -58,7 +65,7 @@ export function SectionNav({
     );
     for (const el of elements) observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [sections]);
 
   return (
     <div
@@ -70,7 +77,7 @@ export function SectionNav({
     >
       <div className="mx-auto flex w-full max-w-[1120px] items-center justify-between gap-4 px-6 py-3">
         <nav className="flex gap-5 text-sm">
-          {NAV_SECTIONS.map((s) => (
+          {sections.map((s) => (
             <button
               key={s.id}
               type="button"

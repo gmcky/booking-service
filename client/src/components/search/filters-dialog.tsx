@@ -107,11 +107,16 @@ export interface FiltersDialogProps {
 
 export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersDialogProps) {
   const [draft, setDraft] = React.useState<DraftFilters>(() => draftFromFilters(filters));
+  const [debouncedDraft, setDebouncedDraft] = React.useState(draft);
   const [showAllAmenities, setShowAllAmenities] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
-    setDraft(draftFromFilters(filters));
+    const fresh = draftFromFilters(filters);
+    setDraft(fresh);
+    // Also reset the debounced copy — otherwise the count query keys off the
+    // pre-close draft for the first debounce tick after reopening.
+    setDebouncedDraft(fresh);
     setShowAllAmenities(false);
     // Intentionally re-initializes only on the open transition — re-running
     // on every `filters`/`draft` change would fight the user's edits.
@@ -154,7 +159,6 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
   const effMin = draft.minPrice ?? boundsMin;
   const effMax = draft.maxPrice ?? boundsMax;
 
-  const [debouncedDraft, setDebouncedDraft] = React.useState(draft);
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedDraft(draft), 300);
     return () => clearTimeout(timer);
@@ -284,6 +288,10 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
                   setDraft((d) => ({ ...d, minPrice: clampMin(Number(e.target.value)) }))
                 }
                 className={RANGE_INPUT_CLASS}
+                // The max input is later in the DOM and wins hit-testing when
+                // the thumbs overlap; once the min thumb sits in the upper
+                // half it must take precedence or it gets stuck under max.
+                style={effMin > boundsMin + priceSpan / 2 ? { zIndex: 1 } : undefined}
               />
               <input
                 type="range"
@@ -312,7 +320,9 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
                     onChange={(e) =>
                       setDraft((d) => ({
                         ...d,
-                        minPrice: clampMin(Number(e.target.value) || boundsMin),
+                        minPrice: clampMin(
+                          e.target.value === "" ? boundsMin : Number(e.target.value),
+                        ),
                       }))
                     }
                     className="h-auto border-0 p-0 focus-visible:ring-0"
@@ -332,7 +342,9 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
                     onChange={(e) =>
                       setDraft((d) => ({
                         ...d,
-                        maxPrice: clampMax(Number(e.target.value) || boundsMax),
+                        maxPrice: clampMax(
+                          e.target.value === "" ? boundsMax : Number(e.target.value),
+                        ),
                       }))
                     }
                     className="h-auto border-0 p-0 focus-visible:ring-0"
