@@ -24,11 +24,20 @@ test.describe("browse and property detail", () => {
     await page.goto("/browse");
     await page.waitForTimeout(500);
 
-    const cityInput = page.getByPlaceholder(/city|where/i).first();
-    if (await cityInput.isVisible().catch(() => false)) {
-      await cityInput.fill("Lviv");
-      await cityInput.press("Enter");
-      await page.waitForTimeout(1000);
+    // Open the SearchPill's "Where" segment (a real <button> with
+    // aria-expanded, per the segmented-pill a11y contract).
+    const whereTrigger = page.getByRole("button", { name: /where/i }).first();
+    await whereTrigger.click();
+
+    const destinationInput = page.getByRole("textbox", { name: /search destinations/i });
+    await destinationInput.fill("Lviv");
+    await page.waitForTimeout(500);
+
+    const suggestion = page.getByRole("button", { name: /Lviv/i }).first();
+    if (await suggestion.isVisible().catch(() => false)) {
+      await suggestion.click();
+      await page.getByRole("button", { name: "Search" }).click();
+      await page.waitForURL(/city=/);
       const cards = page.locator('a[href^="/properties/"]');
       const count = await cards.count();
       expect(count).toBeGreaterThanOrEqual(0);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
-import { SearchBar } from "@/components/search/search-bar";
+import { SearchPill } from "@/components/search/search-pill";
 import { PropertyGrid } from "@/components/property/property-grid";
 
 export default function HomePage() {
@@ -23,7 +23,7 @@ export default function HomePage() {
         </section>
 
         <section className="mx-auto mb-2 max-w-[920px]">
-          <SearchBar />
+          <SearchPill />
         </section>
 
         <section className="flex items-baseline justify-between pt-14">

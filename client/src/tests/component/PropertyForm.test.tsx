@@ -35,6 +35,7 @@ describe("PropertyForm", () => {
     expect(screen.getByLabelText("Title")).toHaveValue("");
     expect(screen.getByLabelText("Street address")).toHaveValue("");
     expect(screen.getByLabelText("City")).toHaveValue("");
+    expect(screen.getByLabelText("Country")).toHaveValue("");
 
     await userEvent.click(screen.getByRole("button", { name: /publish listing/i }));
 
@@ -43,6 +44,7 @@ describe("PropertyForm", () => {
       expect(screen.getByText("Write at least 20 characters.")).toBeInTheDocument();
       expect(screen.getByText("Enter a street address.")).toBeInTheDocument();
       expect(screen.getByText("Enter a city.")).toBeInTheDocument();
+      expect(screen.getByText("Enter a country.")).toBeInTheDocument();
       expect(screen.getByText("Set max guests.")).toBeInTheDocument();
       expect(screen.getByText("Set a nightly price.")).toBeInTheDocument();
       expect(screen.getByText("Fix the highlighted fields before saving.")).toBeInTheDocument();
@@ -69,6 +71,7 @@ describe("PropertyForm", () => {
     );
     await userEvent.type(screen.getByLabelText("Street address"), "1240 Lakeshore Dr");
     await userEvent.type(screen.getByLabelText("City"), "South Lake Tahoe");
+    await userEvent.type(screen.getByLabelText("Country"), "United States");
     await userEvent.type(screen.getByLabelText("Max guests"), "6");
     await userEvent.type(screen.getByLabelText("Price / night"), "248");
 
@@ -80,6 +83,7 @@ describe("PropertyForm", () => {
       description: "A cozy cabin in the woods with a view.",
       address: "1240 Lakeshore Dr",
       city: "South Lake Tahoe",
+      country: "United States",
       maxGuests: 6,
       pricePerNight: 248,
       type: "HOUSE",
@@ -94,6 +98,7 @@ describe("PropertyForm", () => {
       description: "An existing description that is long enough.",
       address: "1 Main St",
       city: "Austin",
+      country: "United States",
       maxGuests: 4,
       pricePerNight: "150",
       type: "APARTMENT",
@@ -114,6 +119,7 @@ describe("PropertyForm", () => {
     expect(screen.getByLabelText("Title")).toHaveValue("Old Title");
     expect(screen.getByLabelText("Street address")).toHaveValue("1 Main St");
     expect(screen.getByLabelText("City")).toHaveValue("Austin");
+    expect(screen.getByLabelText("Country")).toHaveValue("United States");
     expect(screen.getByLabelText("Max guests")).toHaveValue(4);
     expect(screen.getByLabelText("Price / night")).toHaveValue(150);
 
