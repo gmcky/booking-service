@@ -9,14 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { propertyApi, type LocationCountry, type PropertyQuery } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { formatRange, isoToLocalDate, toISODate } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils";
 
-/** `PET_FRIENDLY` is this app's Amenity enum value for pets — there's no
- * literal `PETS_ALLOWED` entry, but this is the equivalent "pets ok" facet. */
-const PET_AMENITY = "PET_FRIENDLY";
+/** Sane upper bound on adults + children so the steppers can't run away. */
+const MAX_GUESTS = 16;
 
 export interface LocationSelection {
   country?: string;
@@ -41,9 +41,14 @@ export interface SearchPillProps {
   className?: string;
 }
 
-function clampAdults(adults: number, children: number, infants: number): number {
-  const min = children > 0 || infants > 0 ? 1 : 0;
-  return Math.max(min, adults);
+function clampAdults(adults: number, children: number, infants: boolean): number {
+  const min = children > 0 || infants ? 1 : 0;
+  const max = Math.max(min, MAX_GUESTS - children);
+  return Math.min(max, Math.max(min, adults));
+}
+
+function clampChildren(children: number, adults: number): number {
+  return Math.min(Math.max(0, children), Math.max(0, MAX_GUESTS - adults));
 }
 
 function whereLabel(selection: LocationSelection): string | undefined {
@@ -107,10 +112,8 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     // entirely to adults — the closest lossless reconstruction available.
     const [adults, setAdults] = React.useState(initialFilters?.maxGuests ?? 0);
     const [children, setChildren] = React.useState(0);
-    const [infants, setInfants] = React.useState(0);
-    const [pets, setPets] = React.useState(
-      initialFilters?.amenities?.includes(PET_AMENITY) ? 1 : 0,
-    );
+    const [infants, setInfants] = React.useState(Boolean(initialFilters?.infantsAllowed));
+    const [pets, setPets] = React.useState(Boolean(initialFilters?.petsAllowed));
 
     // Adults must never sit at 0 while children/infants are present — clamp
     // whenever either changes (covers both stepper clicks and initial props).
@@ -190,7 +193,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       // (matching the /properties API query param) — using a bare `guests`
       // key here would be silently dropped on landing.
       if (guestsTotal > 0) params.set("maxGuests", String(guestsTotal));
-      if (pets > 0) params.set("amenities", PET_AMENITY);
+      // House-rule filters are one-directional (narrow to allowing listings)
+      // — only ever sent as `true`, never `false`, matching the backend.
+      if (pets) params.set("petsAllowed", "true");
+      if (infants) params.set("infantsAllowed", "true");
 
       const qs = params.toString();
       router.push(qs ? `/browse?${qs}` : "/browse");
@@ -199,7 +205,15 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     const whereText = whereLabel(selection);
     const whenText =
       range?.from && range?.to ? formatRange(toISODate(range.from)!, toISODate(range.to)!) : undefined;
-    const whoText = guestsTotal > 0 ? `${guestsTotal} guest${guestsTotal === 1 ? "" : "s"}` : undefined;
+    const whoText = (() => {
+      const parts: string[] = [];
+      if (guestsTotal > 0) parts.push(`${guestsTotal} guest${guestsTotal === 1 ? "" : "s"}`);
+      const rules: string[] = [];
+      if (pets) rules.push("pets");
+      if (infants) rules.push("infants");
+      if (rules.length > 0) parts.push(rules.join(" · "));
+      return parts.length > 0 ? parts.join(" · ") : undefined;
+    })();
 
     return (
       <div className={cn("rounded-full border border-border bg-card p-2.5 shadow-sm", className)}>
@@ -382,21 +396,29 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 hint="Ages 13+"
                 value={adults}
                 onChange={(v) => setAdults(clampAdults(v, children, infants))}
-                min={children > 0 || infants > 0 ? 1 : 0}
+                min={children > 0 || infants ? 1 : 0}
+                max={MAX_GUESTS - children}
               />
               <GuestStepper
                 label="Children"
                 hint="2–12"
                 value={children}
-                onChange={setChildren}
+                onChange={(v) => setChildren(clampChildren(v, adults))}
+                max={MAX_GUESTS - adults}
               />
-              <GuestStepper
+              <div className="my-1 h-px bg-border" />
+              <GuestToggle
                 label="Infants"
-                hint="Under 2"
-                value={infants}
-                onChange={setInfants}
+                hint="Under 2 — suitable stays only"
+                checked={infants}
+                onCheckedChange={setInfants}
               />
-              <GuestStepper label="Pets" value={pets} onChange={setPets} />
+              <GuestToggle
+                label="Pets"
+                hint="Pet-friendly stays only"
+                checked={pets}
+                onCheckedChange={setPets}
+              />
             </PopoverContent>
           </Popover>
 
@@ -422,12 +444,14 @@ function GuestStepper({
   value,
   onChange,
   min = 0,
+  max = Infinity,
 }: {
   label: string;
   hint?: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
+  max?: number;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 first:pt-1 last:pb-1">
@@ -449,12 +473,35 @@ function GuestStepper({
         <button
           type="button"
           aria-label={`Increase ${label.toLowerCase()}`}
-          onClick={() => onChange(value + 1)}
-          className="flex size-7 items-center justify-center"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={value >= max}
+          className="flex size-7 items-center justify-center disabled:opacity-40"
         >
           <Plus className="size-[13px]" />
         </button>
       </div>
+    </div>
+  );
+}
+
+function GuestToggle({
+  label,
+  hint,
+  checked,
+  onCheckedChange,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 first:pt-1 last:pb-1">
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
     </div>
   );
 }

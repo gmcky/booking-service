@@ -1082,6 +1082,10 @@ export interface paths {
                     minPrice?: number;
                     maxPrice?: number;
                     maxGuests?: number;
+                    /** @description true narrows to pet-friendly listings */
+                    petsAllowed?: boolean;
+                    /** @description true narrows to infant-suitable listings */
+                    infantsAllowed?: boolean;
                     sort?: "price_asc" | "price_desc" | "newest";
                     page?: number;
                     limit?: number;
@@ -2391,6 +2395,8 @@ export interface components {
             /** @description Decimal serialized as string */
             pricePerNight: string;
             maxGuests: number;
+            petsAllowed: boolean;
+            infantsAllowed: boolean;
             amenities: components["schemas"]["Amenity"][];
             /** @description Decimal serialized as string */
             averageRating: string | null;
@@ -2463,6 +2469,8 @@ export interface components {
             /** @description Decimal serialized as string */
             pricePerNight: string;
             maxGuests: number;
+            petsAllowed: boolean;
+            infantsAllowed: boolean;
             amenities: components["schemas"]["Amenity"][];
             /** @description Decimal serialized as string */
             averageRating: string | null;

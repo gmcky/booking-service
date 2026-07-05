@@ -81,6 +81,8 @@ export function PropertyEditView({ id }: { id: string }) {
               maxGuests: data.maxGuests,
               pricePerNight: data.pricePerNight,
               type: data.type,
+              petsAllowed: data.petsAllowed,
+              infantsAllowed: data.infantsAllowed,
               amenities: data.amenities,
               images: data.images,
             }}
