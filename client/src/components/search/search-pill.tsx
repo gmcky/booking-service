@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { propertyApi, type LocationCountry, type PropertyQuery } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { isoToLocalDate, startOfToday, toISODate } from "@/lib/utils/dates";
-import { extendRange, flexibleWindow, type FlexibleDuration } from "@/lib/utils/flexible-dates";
+import { extendStay, flexibleWindow, type FlexibleDuration } from "@/lib/utils/flexible-dates";
 import { cn } from "@/lib/utils";
 
 /** Sane upper bound on adults + children so the steppers can't run away. */
@@ -32,7 +32,7 @@ const MAX_GUESTS = 16;
 
 type WhenTab = "dates" | "flexible";
 
-/** ± days offered by the flexible-dates chip row; 0 means "Exact dates". */
+/** Stay-length shortcuts (nights from check-in); 0 means "Exact dates". */
 const FLEX_CHIP_DAYS = [0, 1, 2, 3, 7, 14] as const;
 type ChipDays = (typeof FLEX_CHIP_DAYS)[number];
 
@@ -75,13 +75,11 @@ function clampChildren(children: number, adults: number): number {
   return Math.min(Math.max(0, children), Math.max(0, MAX_GUESTS - adults));
 }
 
-/** "Jul 10 – 24" (same month) / "Jul 28 – Aug 3" (spanning months), plus a
- *  "· ±N" suffix once a flexible chip has extended the picked base range. */
-function formatDatesLabel(range: { from: Date; to: Date }, chipDays: number): string {
+/** "Jul 10 – 24" (same month) / "Jul 28 – Aug 3" (spanning months). */
+function formatDatesLabel(range: { from: Date; to: Date }): string {
   const sameMonth =
     range.from.getMonth() === range.to.getMonth() && range.from.getFullYear() === range.to.getFullYear();
-  const label = `${format(range.from, "MMM d")} – ${format(range.to, sameMonth ? "d" : "MMM d")}`;
-  return chipDays > 0 ? `${label} · ±${chipDays}` : label;
+  return `${format(range.from, "MMM d")} – ${format(range.to, sameMonth ? "d" : "MMM d")}`;
 }
 
 function whereLabel(selection: LocationSelection): string | undefined {
@@ -142,11 +140,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       });
     }, [whenOpen]);
 
-    // `base` is the immutable range the user actually picked on the calendar.
-    // The ± chips always derive the displayed/submitted range from `base` —
-    // never from a previously-extended range — so ±1 -> ±2 replaces instead
-    // of compounding. Re-picking on the calendar sets a new base and resets
-    // the chip to "Exact dates".
+    // `base` is what the user actually picked on the calendar. The duration
+    // chips derive the submitted range from `base.from` only (+N nights), so
+    // +7 -> +14 replaces the checkout instead of compounding. Re-picking on
+    // the calendar resets the chip to "Exact dates".
     const [base, setBase] = React.useState<DateRange | undefined>(() =>
       initialFilters?.checkIn && initialFilters?.checkOut
         ? {
@@ -163,8 +160,8 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     const flexMonthsScrollRef = React.useRef<HTMLDivElement>(null);
 
     const range = React.useMemo(
-      () => (base?.from && base?.to && chipDays > 0 ? extendRange(base, chipDays, today) : base),
-      [base, chipDays, today],
+      () => (base?.from && chipDays > 0 ? extendStay(base.from, chipDays) : base),
+      [base, chipDays],
     );
 
     function onCalendarSelect(next?: DateRange) {
@@ -178,7 +175,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     }, [today]);
 
     function scrollFlexMonths(direction: -1 | 1) {
-      flexMonthsScrollRef.current?.scrollBy({ left: direction * 168, behavior: "smooth" });
+      flexMonthsScrollRef.current?.scrollBy({ left: direction * 240, behavior: "smooth" });
     }
 
     // The URL only ever carries a single aggregate `maxGuests` count (no
@@ -297,7 +294,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
           ? `${DURATION_LABEL[flexDuration]} in ${format(flexMonth, "MMMM")}`
           : undefined
         : range?.from && range?.to
-          ? formatDatesLabel(range as { from: Date; to: Date }, chipDays)
+          ? formatDatesLabel(range as { from: Date; to: Date })
           : undefined;
     const whoText = (() => {
       const parts: string[] = [];
@@ -465,6 +462,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                     numberOfMonths={2}
                     defaultMonth={base?.from}
                     disabled={{ before: today }}
+                    showOutsideDays={false}
                     autoFocus
                   />
                   <div className="flex flex-wrap gap-1.5 border-t border-border p-3 pt-2.5">
@@ -472,16 +470,16 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                       <RangeChip
                         key={days}
                         active={chipDays === days}
-                        disabled={!base?.from || !base?.to}
+                        disabled={!base?.from}
                         onClick={() => setChipDays(days)}
                       >
-                        {days === 0 ? "Exact dates" : `± ${days} day${days === 1 ? "" : "s"}`}
+                        {days === 0 ? "Exact dates" : `+ ${days} day${days === 1 ? "" : "s"}`}
                       </RangeChip>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="flex w-[420px] max-w-full flex-col gap-3 p-3">
+                <div className="flex w-[560px] max-w-[92vw] flex-col gap-5 p-5">
                   <div>
                     <div className="mb-1.5 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
                       Stay for
@@ -687,13 +685,13 @@ function MonthCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-20 shrink-0 snap-start flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center transition-colors motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
+        "flex w-28 shrink-0 snap-start flex-col items-center gap-1.5 rounded-xl border px-3 py-4 text-center transition-colors motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
         active ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
       )}
     >
-      <CalendarIcon className="size-4 text-muted-foreground" />
-      <span className="text-xs font-medium">{format(month, "MMM")}</span>
-      <span className="text-[11px] text-muted-foreground">{format(month, "yyyy")}</span>
+      <CalendarIcon className="size-5 text-muted-foreground" />
+      <span className="text-sm font-medium">{format(month, "MMMM")}</span>
+      <span className="text-xs text-muted-foreground">{format(month, "yyyy")}</span>
     </button>
   );
 }

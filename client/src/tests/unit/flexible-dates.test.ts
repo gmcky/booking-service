@@ -1,33 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { extendRange, flexibleWindow } from "@/lib/utils/flexible-dates";
+import { extendStay, flexibleWindow } from "@/lib/utils/flexible-dates";
 
-describe("extendRange", () => {
-  const today = new Date(2026, 6, 1); // Jul 1 2026
-  const base = { from: new Date(2026, 6, 10), to: new Date(2026, 6, 15) };
+describe("extendStay", () => {
+  const from = new Date(2026, 6, 4); // Jul 4 2026
 
-  it("extends from and to by the same number of days", () => {
-    const result = extendRange(base, 2, today);
-    expect(result.from).toEqual(new Date(2026, 6, 8));
-    expect(result.to).toEqual(new Date(2026, 6, 17));
+  it("keeps check-in and sets checkout N days later", () => {
+    const result = extendStay(from, 7);
+    expect(result.from).toEqual(from);
+    expect(result.to).toEqual(new Date(2026, 6, 11));
   });
 
-  it("clamps from at today instead of going before it", () => {
-    const result = extendRange(base, 14, today);
-    expect(result.from).toEqual(today);
-    expect(result.to).toEqual(new Date(2026, 6, 29));
+  it("derives from the picked start, so switching magnitudes replaces the checkout", () => {
+    const plusSeven = extendStay(from, 7);
+    const plusFourteen = extendStay(from, 14);
+    expect(plusSeven.to).toEqual(new Date(2026, 6, 11));
+    expect(plusFourteen.to).toEqual(new Date(2026, 6, 18));
+    expect(plusFourteen.from).toEqual(from);
   });
 
-  it("always derives from the base, so switching magnitudes never compounds", () => {
-    const plusOne = extendRange(base, 1, today);
-    const plusTwo = extendRange(base, 2, today);
-    expect(plusOne.from).toEqual(new Date(2026, 6, 9));
-    expect(plusTwo.from).toEqual(new Date(2026, 6, 8));
-    expect(plusTwo.to).toEqual(new Date(2026, 6, 17));
-  });
-
-  it("returns the base unchanged when it has no from/to", () => {
-    const incomplete = { from: undefined, to: undefined };
-    expect(extendRange(incomplete, 3, today)).toBe(incomplete);
+  it("crosses month boundaries", () => {
+    const result = extendStay(new Date(2026, 6, 28), 7);
+    expect(result.to).toEqual(new Date(2026, 7, 4));
   });
 });
 

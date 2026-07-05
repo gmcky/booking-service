@@ -4,18 +4,12 @@ import type { DateRange } from "react-day-picker";
 export type FlexibleDuration = "weekend" | "week" | "month";
 
 /**
- * Extends a picked base range outward by `days` on each side, clamped so
- * `from` never moves before `today`. Callers must always derive from the
- * immutable base range the user picked — never from a previously-extended
- * range — otherwise switching ±1 -> ±2 would compound instead of replace.
+ * Duration shortcut: a stay of `days` nights starting at the picked
+ * check-in date. Chips always derive from the user's picked start date,
+ * so switching +7 -> +14 replaces the checkout instead of compounding.
  */
-export function extendRange(base: DateRange, days: number, today: Date): DateRange {
-  if (!base.from || !base.to) return base;
-  const from = addDays(base.from, -days);
-  return {
-    from: from < today ? today : from,
-    to: addDays(base.to, days),
-  };
+export function extendStay(from: Date, days: number): DateRange {
+  return { from, to: addDays(from, days) };
 }
 
 /** First date on or after `reference` whose day-of-week is `weekday` (0=Sun..6=Sat). */
