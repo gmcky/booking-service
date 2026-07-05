@@ -7,9 +7,9 @@
  * type=property:
  *   1. Validates raw paths against UPLOADS_ROOT (path-traversal guard).
  *   2. Resizes and converts each image to WebP via sharp.
- *   3. Persists processed file paths to the property record in DB.
+ *   3. Uploads to object storage and persists public URLs to the property record.
  *   4. Enqueues raw files for deletion via the cleanup worker.
- *   Output layout: uploads/properties/{propertyId}/{index}.webp
+ *   Object key layout: properties/{propertyId}/{index}.webp
  *
  * type=avatar:
  *   1. Reads temp file written by the request handler.
@@ -19,7 +19,7 @@
  */
 import "../instrument.js";
 import sharp from "sharp";
-import { mkdir, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { Worker, type Job } from "bullmq";
@@ -73,36 +73,35 @@ async function processPropertyImages(job: Job<PropertyImageJob>): Promise<void> 
     "Starting property image processing job",
   );
 
-  // Ensure the output directory exists before writing any files.
-  const outputDir = resolve(UPLOADS_ROOT, "properties", propertyId);
-  await mkdir(outputDir, { recursive: true });
+  const imageUrls: string[] = [];
 
-  const processedPaths: string[] = [];
-
-  for (const [, rawPath] of rawImagePaths.entries()) {
+  for (const [index, rawPath] of rawImagePaths.entries()) {
     const absoluteInput = safeResolve(rawPath);
-    const id = randomUUID();
-    const relativePath = `uploads/properties/${propertyId}/${id}.webp`;
-    const absoluteOutput = resolve(UPLOADS_ROOT, "properties", propertyId, `${id}.webp`);
+    // Index-based keys make retries idempotent: a re-run after a mid-loop
+    // failure overwrites the same objects instead of orphaning uploads from
+    // the failed attempt. Images are set once at property create, so keys
+    // can't collide across jobs.
+    const key = `properties/${propertyId}/${index}.webp`;
 
-    await sharp(absoluteInput)
+    const optimizedBuffer = await sharp(absoluteInput)
+      .rotate()
       .resize({ width: 1200, height: 800, fit: "cover" })
       .webp({ quality: 80 })
-      .toFile(absoluteOutput);
+      .toBuffer();
 
-    processedPaths.push(relativePath);
+    const url = await uploadToS3(optimizedBuffer, key, "image/webp");
+    imageUrls.push(url);
 
-    logger.debug({ propertyId, id, output: relativePath }, "Image converted");
+    logger.debug({ propertyId, key }, "Image converted and uploaded");
   }
 
   // TODO: append/merge with existing images to avoid concurrent upload overwrite race.
-  // Persist optimised WebP paths to the property record.
   await prisma.property.update({
     where: { id: propertyId },
-    data: { images: processedPaths },
+    data: { images: imageUrls },
   });
 
-  logger.info({ propertyId, processedPaths }, "DB updated with processed image paths");
+  logger.info({ propertyId, imageUrls }, "DB updated with processed image URLs");
 
   // Remove raw source files via the dedicated cleanup worker.
   const jobName: CleanupJobName = "unlink-property-images";

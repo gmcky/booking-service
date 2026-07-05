@@ -49,7 +49,7 @@ export const env = cleanEnv(process.env, {
   SMTP_PASSWORD: str({ default: "" }),
   EMAIL_FROM: str({ default: "noreply@booking-service.local" }),
 
-  // S3-compatible object storage (avatar storage; AWS S3 or Cloudflare R2)
+  // S3-compatible object storage (avatars + property images; AWS S3 or Cloudflare R2)
   AWS_REGION: str({ default: "us-east-1" }),
   S3_BUCKET: str({ default: "" }),
   // Non-AWS endpoint (e.g. https://<account>.r2.cloudflarestorage.com); empty = AWS
