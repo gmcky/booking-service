@@ -15,6 +15,8 @@ export async function getProperties(req: Request, res: Response) {
     page,
     limit,
     city,
+    country,
+    district,
     type,
     amenities,
     minPrice,
@@ -27,10 +29,31 @@ export async function getProperties(req: Request, res: Response) {
 
   const result = await PropertyService.getAll(
     { page, limit },
-    { city, type, amenities, minPrice, maxPrice, maxGuests, sort, checkIn, checkOut },
+    {
+      city,
+      country,
+      district,
+      type,
+      amenities,
+      minPrice,
+      maxPrice,
+      maxGuests,
+      sort,
+      checkIn,
+      checkOut,
+    },
   );
 
   res.json(result);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/properties/locations
+ * @access Public
+ */
+export async function getPropertyLocations(req: Request, res: Response) {
+  res.json(await PropertyService.getLocations());
 }
 
 /**

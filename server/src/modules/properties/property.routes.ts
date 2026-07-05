@@ -40,6 +40,8 @@ const propertyImageUpload = multer({
  *     summary: Search properties with filters
  *     parameters:
  *       - { in: query, name: city, schema: { type: string } }
+ *       - { in: query, name: country, schema: { type: string } }
+ *       - { in: query, name: district, schema: { type: string } }
  *       - { in: query, name: type, schema: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] } }
  *       - { in: query, name: amenities, schema: { type: string }, description: 'CSV of Amenity enum values' }
  *       - { in: query, name: minPrice, schema: { type: number } }
@@ -96,6 +98,23 @@ propertyRouter.get(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 propertyRouter.get("/my", authenticate, asyncHandler(propertyController.getMyProperties));
+
+/**
+ * @openapi
+ * /properties/locations:
+ *   get:
+ *     tags: [Properties]
+ *     summary: Location facets (country/city/district counts) for active listings
+ *     responses:
+ *       200:
+ *         description: Location tree, sorted alphabetically at every level
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/LocationCountry' }
+ */
+propertyRouter.get("/locations", asyncHandler(propertyController.getPropertyLocations));
 
 /**
  * @openapi
@@ -170,12 +189,14 @@ propertyRouter.post(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [title, description, type, city, address, pricePerNight, maxGuests]
+ *             required: [title, description, type, city, country, address, pricePerNight, maxGuests]
  *             properties:
  *               title: { type: string, minLength: 5, maxLength: 200 }
  *               description: { type: string, minLength: 20 }
  *               type: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] }
  *               city: { type: string }
+ *               country: { type: string, minLength: 2 }
+ *               district: { type: string, minLength: 2, maxLength: 100 }
  *               address: { type: string }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
@@ -217,6 +238,8 @@ propertyRouter.post(
  *               description: { type: string }
  *               type: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] }
  *               city: { type: string }
+ *               country: { type: string, minLength: 2 }
+ *               district: { type: string, minLength: 2, maxLength: 100 }
  *               address: { type: string }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }

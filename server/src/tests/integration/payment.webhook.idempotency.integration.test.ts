@@ -99,6 +99,7 @@ describe("Stripe webhook idempotency integration", () => {
         description: "Test property for webhook idempotency.",
         type: "APARTMENT",
         city: "Kyiv",
+        country: "Ukraine",
         address: "Test St 1",
         pricePerNight: 100,
         maxGuests: 2,
