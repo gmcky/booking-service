@@ -54,6 +54,12 @@ export class PropertyService {
       ...(filters.city && {
         city: { contains: filters.city, mode: "insensitive" as const },
       }),
+      ...(filters.country && {
+        country: { contains: filters.country, mode: "insensitive" as const },
+      }),
+      ...(filters.district && {
+        district: { contains: filters.district, mode: "insensitive" as const },
+      }),
       ...(filters.type && { type: filters.type }),
       ...(filters.amenities?.length && {
         amenities: { hasEvery: filters.amenities },
@@ -118,6 +124,70 @@ export class PropertyService {
     const result = createPaginatedResponse(properties, total, params);
     await cacheSet(cacheKey, result, 5 * 60);
     return result;
+  }
+
+  /**
+   * Public location facets — country/city/district counts for active
+   * listings, folded into a sorted tree. Cached under a fixed key since it
+   * has no per-request variance; invalidated alongside the search cache.
+   */
+  static async getLocations() {
+    const cacheKey = "properties:locations";
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
+
+    const rows = await prisma.property.groupBy({
+      by: ["country", "city", "district"],
+      where: { isActive: true },
+      _count: true,
+    });
+
+    type CountryNode = { count: number; cities: Map<string, CityNode> };
+    type CityNode = { count: number; districts: Map<string, number> };
+
+    const countries = new Map<string, CountryNode>();
+
+    for (const row of rows) {
+      const count =
+        typeof row._count === "number" ? row._count : (row._count as { _all: number })._all;
+
+      let countryNode = countries.get(row.country);
+      if (!countryNode) {
+        countryNode = { count: 0, cities: new Map() };
+        countries.set(row.country, countryNode);
+      }
+      countryNode.count += count;
+
+      let cityNode = countryNode.cities.get(row.city);
+      if (!cityNode) {
+        cityNode = { count: 0, districts: new Map() };
+        countryNode.cities.set(row.city, cityNode);
+      }
+      cityNode.count += count;
+
+      if (row.district) {
+        cityNode.districts.set(row.district, (cityNode.districts.get(row.district) ?? 0) + count);
+      }
+    }
+
+    const tree = Array.from(countries.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([country, countryNode]) => ({
+        country,
+        count: countryNode.count,
+        cities: Array.from(countryNode.cities.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([city, cityNode]) => ({
+            city,
+            count: cityNode.count,
+            districts: Array.from(cityNode.districts.entries())
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([district, count]) => ({ district, count })),
+          })),
+      }));
+
+    await cacheSet(cacheKey, tree, 5 * 60);
+    return tree;
   }
 
   static async getMyProperties(ownerId: string, params: PaginationParams) {
@@ -247,7 +317,10 @@ export class PropertyService {
       propertyTitle: property.title,
     });
 
-    await cacheInvalidateNamespace("properties:search");
+    await Promise.all([
+      cacheInvalidateNamespace("properties:search"),
+      cacheDel("properties:locations"),
+    ]);
 
     const {
       owner: { email: _email, ...ownerWithoutEmail },
@@ -278,7 +351,11 @@ export class PropertyService {
       }
     }
 
-    await Promise.all([cacheDel(`property:${id}`), cacheInvalidateNamespace("properties:search")]);
+    await Promise.all([
+      cacheDel(`property:${id}`),
+      cacheInvalidateNamespace("properties:search"),
+      cacheDel("properties:locations"),
+    ]);
 
     return updated;
   }
@@ -308,6 +385,7 @@ export class PropertyService {
     await Promise.all([
       cacheDel(`property:${id}`),
       cacheInvalidateNamespace("properties:search"),
+      cacheDel("properties:locations"),
       invalidateUserStatsCache(ownerId),
     ]);
   }
@@ -326,6 +404,7 @@ export class PropertyService {
     await Promise.all([
       cacheDel(`property:${id}`),
       cacheInvalidateNamespace("properties:search"),
+      cacheDel("properties:locations"),
       invalidateUserStatsCache(ownerId),
     ]);
 

@@ -16,6 +16,8 @@ export type PropertyQueryInput = z.infer<typeof propertyQuerySchema>;
 
 export interface PropertyFilters {
   city?: string;
+  country?: string;
+  district?: string;
   type?: PropertyType;
   amenities?: Amenity[];
   minPrice?: number;

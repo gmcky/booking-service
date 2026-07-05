@@ -8,6 +8,8 @@ export const createPropertySchema = z.object({
   description: z.string().trim().min(20).transform(sanitizeString),
   type: z.nativeEnum(PropertyType),
   city: z.string().min(2),
+  country: z.string().min(2),
+  district: z.string().min(2).max(100).optional(),
   address: z.string().min(5),
   pricePerNight: z.number().positive(),
   maxGuests: z.number().int().positive(),
@@ -21,6 +23,8 @@ export const updatePropertySchema = z.object({
   description: z.string().trim().min(20).transform(sanitizeString).optional(),
   type: z.nativeEnum(PropertyType).optional(),
   city: z.string().min(2).optional(),
+  country: z.string().min(2).optional(),
+  district: z.string().min(2).max(100).optional(),
   address: z.string().min(5).optional(),
   pricePerNight: z.number().positive().optional(),
   maxGuests: z.number().int().positive().optional(),
@@ -32,6 +36,8 @@ export const updatePropertySchema = z.object({
 export const propertyQuerySchema = z
   .object({
     city: z.string().optional(),
+    country: z.string().optional(),
+    district: z.string().optional(),
     type: z.nativeEnum(PropertyType).optional(),
     // Accepts CSV and repeated query params for amenities.
     amenities: z

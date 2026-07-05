@@ -43,6 +43,8 @@ model Property {
   description   String       @db.Text
   type          PropertyType
   city          String
+  country       String
+  district      String?
   address       String
   pricePerNight Decimal      @db.Decimal(10, 2)
   maxGuests     Int

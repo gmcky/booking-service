@@ -268,6 +268,8 @@ export const swaggerOptions: Options = {
             description: { type: "string" },
             type: { $ref: "#/components/schemas/PropertyType" },
             city: { type: "string" },
+            country: { type: "string" },
+            district: { type: "string", nullable: true },
             address: { type: "string" },
             images: { type: "array", items: { type: "string" } },
             pricePerNight: {
@@ -296,6 +298,8 @@ export const swaggerOptions: Options = {
             "description",
             "type",
             "city",
+            "country",
+            "district",
             "address",
             "images",
             "pricePerNight",
@@ -356,6 +360,38 @@ export const swaggerOptions: Options = {
             "hostReplyText",
             "hostReplyBy",
           ],
+        },
+        LocationDistrict: {
+          type: "object",
+          properties: {
+            district: { type: "string" },
+            count: { type: "integer" },
+          },
+          required: ["district", "count"],
+        },
+        LocationCity: {
+          type: "object",
+          properties: {
+            city: { type: "string" },
+            count: { type: "integer" },
+            districts: {
+              type: "array",
+              items: { $ref: "#/components/schemas/LocationDistrict" },
+            },
+          },
+          required: ["city", "count", "districts"],
+        },
+        LocationCountry: {
+          type: "object",
+          properties: {
+            country: { type: "string" },
+            count: { type: "integer" },
+            cities: {
+              type: "array",
+              items: { $ref: "#/components/schemas/LocationCity" },
+            },
+          },
+          required: ["country", "count", "cities"],
         },
         PropertyDetail: {
           allOf: [
