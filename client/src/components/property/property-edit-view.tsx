@@ -77,6 +77,7 @@ export function PropertyEditView({ id }: { id: string }) {
               description: data.description,
               address: data.address,
               city: data.city,
+              country: data.country,
               maxGuests: data.maxGuests,
               pricePerNight: data.pricePerNight,
               type: data.type,

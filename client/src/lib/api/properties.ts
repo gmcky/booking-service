@@ -16,8 +16,14 @@ export interface Paginated<T> {
   pagination: components["schemas"]["Pagination"];
 }
 
+export type LocationCountry = components["schemas"]["LocationCountry"];
+export type LocationCity = components["schemas"]["LocationCity"];
+export type LocationDistrict = components["schemas"]["LocationDistrict"];
+
 export interface PropertyQuery {
   city?: string;
+  country?: string;
+  district?: string;
   type?: PropertyType;
   amenities?: string[];
   minPrice?: number;
@@ -35,6 +41,8 @@ export interface CreatePropertyInput {
   description: string;
   type: PropertyType;
   city: string;
+  country: string;
+  district?: string;
   address: string;
   pricePerNight: number;
   maxGuests: number;
@@ -54,6 +62,8 @@ export const propertyApi = {
       params: {
         query: {
           city: query.city,
+          country: query.country,
+          district: query.district,
           type: query.type,
           amenities: query.amenities?.length ? query.amenities.join(",") : undefined,
           minPrice: query.minPrice,
@@ -79,6 +89,11 @@ export const propertyApi = {
 
   mine: async (): Promise<Paginated<HostProperty>> => {
     const { data, error, response } = await apiClient.GET("/properties/my");
+    return unwrap({ data, error, response });
+  },
+
+  locations: async (): Promise<LocationCountry[]> => {
+    const { data, error, response } = await apiClient.GET("/properties/locations");
     return unwrap({ data, error, response });
   },
 

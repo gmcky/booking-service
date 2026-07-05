@@ -8,6 +8,7 @@ export const queryKeys = {
     browse: (query: PropertyQuery) => ["properties", "browse", query] as const,
     detail: (id: string) => ["properties", "detail", id] as const,
     mine: ["properties", "mine"] as const,
+    locations: ["properties", "locations"] as const,
   },
   bookings: {
     all: ["bookings"] as const,

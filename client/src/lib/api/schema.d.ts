@@ -1074,6 +1074,8 @@ export interface paths {
             parameters: {
                 query?: {
                     city?: string;
+                    country?: string;
+                    district?: string;
                     type?: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
                     /** @description CSV of Amenity enum values */
                     amenities?: string;
@@ -1124,6 +1126,8 @@ export interface paths {
                         /** @enum {string} */
                         type: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
                         city: string;
+                        country: string;
+                        district?: string;
                         address: string;
                         pricePerNight: number;
                         maxGuests: number;
@@ -1182,6 +1186,42 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Unauthorized"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/properties/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Location facets (country/city/district counts) for active listings */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Location tree, sorted alphabetically at every level */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LocationCountry"][];
+                    };
+                };
             };
         };
         put?: never;
@@ -1269,6 +1309,8 @@ export interface paths {
                         /** @enum {string} */
                         type?: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
                         city?: string;
+                        country?: string;
+                        district?: string;
                         address?: string;
                         pricePerNight?: number;
                         maxGuests?: number;
@@ -2342,6 +2384,8 @@ export interface components {
             description: string;
             type: components["schemas"]["PropertyType"];
             city: string;
+            country: string;
+            district: string | null;
             address: string;
             images: string[];
             /** @description Decimal serialized as string */
@@ -2376,6 +2420,20 @@ export interface components {
                 firstName: string;
                 lastName: string;
             } | null;
+        };
+        LocationDistrict: {
+            district: string;
+            count: number;
+        };
+        LocationCity: {
+            city: string;
+            count: number;
+            districts: components["schemas"]["LocationDistrict"][];
+        };
+        LocationCountry: {
+            country: string;
+            count: number;
+            cities: components["schemas"]["LocationCity"][];
         };
         PropertyDetail: components["schemas"]["PropertyWithOwner"] & {
             reviews: components["schemas"]["PropertyReview"][];

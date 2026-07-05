@@ -48,6 +48,8 @@ const property: PropertyDetail = {
   description: "A cozy cabin in the woods.",
   type: "HOUSE",
   city: "Austin",
+  country: "United States",
+  district: null,
   address: "1240 Lakeshore Dr",
   images: [],
   pricePerNight: "200",

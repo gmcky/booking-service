@@ -2,13 +2,21 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, SlidersHorizontal, Search } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
+import { SearchPill, type DetectedLocation, type SearchPillHandle } from "@/components/search/search-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   propertyApi,
   type PropertyQuery,
@@ -53,6 +61,8 @@ function parseFilters(params: URLSearchParams): PropertyQuery {
   const amenities = params.get("amenities");
   return {
     city: params.get("city") ?? undefined,
+    country: params.get("country") ?? undefined,
+    district: params.get("district") ?? undefined,
     type: (params.get("type") as PropertyType | null) ?? undefined,
     minPrice: parseNumber(params.get("minPrice")),
     maxPrice: parseNumber(params.get("maxPrice")),
@@ -64,7 +74,7 @@ function parseFilters(params: URLSearchParams): PropertyQuery {
   };
 }
 
-export function BrowseView() {
+export function BrowseView({ detected }: { detected?: DetectedLocation }) {
   return (
     <React.Suspense
       fallback={
@@ -76,25 +86,63 @@ export function BrowseView() {
         </div>
       }
     >
-      <BrowseResults />
+      <BrowseResults detected={detected} />
     </React.Suspense>
   );
 }
 
-function BrowseResults() {
+function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchPillRef = React.useRef<SearchPillHandle>(null);
   const filters = React.useMemo(
     () => parseFilters(new URLSearchParams(searchParams.toString())),
     [searchParams],
   );
 
   const [panelOpen, setPanelOpen] = React.useState(false);
+  const [geoDismissed, setGeoDismissed] = React.useState(false);
+
+  React.useEffect(() => {
+    setGeoDismissed(sessionStorage.getItem("geo-dismissed") === "1");
+  }, []);
+
+  const locationsQuery = useQuery({
+    queryKey: queryKeys.properties.locations,
+    queryFn: propertyApi.locations,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const hasExplicitLocation = Boolean(filters.city || filters.country || filters.district);
+
+  // Detection only ever supplies a rendering-time default — it must never
+  // overwrite explicit URL params, and is never written back to the URL.
+  const detectedMatch = React.useMemo(() => {
+    if (hasExplicitLocation || geoDismissed || !detected?.city) return undefined;
+    const target = detected.city.toLowerCase();
+    // Same-named cities in different countries: the detected country wins,
+    // city-only match is only a fallback when the country didn't resolve.
+    let fallback: { city: string; country: string } | undefined;
+    for (const country of locationsQuery.data ?? []) {
+      for (const city of country.cities) {
+        if (city.city.toLowerCase() !== target) continue;
+        if (detected.country && country.country === detected.country) {
+          return { city: city.city, country: country.country };
+        }
+        fallback ??= { city: city.city, country: country.country };
+      }
+    }
+    return detected.country ? undefined : fallback;
+  }, [hasExplicitLocation, geoDismissed, detected?.city, detected?.country, locationsQuery.data]);
+
+  const effectiveFilters = detectedMatch
+    ? { ...filters, city: detectedMatch.city, country: detectedMatch.country }
+    : filters;
 
   const query = useInfiniteQuery({
-    queryKey: queryKeys.properties.browse(filters),
+    queryKey: queryKeys.properties.browse(effectiveFilters),
     queryFn: ({ pageParam }) =>
-      propertyApi.search({ ...filters, page: pageParam, limit: PAGE_SIZE }),
+      propertyApi.search({ ...effectiveFilters, page: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 1,
     getNextPageParam: (last) => {
       const page = last.pagination.page ?? 1;
@@ -109,6 +157,8 @@ function BrowseResults() {
   function applyFilters(next: PropertyQuery) {
     const params = new URLSearchParams();
     if (next.city) params.set("city", next.city);
+    if (next.country) params.set("country", next.country);
+    if (next.district) params.set("district", next.district);
     if (next.type) params.set("type", next.type);
     if (next.minPrice) params.set("minPrice", String(next.minPrice));
     if (next.maxPrice) params.set("maxPrice", String(next.maxPrice));
@@ -127,19 +177,55 @@ function BrowseResults() {
     (filters.type ? 1 : 0) +
     (filters.minPrice || filters.maxPrice ? 1 : 0) +
     (filters.maxGuests ? 1 : 0) +
-    (filters.amenities?.length ?? 0);
+    (filters.amenities?.length ?? 0) +
+    (filters.country || filters.city || filters.district ? 1 : 0);
+
+  const locationLabel = effectiveFilters.district
+    ? `${effectiveFilters.district}, ${effectiveFilters.city}`
+    : effectiveFilters.city;
 
   return (
     <div className="flex flex-1 flex-col">
       <SiteHeader />
 
       <main className="mx-auto w-full max-w-[1180px] px-6 pt-6">
+        <div className="mb-5">
+          <SearchPill ref={searchPillRef} detected={detected} initialFilters={filters} />
+        </div>
+
+        {detectedMatch ? (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm">
+            <span>
+              Showing stays in {detectedMatch.city} — based on your location
+            </span>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => searchPillRef.current?.openWhere()}
+                className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.setItem("geo-dismissed", "1");
+                  setGeoDismissed(true);
+                }}
+                className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                Show all
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-lg font-semibold tracking-tight">
             {query.isPending
               ? "Searching…"
               : `${total} ${total === 1 ? "stay" : "stays"}${
-                  filters.city ? ` in ${filters.city}` : ""
+                  locationLabel ? ` in ${locationLabel}` : ""
                 }`}
           </h1>
           <div className="flex items-center gap-3">
@@ -253,6 +339,32 @@ function FilterPanel({
   const [maxPrice, setMaxPrice] = React.useState(filters.maxPrice?.toString() ?? "");
   const [maxGuests, setMaxGuests] = React.useState(filters.maxGuests?.toString() ?? "");
   const [amenities, setAmenities] = React.useState<string[]>(filters.amenities ?? []);
+  const [country, setCountry] = React.useState(filters.country ?? "all");
+  const [city, setCity] = React.useState(filters.city ?? "all");
+  const [district, setDistrict] = React.useState(filters.district ?? "all");
+
+  const locationsQuery = useQuery({
+    queryKey: queryKeys.properties.locations,
+    queryFn: propertyApi.locations,
+    staleTime: 5 * 60 * 1000,
+  });
+  const locations = locationsQuery.data ?? [];
+
+  const countryOptions = locations.map((c) => ({ value: c.country, count: c.count }));
+  const cityOptions =
+    country !== "all"
+      ? (locations.find((c) => c.country === country)?.cities ?? []).map((c) => ({
+          value: c.city,
+          count: c.count,
+        }))
+      : [];
+  const districtOptions =
+    country !== "all" && city !== "all"
+      ? (
+          locations.find((c) => c.country === country)?.cities.find((c) => c.city === city)
+            ?.districts ?? []
+        ).map((d) => ({ value: d.district, count: d.count }))
+      : [];
 
   function toggleAmenity(value: string) {
     setAmenities((prev) =>
@@ -262,6 +374,71 @@ function FilterPanel({
 
   return (
     <div className="mb-6 rounded-xl border border-border bg-card p-5">
+      <div className="mb-6 border-b border-border pb-6">
+        <div className="mb-2.5 text-[13px] font-medium">Location</div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Select
+            value={country}
+            onValueChange={(v) => {
+              setCountry(v ?? "all");
+              setCity("all");
+              setDistrict("all");
+            }}
+          >
+            <SelectTrigger className="w-full" aria-label="Country">
+              <SelectValue placeholder="Country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All countries</SelectItem>
+              {countryOptions.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.value} ({c.count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={city}
+            onValueChange={(v) => {
+              setCity(v ?? "all");
+              setDistrict("all");
+            }}
+            disabled={country === "all"}
+          >
+            <SelectTrigger className="w-full" aria-label="City">
+              <SelectValue placeholder="City" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All cities</SelectItem>
+              {cityOptions.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.value} ({c.count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={district}
+            onValueChange={(v) => setDistrict(v ?? "all")}
+            disabled={city === "all"}
+          >
+            <SelectTrigger className="w-full" aria-label="District">
+              <SelectValue placeholder="District" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All districts</SelectItem>
+              {districtOptions.map((d) => (
+                <SelectItem key={d.value} value={d.value}>
+                  {d.value} ({d.count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label className="text-[13px] font-medium" id="price-range-label">
@@ -363,6 +540,9 @@ function FilterPanel({
             onApply({
               ...filters,
               type,
+              country: country !== "all" ? country : undefined,
+              city: city !== "all" ? city : undefined,
+              district: district !== "all" ? district : undefined,
               minPrice: minPrice ? Number(minPrice) : undefined,
               maxPrice: maxPrice ? Number(maxPrice) : undefined,
               maxGuests: maxGuests ? Number(maxGuests) : undefined,

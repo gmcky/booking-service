@@ -39,6 +39,7 @@ export interface PropertyFormValues {
   description: string;
   address: string;
   city: string;
+  country: string;
   maxGuests: number;
   pricePerNight: number;
   type: PropertyType;
@@ -51,6 +52,7 @@ export interface PropertyFormInitial {
   description: string;
   address: string;
   city: string;
+  country: string;
   maxGuests: number;
   pricePerNight: string;
   type: PropertyType;
@@ -83,6 +85,7 @@ export function PropertyForm({
   const [description, setDescription] = React.useState(initial?.description ?? "");
   const [address, setAddress] = React.useState(initial?.address ?? "");
   const [city, setCity] = React.useState(initial?.city ?? "");
+  const [country, setCountry] = React.useState(initial?.country ?? "");
   const [maxGuests, setMaxGuests] = React.useState(initial ? String(initial.maxGuests) : "");
   const [price, setPrice] = React.useState(initial ? String(Number(initial.pricePerNight)) : "");
   const [type, setType] = React.useState<PropertyType>(initial?.type ?? "HOUSE");
@@ -166,6 +169,7 @@ export function PropertyForm({
     if (description.trim().length < 20) next.description = "Write at least 20 characters.";
     if (address.trim().length < 5) next.address = "Enter a street address.";
     if (city.trim().length < 2) next.city = "Enter a city.";
+    if (country.trim().length < 2) next.country = "Enter a country.";
     if (!(Number(maxGuests) > 0)) next.maxGuests = "Set max guests.";
     if (!(Number(price) > 0)) next.price = "Set a nightly price.";
     setErrors(next);
@@ -183,6 +187,7 @@ export function PropertyForm({
       description: description.trim(),
       address: address.trim(),
       city: city.trim(),
+      country: country.trim(),
       maxGuests: Number(maxGuests),
       pricePerNight: Number(price),
       type,
@@ -240,6 +245,15 @@ export function PropertyForm({
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 aria-invalid={Boolean(errors.city)}
+              />
+            </Field>
+            <Field label="Country" htmlFor="country" error={errors.country}>
+              <Input
+                id="country"
+                placeholder="United States"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                aria-invalid={Boolean(errors.country)}
               />
             </Field>
           </div>
