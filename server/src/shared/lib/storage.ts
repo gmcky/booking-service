@@ -6,6 +6,24 @@ type S3ObjectRef = {
   region?: string;
 };
 
+/**
+ * Base URL avatars are publicly served from (no trailing slash).
+ * Required for S3-compatible providers like R2 whose API endpoint is not
+ * publicly readable; empty on plain AWS where the virtual-host URL works.
+ */
+function publicBaseUrl(): string {
+  return (process.env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "");
+}
+
+function createClient(region?: string): S3Client {
+  const endpoint = process.env.S3_ENDPOINT;
+  return new S3Client({
+    region: region || process.env.AWS_REGION || "us-east-1",
+    // Path-style avoids bucket-subdomain DNS assumptions on non-AWS endpoints.
+    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+  });
+}
+
 function parseVirtualHostStyle(host: string): { bucket: string; region?: string } | null {
   const match = host.match(/^([^.]+)\.s3(?:[.-]([a-z0-9-]+))?\.amazonaws\.com$/i);
   if (!match) return null;
@@ -26,6 +44,16 @@ function parseS3Url(rawUrl: string): S3ObjectRef | null {
     url = new URL(rawUrl);
   } catch {
     return null;
+  }
+
+  // Objects under the configured public base map to keys in the configured bucket.
+  const publicBase = publicBaseUrl();
+  if (publicBase && rawUrl.startsWith(`${publicBase}/`)) {
+    const bucket = process.env.S3_BUCKET;
+    const key = decodeURIComponent(rawUrl.slice(publicBase.length + 1));
+    if (!bucket || !key) return null;
+
+    return { bucket, key };
   }
 
   if (url.protocol === "s3:") {
@@ -61,8 +89,7 @@ export async function deleteFromS3(fileUrl: string): Promise<void> {
     throw new Error("Unsupported S3 URL format");
   }
 
-  const region = parsed.region || process.env.AWS_REGION || "us-east-1";
-  const client = new S3Client({ region });
+  const client = createClient(parsed.region);
 
   await client.send(
     new DeleteObjectCommand({
@@ -83,7 +110,7 @@ export async function uploadToS3(
   }
 
   const region = process.env.AWS_REGION || "us-east-1";
-  const client = new S3Client({ region });
+  const client = createClient();
 
   await client.send(
     new PutObjectCommand({
@@ -100,5 +127,8 @@ export async function uploadToS3(
     .map((part) => encodeURIComponent(part))
     .join("/");
 
-  return `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`;
+  const publicBase = publicBaseUrl();
+  return publicBase
+    ? `${publicBase}/${encodedKey}`
+    : `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`;
 }
