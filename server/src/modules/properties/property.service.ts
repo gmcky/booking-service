@@ -32,7 +32,7 @@ type PropertyViewer = {
   role: string;
 };
 
-// Outside uploads/properties so express.static never serves raw uploads.
+// Raw uploads are worker input only — never publicly served.
 const RAW_UPLOAD_PREFIX = "uploads/property-temp/";
 // Orphaned raw uploads are reaped after this window.
 const RAW_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
@@ -181,8 +181,8 @@ export class PropertyService {
 
   /**
    * Writes raw multipart uploads to disk; returns relative paths for
-   * rawImagePaths on create/update. Files land outside the statically
-   * served uploads/properties tree — raw bytes are never public.
+   * rawImagePaths on create/update. Raw bytes stay on local disk as worker
+   * input and are never public — only processed WebP goes to object storage.
    */
   static async saveRawImages(userId: string, files: Express.Multer.File[]): Promise<string[]> {
     const paths: string[] = [];

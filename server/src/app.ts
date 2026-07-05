@@ -4,7 +4,6 @@ import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import { createRequire } from "module";
-import { resolve } from "node:path";
 import { logger, LOG_REDACT_PATHS } from "./shared/lib/logger.js";
 import rateLimit from "express-rate-limit";
 import { RedisStore, type SendCommandFn } from "rate-limit-redis";
@@ -102,21 +101,6 @@ export function createApp(): Application {
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
-
-  app.use(
-    "/uploads/properties",
-    (_req, res, next) => {
-      // helmet sets CORP same-origin; the Next.js client on :3001 must load these cross-origin
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      next();
-    },
-    express.static(resolve(process.cwd(), "uploads/properties"), {
-      dotfiles: "ignore",
-      maxAge: "7d",
-      immutable: true,
-      index: false,
-    }),
-  );
 
   const allowedOrigins = env.CORS_ORIGIN.split(",")
     .map((o) => o.trim())
