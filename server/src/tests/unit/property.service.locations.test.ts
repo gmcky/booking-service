@@ -15,6 +15,22 @@ vi.mock("../../shared/lib/cache.js", () => ({
   hashKey: vi.fn(() => "hash"),
 }));
 
+vi.mock("../../shared/queues/image.queue.js", () => ({
+  imageQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
+vi.mock("../../shared/queues/email.queue.js", () => ({
+  emailQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
+vi.mock("../../shared/queues/cleanup.queue.js", () => ({
+  cleanupQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
+vi.mock("../../modules/users/user.stats.cache.js", () => ({
+  invalidateUserStatsCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from "../../shared/lib/prisma.js";
 import { cacheGet, cacheSet } from "../../shared/lib/cache.js";
 import { PropertyService } from "../../modules/properties/property.service.js";
