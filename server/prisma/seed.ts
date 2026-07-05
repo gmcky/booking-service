@@ -137,7 +137,7 @@ const propertyTemplates: Array<{
     ],
     images: [
       "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1560185007-5f0a3b7a6ac7?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -158,8 +158,8 @@ const propertyTemplates: Array<{
       Amenity.GYM,
     ],
     images: [
-      "https://images.unsplash.com/photo-1556912173-46c336c7fd55?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -177,8 +177,8 @@ const propertyTemplates: Array<{
       Amenity.PRIVATE_BATHROOM,
     ],
     images: [
-      "https://images.unsplash.com/photo-1568605117036-5f326c888be4?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1631679706909-1844bbd07221?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -198,8 +198,8 @@ const propertyTemplates: Array<{
       Amenity.COFFEE_MACHINE,
     ],
     images: [
-      "https://images.unsplash.com/photo-1586023492125-27b2c045efd3?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1549187774-b4e9b0445b41?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1461360228754-6e81c478b882?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -221,8 +221,8 @@ const propertyTemplates: Array<{
       Amenity.KIDS_PLAY_AREA,
     ],
     images: [
-      "https://images.unsplash.com/photo-1449247613801-f6d4b7a43176?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=800",
     ],
   },
 
@@ -243,7 +243,7 @@ const propertyTemplates: Array<{
     ],
     images: [
       "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1555854877-bab93439e74d?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -263,8 +263,8 @@ const propertyTemplates: Array<{
       Amenity.KITCHEN,
     ],
     images: [
-      "https://images.unsplash.com/photo-1464082354059-d9b74de0e530?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1615873968403-89583c888e04?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1595877244574-e90ce41ce089?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -284,8 +284,8 @@ const propertyTemplates: Array<{
       Amenity.AIR_CONDITIONING,
     ],
     images: [
-      "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800",
     ],
   },
 
@@ -307,8 +307,8 @@ const propertyTemplates: Array<{
       Amenity.KITCHEN,
     ],
     images: [
-      "https://images.unsplash.com/photo-1560184897-52acbc2bcbbf?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1574375927843-0d088e52c62f?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1567767292278-a4f21aa2d36e?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -327,8 +327,8 @@ const propertyTemplates: Array<{
       Amenity.CITY_CENTRE,
     ],
     images: [
+      "https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=800",
       "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1631679706909-1844bbd07221?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -350,8 +350,8 @@ const propertyTemplates: Array<{
       Amenity.SMART_TV,
     ],
     images: [
-      "https://images.unsplash.com/photo-1612722432474-b971cdcea546?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1449247613801-f6d4b7a43176?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800",
     ],
   },
 
@@ -371,8 +371,8 @@ const propertyTemplates: Array<{
       Amenity.CITY_CENTRE,
     ],
     images: [
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1586023492125-27b2c045efd3?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1493934558415-9d19f0b2b4d2?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -392,8 +392,8 @@ const propertyTemplates: Array<{
       Amenity.BOOKS,
     ],
     images: [
-      "https://images.unsplash.com/photo-1556912173-46c336c7fd55?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -413,8 +413,8 @@ const propertyTemplates: Array<{
       Amenity.BIKE_RENTAL_NEARBY,
     ],
     images: [
-      "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1555854877-bab93439e74d?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=800",
     ],
   },
 
@@ -435,8 +435,8 @@ const propertyTemplates: Array<{
       Amenity.CITY_CENTRE,
     ],
     images: [
-      "https://images.unsplash.com/photo-1560185007-5f0a3b7a6ac7?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1615873968403-89583c888e04?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1489171078254-c3365d6e359f?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -456,8 +456,8 @@ const propertyTemplates: Array<{
       Amenity.HISTORIC_BUILDING,
     ],
     images: [
-      "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800",
     ],
   },
 
@@ -478,8 +478,8 @@ const propertyTemplates: Array<{
       Amenity.CITY_CENTRE,
     ],
     images: [
-      "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1568605117036-5f326c888be4?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1531572753322-ad063cecc140?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1615529182904-14819c35db37?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -499,8 +499,8 @@ const propertyTemplates: Array<{
       Amenity.AIR_CONDITIONING,
     ],
     images: [
-      "https://images.unsplash.com/photo-1612722432474-b971cdcea546?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1574375927843-0d088e52c62f?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800",
     ],
   },
 
@@ -521,8 +521,8 @@ const propertyTemplates: Array<{
       Amenity.BIKE_INCLUDED,
     ],
     images: [
-      "https://images.unsplash.com/photo-1560184897-52acbc2bcbbf?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800",
     ],
   },
   {
@@ -543,8 +543,8 @@ const propertyTemplates: Array<{
       Amenity.PARKING,
     ],
     images: [
-      "https://images.unsplash.com/photo-1464082354059-d9b74de0e530?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1631679706909-1844bbd07221?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1512470876302-972faa2aa9a4?auto=format&fit=crop&w=800",
+      "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=800",
     ],
   },
 ];
