@@ -49,9 +49,13 @@ export const env = cleanEnv(process.env, {
   SMTP_PASSWORD: str({ default: "" }),
   EMAIL_FROM: str({ default: "noreply@booking-service.local" }),
 
-  // S3 (avatar storage)
+  // S3-compatible object storage (avatar storage; AWS S3 or Cloudflare R2)
   AWS_REGION: str({ default: "us-east-1" }),
   S3_BUCKET: str({ default: "" }),
+  // Non-AWS endpoint (e.g. https://<account>.r2.cloudflarestorage.com); empty = AWS
+  S3_ENDPOINT: str({ default: "" }),
+  // Public base URL objects are served from (e.g. https://pub-xxx.r2.dev); empty = AWS virtual-host URL
+  S3_PUBLIC_URL: str({ default: "" }),
 
   // Stripe
   STRIPE_SECRET_KEY: str({ default: "" }),
