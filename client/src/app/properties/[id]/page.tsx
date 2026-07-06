@@ -13,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const fallback: Metadata = { title: "Property — Booking Service" };
+  const fallback: Metadata = { title: "Property — GMCK Booking" };
   try {
     const res = await fetch(`${BASE_URL}/properties/${encodeURIComponent(id)}`);
     if (!res.ok) return fallback;
@@ -21,7 +21,7 @@ export async function generateMetadata({
     const description = property.description.slice(0, 160);
     const image = property.images[0] ? photoUrl(property.images[0]) : undefined;
     return {
-      title: `${property.title} — Booking Service`,
+      title: `${property.title} — GMCK Booking`,
       description,
       openGraph: {
         title: property.title,

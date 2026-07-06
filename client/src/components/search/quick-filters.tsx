@@ -79,7 +79,7 @@ export function QuickFilters({ filters, activeFilterCount, onApply, onOpenFilter
               className={cn(
                 "shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
                 active
-                  ? "border-foreground ring-1 ring-foreground"
+                  ? "border-foreground ring-1 ring-inset ring-foreground"
                   : "border-border hover:border-foreground/50",
               )}
             >
