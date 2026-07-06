@@ -179,6 +179,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     // Sliding highlight behind the active segment. Measured from the live
     // DOM (rather than fixed fractions) because the three segments have
     // different flex weights and the layout switches to a column on mobile.
+    // Positioned against the pill container (padding included) so the thumb
+    // fills the pill's full height in the horizontal layout; the stacked
+    // mobile layout keeps a per-segment thumb.
+    const pillRef = React.useRef<HTMLDivElement>(null);
     const rowRef = React.useRef<HTMLDivElement>(null);
     const [thumb, setThumb] = React.useState<{
       left: number;
@@ -196,16 +200,18 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
         return () => window.clearTimeout(timer);
       }
       const measure = () => {
+        const pill = pillRef.current;
         const row = rowRef.current;
         const el = row?.querySelector<HTMLElement>(`[data-segment="${activeSegment}"]`);
-        if (!row || !el) return;
-        const rowRect = row.getBoundingClientRect();
+        if (!pill || !row || !el) return;
+        const pillRect = pill.getBoundingClientRect();
         const rect = el.getBoundingClientRect();
+        const horizontal = getComputedStyle(row).flexDirection === "row";
         setThumb({
-          left: rect.left - rowRect.left,
-          top: rect.top - rowRect.top,
+          left: rect.left - pillRect.left,
+          top: horizontal ? 0 : rect.top - pillRect.top,
           width: rect.width,
-          height: rect.height,
+          height: horizontal ? pillRect.height : rect.height,
         });
         setThumbVisible(true);
       };
@@ -476,18 +482,15 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       <div ref={rootRef}>
         <div
           key="expanded"
+          ref={pillRef}
           className={cn(
-            "rounded-full border border-border p-2.5 shadow-sm transition-colors duration-300",
+            "relative rounded-full border border-border p-2.5 shadow-sm transition-colors duration-300",
             activeSegment ? "bg-muted" : "bg-card",
             collapsible &&
               "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200 motion-reduce:transition-none",
             className,
           )}
         >
-          <div
-            ref={rowRef}
-            className="relative flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-0"
-          >
           {thumb ? (
             <div
               aria-hidden
@@ -503,6 +506,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
               }}
             />
           ) : null}
+          <div
+            ref={rowRef}
+            className="relative flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-0"
+          >
           <Popover open={whereOpen} onOpenChange={setWhereOpen}>
             <PopoverTrigger
               render={
@@ -528,7 +535,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </button>
               }
             />
-            <PopoverContent className="w-80 p-0" align="start">
+            <PopoverContent className="w-80 p-0" align="start" anchor={pillRef}>
               <div className="p-1.5 pb-1">
                 <Input
                   value={whereQuery}
@@ -639,7 +646,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </button>
               }
             />
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto p-0" align="center" anchor={pillRef}>
               <div className="flex justify-center px-4 pt-4">
                 <div className="relative grid w-60 grid-cols-2 rounded-full bg-muted p-1">
                   <div
@@ -708,7 +715,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                             className={cn(
                               "rounded-full border px-5 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
                               flexDuration === duration
-                                ? "border-foreground ring-1 ring-foreground"
+                                ? "border-foreground ring-1 ring-inset ring-foreground"
                                 : "border-border hover:border-foreground/50",
                             )}
                           >
@@ -789,7 +796,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </button>
               }
             />
-            <PopoverContent className="w-72" align="end">
+            <PopoverContent className="w-72" align="end" anchor={pillRef}>
               <GuestStepper
                 label="Adults"
                 hint="Ages 13+"
@@ -942,7 +949,7 @@ function MonthCard({
       onClick={onClick}
       className={cn(
         "flex w-28 shrink-0 snap-start flex-col items-center gap-2 rounded-2xl border px-3 py-5 text-center transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
-        active ? "border-foreground ring-1 ring-foreground" : "border-border hover:border-foreground/50",
+        active ? "border-foreground ring-1 ring-inset ring-foreground" : "border-border hover:border-foreground/50",
       )}
     >
       <CalendarIcon className="size-6 text-muted-foreground" />
