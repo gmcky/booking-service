@@ -61,6 +61,16 @@ export function PropertyDetailView({ id }: { id: string }) {
   const gallerySentinelRef = React.useRef<HTMLDivElement>(null);
   const bookingCardRef = React.useRef<HTMLDivElement>(null);
 
+  // Stay range shared between the availability calendar and the reserve
+  // card — picking dates in either reprices the booking.
+  const [checkIn, setCheckIn] = React.useState<Date | undefined>();
+  const [checkOut, setCheckOut] = React.useState<Date | undefined>();
+
+  function handleCheckInChange(date?: Date) {
+    setCheckIn(date);
+    setCheckOut((out) => (date && out && out <= date ? undefined : out));
+  }
+
   if (isPending) {
     return (
       <div className="flex flex-1 flex-col">
@@ -157,7 +167,16 @@ export function PropertyDetailView({ id }: { id: string }) {
 
             <AmenitiesSection amenities={property.amenities} />
 
-            <AvailabilitySection propertyId={property.id} />
+            <AvailabilitySection
+              propertyId={property.id}
+              city={property.city}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              onRangeChange={(nextIn, nextOut) => {
+                setCheckIn(nextIn);
+                setCheckOut(nextOut);
+              }}
+            />
 
             <PropertyReviews propertyId={property.id} propertyOwnerId={property.owner.id} />
 
@@ -170,6 +189,10 @@ export function PropertyDetailView({ id }: { id: string }) {
               pricePerNight={property.pricePerNight}
               maxGuests={property.maxGuests}
               rating={rating}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              onCheckInChange={handleCheckInChange}
+              onCheckOutChange={setCheckOut}
             />
           </aside>
         </div>
@@ -340,19 +363,31 @@ function BookingCard({
   pricePerNight,
   maxGuests,
   rating,
+  checkIn,
+  checkOut,
+  onCheckInChange,
+  onCheckOutChange,
 }: {
   propertyId: string;
   pricePerNight: string;
   maxGuests: number;
   rating: string | null;
+  checkIn?: Date;
+  checkOut?: Date;
+  onCheckInChange: (date?: Date) => void;
+  onCheckOutChange: (date?: Date) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const status = useAuthStore((s) => s.status);
-  const [checkIn, setCheckIn] = React.useState<Date | undefined>();
-  const [checkOut, setCheckOut] = React.useState<Date | undefined>();
   const [guests, setGuests] = React.useState("1");
   const [conflict, setConflict] = React.useState<string | null>(null);
+
+  // Dates can also change from the availability calendar — any change
+  // invalidates a previously reported conflict.
+  React.useEffect(() => {
+    setConflict(null);
+  }, [checkIn, checkOut]);
 
   const {
     isPending: blockedPending,
@@ -413,17 +448,6 @@ function BookingCard({
     }
     setConflict(null);
     availability.mutate();
-  }
-
-  function onCheckInChange(date?: Date) {
-    setCheckIn(date);
-    setConflict(null);
-    if (date && checkOut && checkOut <= date) setCheckOut(undefined);
-  }
-
-  function onCheckOutChange(date?: Date) {
-    setCheckOut(date);
-    setConflict(null);
   }
 
   return (
