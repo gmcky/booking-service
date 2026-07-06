@@ -42,7 +42,7 @@ export default function HomePage() {
         </section>
 
         <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
-          <span className="font-mono text-xs text-muted-foreground">© 2026 Perch</span>
+          <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
           <nav className="flex gap-5 text-[13px] text-muted-foreground">
             <Link href="#">Support</Link>
             <Link href="#">Privacy</Link>

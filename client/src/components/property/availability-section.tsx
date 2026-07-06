@@ -21,6 +21,18 @@ export function AvailabilitySection({ propertyId }: { propertyId: string }) {
           numberOfMonths={2}
           showOutsideDays={false}
           disabled={[{ before: today }, ...blockedMatchers]}
+          className="p-0"
+          style={{ "--cell-size": "2.5rem" } as React.CSSProperties}
+          classNames={{
+            months: "relative flex flex-col gap-6 md:flex-row md:gap-10",
+            month_caption:
+              "flex h-(--cell-size) w-full items-center justify-center px-(--cell-size) whitespace-nowrap",
+            caption_label: "text-[15px] font-medium select-none",
+            // Read-only calendar (no `mode`) renders plain text cells without
+            // the DayButton that normally carries min-w-(--cell-size) — size
+            // the cell itself or the grid collapses.
+            day: "relative flex size-(--cell-size) items-center justify-center rounded-(--cell-radius) p-0 text-center text-sm select-none",
+          }}
         />
       </div>
     </div>

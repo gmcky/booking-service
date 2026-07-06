@@ -100,7 +100,7 @@ export default function AccountPage() {
         </div>
 
         <footer className="mt-18 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
-          <span className="font-mono text-xs text-muted-foreground">© 2026 Perch</span>
+          <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
           <nav className="flex gap-5 text-[13px] text-muted-foreground">
             <a href="#">Support</a>
             <a href="#">Privacy</a>
