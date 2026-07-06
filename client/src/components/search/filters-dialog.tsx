@@ -5,6 +5,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   Baby,
   Building2,
+  ChevronDown,
+  ChevronUp,
   Dog,
   Home,
   Hotel,
@@ -44,7 +46,7 @@ const TYPE_OPTIONS: { value?: PropertyType; label: string; icon?: LucideIcon }[]
 
 const CHIP_CLASS =
   "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none";
-const CHIP_ACTIVE = "border-foreground ring-1 ring-foreground";
+const CHIP_ACTIVE = "border-foreground ring-1 ring-inset ring-foreground";
 const CHIP_INACTIVE = "border-border hover:border-foreground/50";
 
 /**
@@ -123,18 +125,21 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const locationQuery = {
-    city: filters.city,
-    country: filters.country,
-    district: filters.district,
-    checkIn: filters.checkIn,
-    checkOut: filters.checkOut,
+  // The histogram reflects every draft filter EXCEPT price itself — pricing
+  // the distribution by the price selection would feed the slider back into
+  // its own bounds while dragging.
+  const histogramFilters = {
+    ...buildQuery(filters, debouncedDraft),
+    minPrice: undefined,
+    maxPrice: undefined,
+    limit: 100,
   };
 
   const histogramQuery = useQuery({
-    queryKey: queryKeys.properties.list({ ...locationQuery, limit: 100 }),
-    queryFn: () => propertyApi.search({ ...locationQuery, limit: 100 }),
+    queryKey: queryKeys.properties.list(histogramFilters),
+    queryFn: () => propertyApi.search(histogramFilters),
     enabled: open,
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 
@@ -158,6 +163,24 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
   const priceSpan = Math.max(1, boundsMax - boundsMin);
   const effMin = draft.minPrice ?? boundsMin;
   const effMax = draft.maxPrice ?? boundsMax;
+
+  // Other draft filters move the histogram bounds under an explicit price
+  // selection — clamp it back inside so the thumbs can't sit off-track.
+  React.useEffect(() => {
+    setDraft((d) => {
+      const minPrice =
+        d.minPrice !== undefined
+          ? Math.max(boundsMin, Math.min(d.minPrice, boundsMax - 1))
+          : undefined;
+      const maxPrice =
+        d.maxPrice !== undefined
+          ? Math.min(boundsMax, Math.max(d.maxPrice, boundsMin + 1))
+          : undefined;
+      return minPrice === d.minPrice && maxPrice === d.maxPrice
+        ? d
+        : { ...d, minPrice, maxPrice };
+    });
+  }, [boundsMin, boundsMax]);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedDraft(draft), 300);
@@ -411,9 +434,14 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
             <button
               type="button"
               onClick={() => setShowAllAmenities((v) => !v)}
-              className="mt-3 text-sm text-foreground underline underline-offset-2"
+              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-foreground underline underline-offset-2"
             >
-              {showAllAmenities ? "Show less ⌃" : "Show more ⌄"}
+              {showAllAmenities ? "Show less" : "Show more"}
+              {showAllAmenities ? (
+                <ChevronUp className="size-4" />
+              ) : (
+                <ChevronDown className="size-4" />
+              )}
             </button>
           </section>
 
