@@ -10,8 +10,6 @@ import {
   Search,
   Users,
   Navigation,
-  Minus,
-  Plus,
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
@@ -19,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { Switch } from "@/components/ui/switch";
+import { GuestStepper, GuestToggle } from "@/components/search/guest-fields";
 import { propertyApi, type LocationCountry, type PropertyQuery } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { isoToLocalDate, startOfToday, toISODate } from "@/lib/utils/dates";
@@ -393,14 +391,16 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       [locations, whereQuery],
     );
 
+    // Committing a destination advances straight to When (Airbnb flow);
+    // picking a city that has districts keeps Where open for the drill-down.
     function selectCity(country: string, city: string, districtCount: number) {
       setSelection({ country, city, district: undefined });
-      if (districtCount === 0) setOpenSegment(null);
+      if (districtCount === 0) setOpenSegment("when");
     }
 
     function selectDistrict(country: string, city: string, district: string) {
       setSelection({ country, city, district });
-      setOpenSegment(null);
+      setOpenSegment("when");
     }
 
     // "Nearby" is only offered when the detected city resolves against the
@@ -427,7 +427,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     function selectNearby() {
       if (!resolvedNearby) return;
       setSelection({ ...resolvedNearby, district: undefined });
-      setOpenSegment(null);
+      setOpenSegment("when");
     }
 
     const guestsTotal = adults + children;
@@ -1016,70 +1016,3 @@ function MonthCard({
   );
 }
 
-function GuestStepper({
-  label,
-  hint,
-  value,
-  onChange,
-  min = 0,
-  max = Infinity,
-}: {
-  label: string;
-  hint?: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2 first:pt-1 last:pb-1">
-      <div>
-        <div className="text-sm font-medium">{label}</div>
-        {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
-      </div>
-      <div className="flex items-center overflow-hidden rounded-full border border-border">
-        <button
-          type="button"
-          aria-label={`Decrease ${label.toLowerCase()}`}
-          onClick={() => onChange(Math.max(min, value - 1))}
-          disabled={value <= min}
-          className="flex size-7 items-center justify-center disabled:opacity-40"
-        >
-          <Minus className="size-[13px]" />
-        </button>
-        <span className="min-w-6 text-center font-mono text-sm">{value}</span>
-        <button
-          type="button"
-          aria-label={`Increase ${label.toLowerCase()}`}
-          onClick={() => onChange(Math.min(max, value + 1))}
-          disabled={value >= max}
-          className="flex size-7 items-center justify-center disabled:opacity-40"
-        >
-          <Plus className="size-[13px]" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function GuestToggle({
-  label,
-  hint,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2 first:pt-1 last:pb-1">
-      <div>
-        <div className="text-sm font-medium">{label}</div>
-        {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
-      </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
-    </div>
-  );
-}
