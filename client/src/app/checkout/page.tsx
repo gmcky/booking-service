@@ -287,7 +287,7 @@ function CheckoutInner() {
         <div className="mx-auto flex h-16 max-w-[1080px] items-center gap-4 px-6">
           <Link href="/" className="flex items-center gap-2 text-[17px] font-semibold tracking-tight">
             <span className="inline-block size-2.5 rounded-full bg-primary" />
-            Perch
+            GMCK Booking
           </Link>
           <span className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
             <Lock className="size-3.5" />

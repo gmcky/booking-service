@@ -22,7 +22,7 @@ export function SiteHeader() {
           className="flex items-center gap-2 text-[17px] font-semibold tracking-tight"
         >
           <span className="inline-block size-2.5 rounded-full bg-primary" />
-          Perch
+          GMCK Booking
         </Link>
         <nav className="ml-2 flex items-center gap-1">
           <Link

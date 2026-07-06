@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 
-export const metadata = { title: "Create account — Booking Service" };
+export const metadata = { title: "Create account — GMCK Booking" };
 
 export default function RegisterPage() {
   return (

@@ -103,7 +103,7 @@ function ConfirmationInner() {
         className="mb-7 flex items-center gap-2 text-[19px] font-semibold tracking-tight"
       >
         <span className="inline-block size-2.5 rounded-full bg-primary" />
-        Perch
+        GMCK Booking
       </Link>
 
       <div className="w-full max-w-[440px]">
