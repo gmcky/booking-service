@@ -21,6 +21,7 @@ function DatePicker({
   disabledDates,
   defaultMonth,
   label,
+  className,
 }: {
   value?: Date;
   onChange?: (date?: Date) => void;
@@ -28,6 +29,7 @@ function DatePicker({
   disabled?: boolean;
   disabledDates?: React.ComponentProps<typeof Calendar>["disabled"];
   defaultMonth?: Date;
+  className?: string;
   /**
    * Field name for assistive tech, e.g. "Check in". Callers wrap the picker
    * in a <label> for layout, which would make the label text the button's
@@ -50,6 +52,7 @@ function DatePicker({
             className={cn(
               "w-full justify-start gap-2 font-normal",
               !value && "text-muted-foreground",
+              className,
             )}
           >
             <CalendarIcon />

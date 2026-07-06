@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays } from "date-fns";
-import { ArrowLeft, MapPin, Star } from "lucide-react";
+import { ArrowLeft, ChevronDown, MapPin, Star } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { GuestStepper, GuestToggle } from "@/components/search/guest-fields";
 import {
   Select,
   SelectContent,
@@ -21,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { ReviewItem } from "@/components/reviews/review-item";
 import { PhotoGallery } from "@/components/property/photo-gallery";
-import { SectionNav } from "@/components/property/section-nav";
 import { Highlights } from "@/components/property/highlights";
 import { AmenitiesSection } from "@/components/property/amenities-section";
 import { AvailabilitySection } from "@/components/property/availability-section";
@@ -58,9 +58,6 @@ export function PropertyDetailView({ id }: { id: string }) {
     queryKey: queryKeys.properties.detail(id),
     queryFn: () => propertyApi.byId(id),
   });
-  const gallerySentinelRef = React.useRef<HTMLDivElement>(null);
-  const bookingCardRef = React.useRef<HTMLDivElement>(null);
-
   // Stay range shared between the availability calendar and the reserve
   // card — picking dates in either reprices the booking.
   const [checkIn, setCheckIn] = React.useState<Date | undefined>();
@@ -103,12 +100,6 @@ export function PropertyDetailView({ id }: { id: string }) {
   return (
     <div className="flex flex-1 flex-col">
       <SiteHeader />
-      <SectionNav
-        sentinelRef={gallerySentinelRef}
-        bookingCardRef={bookingCardRef}
-        pricePerNight={property.pricePerNight}
-        hasAmenities={property.amenities.length > 0}
-      />
 
       <main className="mx-auto w-full max-w-[1120px] px-6 pt-6">
         <Link
@@ -143,7 +134,6 @@ export function PropertyDetailView({ id }: { id: string }) {
         </div>
 
         <PhotoGallery images={property.images} title={property.title} />
-        <div ref={gallerySentinelRef} aria-hidden className="h-px" />
 
         <div className="grid items-start gap-16 lg:grid-cols-[1fr_372px]">
           <div className="min-w-0">
@@ -183,11 +173,13 @@ export function PropertyDetailView({ id }: { id: string }) {
             <LocationSection property={property} />
           </div>
 
-          <aside ref={bookingCardRef} className="scroll-mt-32 lg:sticky lg:top-22">
+          <aside className="scroll-mt-32 lg:sticky lg:top-22">
             <BookingCard
               propertyId={property.id}
               pricePerNight={property.pricePerNight}
               maxGuests={property.maxGuests}
+              petsAllowed={property.petsAllowed}
+              infantsAllowed={property.infantsAllowed}
               rating={rating}
               checkIn={checkIn}
               checkOut={checkOut}
@@ -358,10 +350,14 @@ function RatingBreakdown({ stats }: { stats: ReviewStats }) {
   );
 }
 
+const MAX_INFANTS = 5;
+
 function BookingCard({
   propertyId,
   pricePerNight,
   maxGuests,
+  petsAllowed,
+  infantsAllowed,
   rating,
   checkIn,
   checkOut,
@@ -371,6 +367,8 @@ function BookingCard({
   propertyId: string;
   pricePerNight: string;
   maxGuests: number;
+  petsAllowed: boolean;
+  infantsAllowed: boolean;
   rating: string | null;
   checkIn?: Date;
   checkOut?: Date;
@@ -380,8 +378,22 @@ function BookingCard({
   const router = useRouter();
   const queryClient = useQueryClient();
   const status = useAuthStore((s) => s.status);
-  const [guests, setGuests] = React.useState("1");
+  // Adults + children share the property's guest limit; infants don't count
+  // toward it (same rule as the search pill) and pets are a yes/no.
+  const [adults, setAdults] = React.useState(1);
+  const [children, setChildren] = React.useState(0);
+  const [infants, setInfants] = React.useState(0);
+  const [pets, setPets] = React.useState(false);
   const [conflict, setConflict] = React.useState<string | null>(null);
+
+  const guestsTotal = adults + children;
+  const guestsLabel = [
+    `${guestsTotal} ${guestsTotal === 1 ? "guest" : "guests"}`,
+    infants > 0 ? `${infants} ${infants === 1 ? "infant" : "infants"}` : null,
+    pets ? "pets" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   // Dates can also change from the availability calendar — any change
   // invalidates a previously reported conflict.
@@ -423,15 +435,11 @@ function BookingCard({
         });
         return;
       }
-      const parsedGuests = Number(guests);
-      const effectiveGuests = Number.isFinite(parsedGuests)
-        ? Math.min(Math.max(Math.round(parsedGuests), 1), maxGuests)
-        : 1;
       const params = new URLSearchParams({
         propertyId,
         checkIn: toISODate(checkIn)!,
         checkOut: toISODate(checkOut)!,
-        guests: String(effectiveGuests),
+        guests: String(Math.min(Math.max(guestsTotal, 1), maxGuests)),
       });
       router.push(`/checkout?${params.toString()}`);
     },
@@ -466,25 +474,31 @@ function BookingCard({
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="mb-1.5 flex-col items-start font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
-              Check in
+            <Label className="mb-1.5 flex-col items-start gap-1.5">
+              <span className="font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+                Check in
+              </span>
               <DatePicker
                 value={checkIn}
                 onChange={onCheckInChange}
                 placeholder="Add date"
                 label="Check in"
+                className="text-[13px]"
                 disabledDates={[{ before: today }, ...blockedMatchers]}
               />
             </Label>
           </div>
           <div>
-            <Label className="mb-1.5 flex-col items-start font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
-              Check out
+            <Label className="mb-1.5 flex-col items-start gap-1.5">
+              <span className="font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+                Check out
+              </span>
               <DatePicker
                 value={checkOut}
                 onChange={onCheckOutChange}
                 placeholder="Add date"
                 label="Check out"
+                className="text-[13px]"
                 disabledDates={[
                   { before: addDays(checkIn ?? today, 1) },
                   ...checkoutMatchers,
@@ -502,28 +516,64 @@ function BookingCard({
           </p>
         ) : null}
         <div>
-          <Label
-            htmlFor="guests"
-            className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground"
-          >
+          <span className="mb-1.5 block font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
             Guests
-          </Label>
-          <Input
-            id="guests"
-            type="number"
-            min={1}
-            max={maxGuests}
-            value={guests}
-            onChange={(e) => setGuests(e.target.value)}
-            onBlur={() => {
-              const n = Number(guests);
-              if (!Number.isFinite(n)) {
-                setGuests("1");
-                return;
+          </span>
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="outline"
+                  className="w-full justify-between font-normal text-[13px]"
+                  aria-label={`Guests, ${guestsLabel}`}
+                >
+                  {guestsLabel}
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                </Button>
               }
-              setGuests(String(Math.min(Math.max(Math.round(n), 1), maxGuests)));
-            }}
-          />
+            />
+            <PopoverContent className="w-72" align="end">
+              <GuestStepper
+                label="Adults"
+                hint="Ages 13+"
+                value={adults}
+                onChange={(v) => setAdults(Math.min(Math.max(1, v), maxGuests - children))}
+                min={1}
+                max={maxGuests - children}
+              />
+              <GuestStepper
+                label="Children"
+                hint="2–12"
+                value={children}
+                onChange={(v) => setChildren(Math.min(Math.max(0, v), maxGuests - adults))}
+                max={maxGuests - adults}
+              />
+              {infantsAllowed ? (
+                <GuestStepper
+                  label="Infants"
+                  hint="Under 2 — don't count toward the limit"
+                  value={infants}
+                  onChange={(v) => setInfants(Math.min(Math.max(0, v), MAX_INFANTS))}
+                  max={MAX_INFANTS}
+                />
+              ) : null}
+              {petsAllowed ? (
+                <>
+                  <div className="my-1 h-px bg-border" />
+                  <GuestToggle
+                    label="Pets"
+                    hint="This stay allows pets"
+                    checked={pets}
+                    onCheckedChange={setPets}
+                  />
+                </>
+              ) : null}
+              <p className="pt-1 text-xs text-muted-foreground">
+                This place fits up to {maxGuests} {maxGuests === 1 ? "guest" : "guests"}
+                {infantsAllowed ? " (infants excluded)" : ""}.
+              </p>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
