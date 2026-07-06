@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/auth/store";
 
+function initials(firstName: string, lastName: string): string {
+  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
+}
+
 export function SiteHeader() {
-  const { status } = useAuthStore();
+  const { status, user } = useAuthStore();
   const authed = status === "authed";
 
   return (
@@ -44,12 +49,17 @@ export function SiteHeader() {
               >
                 Host dashboard
               </Button>
-              <Link
-                href="/profile"
-                aria-label="Account"
-                className="flex size-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground"
-              >
-                <User className="size-4" />
+              <Link href="/profile" aria-label="Account" className="rounded-full">
+                <Avatar className="size-9">
+                  {user?.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
+                  <AvatarFallback>
+                    {user && initials(user.firstName, user.lastName) ? (
+                      initials(user.firstName, user.lastName)
+                    ) : (
+                      <User className="size-4" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
               </Link>
             </>
           ) : (
