@@ -19,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { propertyApi, type LocationCountry, type PropertyQuery } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
@@ -142,39 +141,64 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     const rootRef = React.useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = React.useState(!collapsible);
 
-    const [whereOpen, setWhereOpen] = React.useState(false);
-    const [whenOpen, setWhenOpen] = React.useState(false);
-    const [whoOpen, setWhoOpen] = React.useState(false);
+    // The Where/When/Who panels render inside ONE shared popup box that
+    // morphs (position + size) between segments instead of closing and
+    // reopening: `openSegment` is what the user asked for, `displayed` is
+    // the content currently mounted in the box — they diverge for ~110ms
+    // while the old content fades out before the box glides over.
+    const [openSegment, setOpenSegment] = React.useState<SegmentKey | null>(null);
+    const [displayed, setDisplayed] = React.useState<SegmentKey | null>(null);
+    const [contentVisible, setContentVisible] = React.useState(false);
+
+    React.useEffect(() => {
+      if (openSegment === displayed) return;
+      if (!openSegment || !displayed) {
+        // Plain open or close — no crossfade choreography needed.
+        setDisplayed(openSegment);
+        setContentVisible(Boolean(openSegment));
+        return;
+      }
+      setContentVisible(false);
+      const timer = window.setTimeout(() => {
+        setDisplayed(openSegment);
+        setContentVisible(true);
+      }, 110);
+      return () => window.clearTimeout(timer);
+    }, [openSegment, displayed]);
 
     function expandAndOpen(segment: SegmentKey) {
       setExpanded(true);
-      if (segment === "where") setWhereOpen(true);
-      else if (segment === "when") setWhenOpen(true);
-      else setWhoOpen(true);
+      setOpenSegment(segment);
     }
 
-    // Collapse back to the compact bar on an outside click, but only once no
-    // popover is open — an outside click that's merely dismissing a popover
-    // (e.g. base-ui's own outside-click handling) shouldn't also collapse
-    // the pill in the same gesture.
+    function toggleSegment(segment: SegmentKey) {
+      setOpenSegment((current) => (current === segment ? null : segment));
+    }
+
+    // One outside click dismisses the panel; the next one collapses the
+    // pill (browse) — mirrors how the popover-based version behaved.
     React.useEffect(() => {
-      if (!collapsible || !expanded || whereOpen || whenOpen || whoOpen) return;
+      if (!openSegment && !(collapsible && expanded)) return;
       function handlePointerDown(e: PointerEvent) {
         if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-          setExpanded(false);
+          if (openSegment) setOpenSegment(null);
+          else setExpanded(false);
         }
       }
       document.addEventListener("pointerdown", handlePointerDown);
       return () => document.removeEventListener("pointerdown", handlePointerDown);
-    }, [collapsible, expanded, whereOpen, whenOpen, whoOpen]);
+    }, [collapsible, expanded, openSegment]);
 
-    const activeSegment: SegmentKey | null = whereOpen
-      ? "where"
-      : whenOpen
-        ? "when"
-        : whoOpen
-          ? "who"
-          : null;
+    React.useEffect(() => {
+      if (!openSegment) return;
+      function handleKeyDown(e: KeyboardEvent) {
+        if (e.key === "Escape") setOpenSegment(null);
+      }
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [openSegment]);
+
+    const activeSegment = openSegment;
 
     // Sliding highlight behind the active segment. Measured from the live
     // DOM (rather than fixed fractions) because the three segments have
@@ -220,19 +244,49 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       return () => window.removeEventListener("resize", measure);
     }, [activeSegment]);
 
-    // Popovers anchor to the whole pill (Where left, When centered, Who
-    // right — Airbnb layout) only while the segments sit in one row; in the
-    // stacked mobile layout each popover must follow its own trigger or it
-    // renders detached below the whole stack.
-    const [rowLayout, setRowLayout] = React.useState(false);
-    React.useEffect(() => {
-      const mq = window.matchMedia("(min-width: 640px)");
-      const update = () => setRowLayout(mq.matches);
-      update();
-      mq.addEventListener("change", update);
-      return () => mq.removeEventListener("change", update);
-    }, []);
-    const pillAnchor = rowLayout ? pillRef : undefined;
+    // Shared panel geometry: aligned to the pill (Where left, When centered,
+    // Who right — Airbnb layout), clamped into the viewport, sized to the
+    // displayed content. Transitioning left/width/height on this box is what
+    // produces the single-box morph between segments.
+    const panelContentRef = React.useRef<HTMLDivElement>(null);
+    const [panelBox, setPanelBox] = React.useState<{
+      left: number;
+      width: number;
+      height: number;
+    } | null>(null);
+
+    React.useLayoutEffect(() => {
+      if (!displayed) {
+        setPanelBox(null);
+        return;
+      }
+      const measure = () => {
+        const rootEl = rootRef.current;
+        const content = panelContentRef.current;
+        if (!rootEl || !content) return;
+        const rootRect = rootEl.getBoundingClientRect();
+        const width = content.offsetWidth;
+        const height = content.offsetHeight;
+        let left =
+          displayed === "where"
+            ? 0
+            : displayed === "when"
+              ? (rootRect.width - width) / 2
+              : rootRect.width - width;
+        const minLeft = 8 - rootRect.left;
+        const maxLeft = window.innerWidth - 8 - width - rootRect.left;
+        left = Math.max(minLeft, Math.min(left, Math.max(minLeft, maxLeft)));
+        setPanelBox({ left, width, height });
+      };
+      measure();
+      const observer = new ResizeObserver(measure);
+      if (panelContentRef.current) observer.observe(panelContentRef.current);
+      window.addEventListener("resize", measure);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", measure);
+      };
+    }, [displayed]);
 
     const [whereQuery, setWhereQuery] = React.useState("");
     const [selection, setSelection] = React.useState<LocationSelection>({
@@ -241,8 +295,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       district: initialFilters?.district,
     });
 
-    // Recomputed each time the When popover opens so a tab left open across
+    // Recomputed each time the When panel opens so a tab left open across
     // midnight can't keep treating yesterday as a selectable "today".
+    const whenOpen = openSegment === "when";
     const [today, setToday] = React.useState(() => startOfToday());
     React.useEffect(() => {
       if (!whenOpen) return;
@@ -322,7 +377,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     React.useImperativeHandle(ref, () => ({
       openWhere: () => {
         setExpanded(true);
-        setWhereOpen(true);
+        setOpenSegment("where");
       },
     }));
 
@@ -340,12 +395,12 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     function selectCity(country: string, city: string, districtCount: number) {
       setSelection({ country, city, district: undefined });
-      if (districtCount === 0) setWhereOpen(false);
+      if (districtCount === 0) setOpenSegment(null);
     }
 
     function selectDistrict(country: string, city: string, district: string) {
       setSelection({ country, city, district });
-      setWhereOpen(false);
+      setOpenSegment(null);
     }
 
     // "Nearby" is only offered when the detected city resolves against the
@@ -372,7 +427,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     function selectNearby() {
       if (!resolvedNearby) return;
       setSelection({ ...resolvedNearby, district: undefined });
-      setWhereOpen(false);
+      setOpenSegment(null);
     }
 
     const guestsTotal = adults + children;
@@ -418,6 +473,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
       const qs = params.toString();
       router.push(qs ? `/browse?${qs}` : "/browse");
+      setOpenSegment(null);
       if (collapsible) setExpanded(false);
     }
 
@@ -493,7 +549,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     }
 
     return (
-      <div ref={rootRef}>
+      <div ref={rootRef} className="relative">
         <div
           key="expanded"
           ref={pillRef}
@@ -524,32 +580,114 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
             ref={rowRef}
             className="relative flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-0"
           >
-          <Popover open={whereOpen} onOpenChange={setWhereOpen}>
-            <PopoverTrigger
-              render={
-                <button
-                  type="button"
-                  data-segment="where"
-                  className="relative z-10 min-w-0 flex-[1.4] rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
-                >
-                  <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
-                    Where
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <MapPin className="size-4 shrink-0 text-muted-foreground" />
-                    <span
-                      className={cn(
-                        "truncate text-[15px]",
-                        whereText ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      {whereText ?? "Search destinations"}
-                    </span>
-                  </span>
-                </button>
-              }
-            />
-            <PopoverContent className="w-80 p-0" align="start" anchor={pillAnchor}>
+          <button
+            type="button"
+            data-segment="where"
+            aria-haspopup="dialog"
+            aria-expanded={openSegment === "where"}
+            onClick={() => toggleSegment("where")}
+            className="relative z-10 min-w-0 flex-[1.4] rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
+          >
+            <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+              Where
+            </span>
+            <span className="flex items-center gap-2">
+              <MapPin className="size-4 shrink-0 text-muted-foreground" />
+              <span
+                className={cn(
+                  "truncate text-[15px]",
+                  whereText ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {whereText ?? "Search destinations"}
+              </span>
+            </span>
+          </button>
+
+          <Divider faded={activeSegment !== null} />
+
+          <button
+            type="button"
+            data-segment="when"
+            aria-haspopup="dialog"
+            aria-expanded={openSegment === "when"}
+            onClick={() => toggleSegment("when")}
+            className="relative z-10 min-w-0 flex-1 rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
+          >
+            <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+              When
+            </span>
+            <span className="flex items-center gap-2">
+              <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
+              <span
+                className={cn(
+                  "truncate text-[15px]",
+                  whenText ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {whenText ?? "Add dates"}
+              </span>
+            </span>
+          </button>
+
+          <Divider faded={activeSegment !== null} />
+
+          <button
+            type="button"
+            data-segment="who"
+            aria-haspopup="dialog"
+            aria-expanded={openSegment === "who"}
+            onClick={() => toggleSegment("who")}
+            className="relative z-10 min-w-0 flex-[0.9] rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
+          >
+            <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+              Who
+            </span>
+            <span className="flex items-center gap-2">
+              <Users className="size-4 shrink-0 text-muted-foreground" />
+              <span
+                className={cn(
+                  "truncate text-[15px]",
+                  whoText ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {whoText ?? "Add guests"}
+              </span>
+            </span>
+          </button>
+
+          <div className="p-2">
+            <Button size="lg" className="w-full rounded-full" onClick={onSearch}>
+              <Search className="mr-1.5" />
+              Search
+            </Button>
+          </div>
+          </div>
+        </div>
+
+        {displayed ? (
+          <div
+            role="dialog"
+            className={cn(
+              "absolute top-full z-50 mt-1 overflow-hidden rounded-lg bg-popover text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden",
+              "transition-[left,width,height] duration-300 ease-out motion-reduce:transition-none",
+              "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95",
+            )}
+            style={
+              panelBox
+                ? { left: panelBox.left, width: panelBox.width, height: panelBox.height }
+                : undefined
+            }
+          >
+            <div
+              ref={panelContentRef}
+              className={cn(
+                "w-max max-w-[92vw] transition-opacity motion-reduce:transition-none",
+                contentVisible ? "opacity-100 delay-100 duration-150" : "opacity-0 duration-100",
+              )}
+            >
+              {displayed === "where" ? (
+                <div className="flex w-80 flex-col gap-2.5">
               <div className="p-1.5 pb-1">
                 <Input
                   value={whereQuery}
@@ -630,37 +768,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                   ))
                 )}
               </div>
-            </PopoverContent>
-          </Popover>
-
-          <Divider faded={activeSegment !== null} />
-
-          <Popover open={whenOpen} onOpenChange={setWhenOpen}>
-            <PopoverTrigger
-              render={
-                <button
-                  type="button"
-                  data-segment="when"
-                  className="relative z-10 min-w-0 flex-1 rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
-                >
-                  <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
-                    When
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
-                    <span
-                      className={cn(
-                        "truncate text-[15px]",
-                        whenText ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      {whenText ?? "Add dates"}
-                    </span>
-                  </span>
-                </button>
-              }
-            />
-            <PopoverContent className="w-auto p-0" align="center" anchor={pillAnchor}>
+                </div>
+              ) : displayed === "when" ? (
+                <div className="flex flex-col gap-2.5">
               <div className="flex justify-center px-4 pt-4">
                 <div className="relative grid w-60 grid-cols-2 rounded-full bg-muted p-1">
                   <div
@@ -682,8 +792,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </div>
               </div>
 
-              <PanelResize>
-                {whenTab === "dates" ? (
+              {whenTab === "dates" ? (
                   <div
                     key="dates"
                     className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
@@ -763,7 +872,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                           type="button"
                           aria-label="Scroll months left"
                           onClick={() => scrollFlexMonths(-1)}
-                          className="absolute top-1/2 -left-3 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
+                          className="absolute top-1/2 left-0 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
                         >
                           <ChevronLeft className="size-4" />
                         </button>
@@ -771,7 +880,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                           type="button"
                           aria-label="Scroll months right"
                           onClick={() => scrollFlexMonths(1)}
-                          className="absolute top-1/2 -right-3 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
+                          className="absolute top-1/2 right-0 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
                         >
                           <ChevronRight className="size-4" />
                         </button>
@@ -779,38 +888,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                     </div>
                   </div>
                 )}
-              </PanelResize>
-            </PopoverContent>
-          </Popover>
-
-          <Divider faded={activeSegment !== null} />
-
-          <Popover open={whoOpen} onOpenChange={setWhoOpen}>
-            <PopoverTrigger
-              render={
-                <button
-                  type="button"
-                  data-segment="who"
-                  className="relative z-10 min-w-0 flex-[0.9] rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
-                >
-                  <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
-                    Who
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Users className="size-4 shrink-0 text-muted-foreground" />
-                    <span
-                      className={cn(
-                        "truncate text-[15px]",
-                        whoText ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      {whoText ?? "Add guests"}
-                    </span>
-                  </span>
-                </button>
-              }
-            />
-            <PopoverContent className="w-72" align="end" anchor={pillAnchor}>
+                </div>
+              ) : (
+                <div className="flex w-72 flex-col gap-2.5 p-2.5">
               <GuestStepper
                 label="Adults"
                 hint="Ages 13+"
@@ -839,17 +919,11 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 checked={pets}
                 onCheckedChange={setPets}
               />
-            </PopoverContent>
-          </Popover>
-
-          <div className="p-2">
-            <Button size="lg" className="w-full rounded-full" onClick={onSearch}>
-              <Search className="mr-1.5" />
-              Search
-            </Button>
+                </div>
+              )}
+            </div>
           </div>
-          </div>
-        </div>
+        ) : null}
       </div>
     );
   },
@@ -886,37 +960,6 @@ function WhenTabButton({
     >
       {children}
     </button>
-  );
-}
-
-/**
- * Animates the popover between the two tab panels' natural sizes. The inner
- * div sizes to content; a ResizeObserver copies that size onto the outer div
- * as explicit width/height so CSS can transition the change.
- */
-function PanelResize({ children }: { children: React.ReactNode }) {
-  const innerRef = React.useRef<HTMLDivElement>(null);
-  const [size, setSize] = React.useState<{ width: number; height: number } | null>(null);
-
-  React.useLayoutEffect(() => {
-    const el = innerRef.current;
-    if (!el) return;
-    const update = () => setSize({ width: el.offsetWidth, height: el.offsetHeight });
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div
-      className="overflow-hidden transition-[width,height] duration-300 ease-out motion-reduce:transition-none"
-      style={size ? { width: size.width, height: size.height } : undefined}
-    >
-      <div ref={innerRef} className="w-max max-w-[92vw]">
-        {children}
-      </div>
-    </div>
   );
 }
 
