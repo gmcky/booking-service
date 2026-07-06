@@ -14,3 +14,16 @@ class ObserverStub {
 
 globalThis.IntersectionObserver ??= ObserverStub as unknown as typeof IntersectionObserver;
 globalThis.ResizeObserver ??= ObserverStub as unknown as typeof ResizeObserver;
+
+// jsdom has no matchMedia either (search-pill uses it to pick the popover
+// anchor per layout). Never-matching is fine: tests don't assert positioning.
+window.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: () => {},
+  removeListener: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => false,
+})) as unknown as typeof window.matchMedia;

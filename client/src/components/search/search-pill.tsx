@@ -220,6 +220,20 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       return () => window.removeEventListener("resize", measure);
     }, [activeSegment]);
 
+    // Popovers anchor to the whole pill (Where left, When centered, Who
+    // right — Airbnb layout) only while the segments sit in one row; in the
+    // stacked mobile layout each popover must follow its own trigger or it
+    // renders detached below the whole stack.
+    const [rowLayout, setRowLayout] = React.useState(false);
+    React.useEffect(() => {
+      const mq = window.matchMedia("(min-width: 640px)");
+      const update = () => setRowLayout(mq.matches);
+      update();
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    }, []);
+    const pillAnchor = rowLayout ? pillRef : undefined;
+
     const [whereQuery, setWhereQuery] = React.useState("");
     const [selection, setSelection] = React.useState<LocationSelection>({
       country: initialFilters?.country,
@@ -535,7 +549,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </button>
               }
             />
-            <PopoverContent className="w-80 p-0" align="start" anchor={pillRef}>
+            <PopoverContent className="w-80 p-0" align="start" anchor={pillAnchor}>
               <div className="p-1.5 pb-1">
                 <Input
                   value={whereQuery}
@@ -646,7 +660,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </button>
               }
             />
-            <PopoverContent className="w-auto p-0" align="center" anchor={pillRef}>
+            <PopoverContent className="w-auto p-0" align="center" anchor={pillAnchor}>
               <div className="flex justify-center px-4 pt-4">
                 <div className="relative grid w-60 grid-cols-2 rounded-full bg-muted p-1">
                   <div
@@ -796,7 +810,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 </button>
               }
             />
-            <PopoverContent className="w-72" align="end" anchor={pillRef}>
+            <PopoverContent className="w-72" align="end" anchor={pillAnchor}>
               <GuestStepper
                 label="Adults"
                 hint="Ages 13+"

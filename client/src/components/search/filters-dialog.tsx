@@ -166,7 +166,12 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
 
   // Other draft filters move the histogram bounds under an explicit price
   // selection — clamp it back inside so the thumbs can't sit off-track.
+  // Only once real prices are in: clamping against the placeholder bounds
+  // (0–1000 pre-load, or an empty result set) would corrupt a saved price
+  // filter that sits outside them.
+  const boundsReal = (histogramQuery.data?.data.length ?? 0) > 0;
   React.useEffect(() => {
+    if (!boundsReal) return;
     setDraft((d) => {
       const minPrice =
         d.minPrice !== undefined
@@ -180,7 +185,7 @@ export function FiltersDialog({ open, onOpenChange, filters, onApply }: FiltersD
         ? d
         : { ...d, minPrice, maxPrice };
     });
-  }, [boundsMin, boundsMax]);
+  }, [boundsReal, boundsMin, boundsMax]);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedDraft(draft), 300);
