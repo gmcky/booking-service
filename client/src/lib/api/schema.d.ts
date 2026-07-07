@@ -1219,6 +1219,8 @@ export interface paths {
                     city?: string;
                     country?: string;
                     district?: string;
+                    /** @description Filter to listings owned by this host */
+                    ownerId?: string;
                     type?: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
                     /** @description CSV of Amenity enum values */
                     amenities?: string;
@@ -2400,6 +2402,51 @@ export interface paths {
         };
         trace?: never;
     };
+    "/users/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List reviews across a host's active listings */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated host review list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["HostReview"][];
+                            pagination: components["schemas"]["Pagination"];
+                        };
+                    };
+                };
+                404: components["responses"]["NotFound"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/{id}": {
         parameters: {
             query?: never;
@@ -2508,6 +2555,7 @@ export interface components {
             firstName: string;
             lastName: string;
             avatarUrl: string | null;
+            bio: string | null;
             /** Format: date-time */
             createdAt: string;
             averageRating: number | null;
@@ -2520,6 +2568,31 @@ export interface components {
             averageRatingAsGuest: number | null;
             averageRatingAsHost: number | null;
             listingsCount: number;
+        };
+        HostReview: {
+            id: string;
+            bookingId: string;
+            userId: string;
+            propertyId: string;
+            rating: number;
+            comment: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            hostReplyText: string | null;
+            hostReplyById: string | null;
+            /** Format: date-time */
+            hostReplyCreatedAt: string | null;
+            user: {
+                firstName: string;
+                lastName: string;
+                avatarUrl: string | null;
+            };
+            property: {
+                id: string;
+                title: string;
+            };
         };
         PropertyOwner: {
             id: string;
