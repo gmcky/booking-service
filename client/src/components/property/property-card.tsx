@@ -3,8 +3,19 @@ import { Star } from "lucide-react";
 import type { Property } from "@/lib/api/properties";
 import { formatPrice, formatRating } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
+import { FavoriteButton } from "@/components/property/favorite-button";
 
-export function PropertyCard({ property }: { property: Property }) {
+/**
+ * Only the fields the card renders. `Property` (search results, PropertyWithOwner)
+ * and `Favorite["property"]` (schema's plain `Property`, no `owner`) both satisfy
+ * this, so the same card works for both without an unsafe cast at the call site.
+ */
+type PropertyCardData = Pick<
+  Property,
+  "id" | "title" | "city" | "pricePerNight" | "averageRating" | "images"
+>;
+
+export function PropertyCard({ property }: { property: PropertyCardData }) {
   const rating = formatRating(property.averageRating);
 
   return (
@@ -16,6 +27,7 @@ export function PropertyCard({ property }: { property: Property }) {
         className="relative flex aspect-[4/3] items-center justify-center"
         style={{ backgroundImage: PHOTO_STRIPES }}
       >
+        <FavoriteButton propertyId={property.id} variant="overlay" />
         {property.images[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
