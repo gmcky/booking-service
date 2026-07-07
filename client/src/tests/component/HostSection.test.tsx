@@ -15,6 +15,7 @@ const host: PublicUserProfile = {
   firstName: "Sam",
   lastName: "Host",
   avatarUrl: null,
+  bio: null,
   // ~2 years before the mocked "now" below
   createdAt: "2024-06-01T00:00:00.000Z",
   averageRating: 4.8,
