@@ -1,5 +1,6 @@
 import type { PropertyQuery } from "@/lib/api/properties";
 import type { ReviewQuery } from "@/lib/api/reviews";
+import type { FavoriteQuery } from "@/lib/api/favorites";
 
 export const queryKeys = {
   properties: {
@@ -24,5 +25,9 @@ export const queryKeys = {
     list: (propertyId: string, query: ReviewQuery) =>
       ["reviews", "list", propertyId, query] as const,
     stats: (propertyId: string) => ["reviews", "stats", propertyId] as const,
+  },
+  favorites: {
+    ids: ["favorites", "ids"] as const,
+    list: (query: FavoriteQuery) => ["favorites", "list", query] as const,
   },
 } as const;

@@ -31,6 +31,7 @@ export const swaggerOptions: Options = {
       { name: "Bookings", description: "Booking lifecycle and availability" },
       { name: "Payments", description: "Payments, refunds, Stripe webhook" },
       { name: "Reviews", description: "Property reviews and reports" },
+      { name: "Favorites", description: "User wishlist / favorited properties" },
     ],
     components: {
       securitySchemes: {
@@ -685,6 +686,19 @@ export const swaggerOptions: Options = {
           },
           required: ["averageRating", "totalReviews", "breakdown", "recentTrend"],
         },
+        // --- Favorites ---
+        Favorite: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            userId: { type: "string" },
+            propertyId: { type: "string" },
+            createdAt: { type: "string", format: "date-time" },
+            property: { $ref: "#/components/schemas/Property" },
+          },
+          required: ["id", "userId", "propertyId", "createdAt", "property"],
+        },
+
         BlockedDates: {
           type: "object",
           properties: {

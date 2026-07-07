@@ -37,6 +37,14 @@ export function SiteHeader() {
           >
             Trips
           </Link>
+          {authed ? (
+            <Link
+              href="/favorites"
+              className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Favorites
+            </Link>
+          ) : null}
         </nav>
         <div className="ml-auto flex items-center gap-2.5">
           {authed ? (
