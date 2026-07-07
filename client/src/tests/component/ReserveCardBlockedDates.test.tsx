@@ -72,7 +72,7 @@ const property: PropertyDetail = {
   isActive: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  owner: { id: "owner-1", firstName: "Sam", lastName: "Host" },
+  owner: { id: "owner-1", firstName: "Sam", lastName: "Host", avatarUrl: null },
   reviews: [],
 };
 

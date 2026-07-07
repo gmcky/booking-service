@@ -20,6 +20,7 @@ export const queryKeys = {
   users: {
     me: ["users", "me"] as const,
     stats: ["users", "stats"] as const,
+    publicProfile: (id: string) => ["users", "public-profile", id] as const,
   },
   reviews: {
     list: (propertyId: string, query: ReviewQuery) =>

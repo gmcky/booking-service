@@ -58,6 +58,7 @@ export class UserService {
       const publicStatsCacheKey = getUserPublicStatsCacheKey(id);
       let publicStats = await cacheGet<{
         averageRating: number | null;
+        reviewsCount: number;
         listingsCount: number;
       }>(publicStatsCacheKey);
 
@@ -66,6 +67,7 @@ export class UserService {
           prisma.review.aggregate({
             where: { property: { ownerId: id, isActive: true } },
             _avg: { rating: true },
+            _count: true,
           }),
           prisma.property.count({
             where: { ownerId: id, isActive: true },
@@ -75,6 +77,7 @@ export class UserService {
         publicStats = {
           averageRating:
             ratingAggregate._avg.rating !== null ? Number(ratingAggregate._avg.rating) : null,
+          reviewsCount: ratingAggregate._count,
           listingsCount: listingCount,
         };
 

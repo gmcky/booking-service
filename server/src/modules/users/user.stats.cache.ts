@@ -7,7 +7,8 @@ export function getUserStatsCacheKey(userId: string): string {
 }
 
 export function getUserPublicStatsCacheKey(userId: string): string {
-  return `user:public:stats:${userId}`;
+  // v2: shape gained reviewsCount — new key so stale v1 entries age out.
+  return `user:public:stats:v2:${userId}`;
 }
 
 export async function invalidateUserStatsCache(
