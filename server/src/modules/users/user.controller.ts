@@ -8,6 +8,7 @@ import type {
   DeleteCurrentUserInput,
   ChangePasswordInput,
   GetUsersQueryInput,
+  GetHostReviewsQueryInput,
   RequestEmailChangeInput,
   ConfirmEmailChangeInput,
 } from "./user.types.js";
@@ -182,6 +183,19 @@ export async function getUserById(req: Request, res: Response) {
 
   const user = await UserService.getById(id, { mode: "public" });
   res.json(user);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/users/:id/reviews
+ * @access Public
+ */
+export async function getHostReviews(req: Request, res: Response) {
+  const id = getIdParam(req);
+  const { page, limit } = req.query as unknown as GetHostReviewsQueryInput;
+
+  const result = await UserService.getHostReviews(id, { page, limit });
+  res.json(result);
 }
 
 /**

@@ -47,6 +47,7 @@ export class UserService {
           firstName: true,
           lastName: true,
           avatarUrl: true,
+          bio: true,
           createdAt: true,
         },
       });
@@ -106,6 +107,45 @@ export class UserService {
     }
 
     return user;
+  }
+
+  /**
+   * Paginated reviews across all of a host's active listings.
+   */
+  static async getHostReviews(id: string, params: PaginationParams) {
+    const user = await prisma.user.findFirst({
+      where: { id, isDeleted: false, isSuspended: false },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new AppError(404, "User not found");
+    }
+
+    const { skip, take } = calculatePagination(params.page, params.limit);
+    const where: Prisma.ReviewWhereInput = {
+      property: { ownerId: id, isActive: true },
+    };
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: { firstName: true, lastName: true, avatarUrl: true },
+          },
+          property: {
+            select: { id: true, title: true },
+          },
+        },
+      }),
+      prisma.review.count({ where }),
+    ]);
+
+    return createPaginatedResponse(reviews, total, params);
   }
 
   /**
