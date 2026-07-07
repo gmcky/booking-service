@@ -28,6 +28,7 @@ model User {
   reviews       Review[]       @relation("ReviewAuthor")
   hostReplies   Review[]       @relation("ReviewHostReply")
   reviewReports ReviewReport[]
+  favorites     Favorite[]
 
   @@map("users")
 }
@@ -64,6 +65,7 @@ model Property {
   bookings     Booking[]
   reviews      Review[]
   blockedDates BlockedDate[]
+  favorites    Favorite[]
 
   @@index([city, pricePerNight])
   @@index([isActive])
@@ -232,6 +234,21 @@ enum ReviewReportStatus {
   PENDING
   RESOLVED
   REJECTED
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@map("favorites")
 }
 
 model Payment {
