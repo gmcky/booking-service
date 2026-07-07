@@ -7,6 +7,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { addDays } from "date-fns";
 import { ArrowLeft, ChevronDown, MapPin, Star } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -26,6 +27,7 @@ import { Highlights } from "@/components/property/highlights";
 import { AmenitiesSection } from "@/components/property/amenities-section";
 import { AvailabilitySection } from "@/components/property/availability-section";
 import { LocationSection } from "@/components/property/location-section";
+import { HostSection } from "@/components/property/host-section";
 import { useBlockedDates } from "@/components/property/use-blocked-dates";
 import { useAuthStore } from "@/lib/auth/store";
 import { propertyApi } from "@/lib/api/properties";
@@ -146,7 +148,14 @@ export function PropertyDetailView({ id }: { id: string }) {
                   Up to {property.maxGuests} {property.maxGuests === 1 ? "guest" : "guests"}
                 </p>
               </div>
-              <div className="size-12 shrink-0 rounded-full border border-border bg-muted" />
+              <Avatar className="size-12 shrink-0 border border-border">
+                {property.owner.avatarUrl ? (
+                  <AvatarImage src={property.owner.avatarUrl} alt="" />
+                ) : null}
+                <AvatarFallback>
+                  {`${property.owner.firstName[0] ?? ""}${property.owner.lastName[0] ?? ""}`.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
             </div>
 
             <Highlights property={property} />
@@ -171,6 +180,8 @@ export function PropertyDetailView({ id }: { id: string }) {
             <PropertyReviews propertyId={property.id} propertyOwnerId={property.owner.id} />
 
             <LocationSection property={property} />
+
+            <HostSection ownerId={property.owner.id} />
           </div>
 
           <aside className="scroll-mt-32 lg:sticky lg:top-22">

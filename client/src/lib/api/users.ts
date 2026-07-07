@@ -4,6 +4,7 @@ import type { components, paths } from "./schema";
 
 export type UserProfile = components["schemas"]["UserProfile"];
 export type UserStats = components["schemas"]["UserStats"];
+export type PublicUserProfile = components["schemas"]["PublicUserProfile"];
 
 export interface UpdateProfileInput {
   firstName?: string;
@@ -53,6 +54,13 @@ export const userApi = {
       return { status: 202, message: (result as { message?: string }).message ?? "" };
     }
     return { status: 200, profile: result as UserProfile };
+  },
+
+  publicProfile: async (id: string): Promise<PublicUserProfile> => {
+    const { data, error, response } = await apiClient.GET("/users/{id}", {
+      params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
   },
 
   getStats: async (): Promise<UserStats> => {
