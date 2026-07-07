@@ -2368,6 +2368,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             averageRating: number | null;
+            reviewsCount: number;
             listingsCount: number;
         };
         UserStats: {
@@ -2381,6 +2382,7 @@ export interface components {
             id: string;
             firstName: string;
             lastName: string;
+            avatarUrl: string | null;
         };
         Property: {
             id: string;
