@@ -62,6 +62,9 @@ describe("UserService.getHostReviews", () => {
       UserService.getHostReviews("missing-user", { page: 1, limit: 10 }),
     ).rejects.toMatchObject({
       statusCode: 404,
+      // Exact message is load-bearing: the client's host profile page
+      // matches this string to show its "Host not found" state.
+      message: "User not found",
     });
 
     expect(mockPrisma.review.findMany).not.toHaveBeenCalled();
@@ -80,7 +83,13 @@ describe("UserService.getHostReviews", () => {
         skip: 5,
         take: 5,
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          hostReplyText: true,
+          hostReplyCreatedAt: true,
           user: { select: { firstName: true, lastName: true, avatarUrl: true } },
           property: { select: { id: true, title: true } },
         },

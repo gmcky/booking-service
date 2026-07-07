@@ -133,7 +133,15 @@ export class UserService {
         skip,
         take,
         orderBy: { createdAt: "desc" },
-        include: {
+        // Public endpoint — select only what the profile page renders; no
+        // bookingId / reviewer userId / hostReplyById leakage.
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          hostReplyText: true,
+          hostReplyCreatedAt: true,
           user: {
             select: { firstName: true, lastName: true, avatarUrl: true },
           },

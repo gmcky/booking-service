@@ -46,15 +46,10 @@ const host: PublicUserProfile = {
 
 const review: HostReview = {
   id: "review-1",
-  bookingId: "booking-1",
-  userId: "guest-1",
-  propertyId: "property-1",
   rating: 5,
   comment: "Wonderful stay!",
   createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-01T00:00:00.000Z",
   hostReplyText: null,
-  hostReplyById: null,
   hostReplyCreatedAt: null,
   user: { firstName: "Alex", lastName: "Guest", avatarUrl: null },
   property: { id: "property-1", title: "Cozy Loft Downtown" },

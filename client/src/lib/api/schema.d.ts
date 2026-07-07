@@ -2571,17 +2571,11 @@ export interface components {
         };
         HostReview: {
             id: string;
-            bookingId: string;
-            userId: string;
-            propertyId: string;
             rating: number;
             comment: string | null;
             /** Format: date-time */
             createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
             hostReplyText: string | null;
-            hostReplyById: string | null;
             /** Format: date-time */
             hostReplyCreatedAt: string | null;
             user: {
