@@ -27,6 +27,7 @@ import { AmenitiesSection } from "@/components/property/amenities-section";
 import { AvailabilitySection } from "@/components/property/availability-section";
 import { LocationSection } from "@/components/property/location-section";
 import { useBlockedDates } from "@/components/property/use-blocked-dates";
+import { FavoriteButton } from "@/components/property/favorite-button";
 import { useAuthStore } from "@/lib/auth/store";
 import { propertyApi } from "@/lib/api/properties";
 import { bookingApi } from "@/lib/api/bookings";
@@ -131,6 +132,7 @@ export function PropertyDetailView({ id }: { id: string }) {
               </span>
             </div>
           </div>
+          <FavoriteButton propertyId={property.id} variant="labeled" className="shrink-0" />
         </div>
 
         <PhotoGallery images={property.images} title={property.title} />

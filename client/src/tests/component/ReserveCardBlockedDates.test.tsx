@@ -11,6 +11,15 @@ import type { AuthUser } from "@/lib/auth/store";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/properties/prop-1",
+}));
+
+vi.mock("@/lib/api/favorites", () => ({
+  favoriteApi: {
+    ids: vi.fn().mockResolvedValue([]),
+    add: vi.fn(),
+    remove: vi.fn(),
+  },
 }));
 
 vi.mock("@/lib/api/properties", () => ({
