@@ -586,7 +586,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
             aria-haspopup="dialog"
             aria-expanded={openSegment === "where"}
             onClick={() => toggleSegment("where")}
-            className="relative z-10 min-w-0 flex-[1.4] rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
+            className={cn(
+              "relative z-10 min-w-0 flex-[1.4] rounded-full px-4 py-2 text-left transition-colors",
+              openSegment !== "where" && "hover:bg-muted",
+            )}
           >
             <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
               Where
@@ -612,7 +615,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
             aria-haspopup="dialog"
             aria-expanded={openSegment === "when"}
             onClick={() => toggleSegment("when")}
-            className="relative z-10 min-w-0 flex-1 rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
+            className={cn(
+              "relative z-10 min-w-0 flex-1 rounded-full px-4 py-2 text-left transition-colors",
+              openSegment !== "when" && "hover:bg-muted",
+            )}
           >
             <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
               When
@@ -638,7 +644,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
             aria-haspopup="dialog"
             aria-expanded={openSegment === "who"}
             onClick={() => toggleSegment("who")}
-            className="relative z-10 min-w-0 flex-[0.9] rounded-full px-4 py-2 text-left transition-colors hover:bg-muted"
+            className={cn(
+              "relative z-10 min-w-0 flex-[0.9] rounded-full px-4 py-2 text-left transition-colors",
+              openSegment !== "who" && "hover:bg-muted",
+            )}
           >
             <span className="mb-1 block font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
               Who
