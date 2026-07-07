@@ -115,7 +115,7 @@ describe("FavoriteService", () => {
 
       expect(mockPrisma.favorite.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: "user-1" },
+          where: { userId: "user-1", property: { isActive: true } },
           skip: 10,
           take: 10,
           orderBy: { createdAt: "desc" },
@@ -143,7 +143,7 @@ describe("FavoriteService", () => {
 
       expect(result).toEqual({ ids: ["property-1", "property-2"] });
       expect(mockPrisma.favorite.findMany).toHaveBeenCalledWith({
-        where: { userId: "user-1" },
+        where: { userId: "user-1", property: { isActive: true } },
         select: { propertyId: true },
       });
     });

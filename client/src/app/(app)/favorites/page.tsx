@@ -35,6 +35,7 @@ export default function FavoritesPage() {
   });
 
   const favorites = data?.pages.flatMap((p) => p.data) ?? [];
+  const total = data?.pages.at(-1)?.pagination.total ?? favorites.length;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -45,7 +46,7 @@ export default function FavoritesPage() {
         <p className="mb-6 text-[15px] text-muted-foreground">
           {isPending
             ? "Loading your favorites…"
-            : `${favorites.length} saved ${favorites.length === 1 ? "stay" : "stays"}`}
+            : `${total} saved ${total === 1 ? "stay" : "stays"}`}
         </p>
 
         {isError ? (

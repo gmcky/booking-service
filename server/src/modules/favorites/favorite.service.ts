@@ -48,15 +48,18 @@ export class FavoriteService {
   static async list(userId: string, params: PaginationParams) {
     const { skip, take } = calculatePagination(params.page, params.limit);
 
+    // Exclude delisted properties — their detail pages 404 for non-owners.
+    const where = { userId, property: { isActive: true } };
+
     const [favorites, total] = await Promise.all([
       prisma.favorite.findMany({
-        where: { userId },
+        where,
         skip,
         take,
         orderBy: { createdAt: "desc" },
         include: { property: true },
       }),
-      prisma.favorite.count({ where: { userId } }),
+      prisma.favorite.count({ where }),
     ]);
 
     return createPaginatedResponse(favorites, total, params);
@@ -68,7 +71,7 @@ export class FavoriteService {
    */
   static async listIds(userId: string) {
     const favorites = await prisma.favorite.findMany({
-      where: { userId },
+      where: { userId, property: { isActive: true } },
       select: { propertyId: true },
     });
 

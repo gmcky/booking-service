@@ -52,17 +52,24 @@ export function useFavorites() {
       }
       toast.error("Couldn't update your favorites. Please try again.");
     },
-    onSettled: () => {
+    onSettled: (_data, _err, { propertyId }) => {
+      pendingRef.current.delete(propertyId);
       queryClient.invalidateQueries({ queryKey: queryKeys.favorites.ids });
       queryClient.invalidateQueries({ queryKey: ["favorites", "list"] });
     },
   });
+
+  // One in-flight mutation per property — a rapid double-click would fire
+  // add+remove with no guaranteed completion order on the server.
+  const pendingRef = React.useRef(new Set<string>());
 
   function isFavorite(propertyId: string): boolean {
     return ids.has(propertyId);
   }
 
   function toggle(propertyId: string) {
+    if (pendingRef.current.has(propertyId)) return;
+    pendingRef.current.add(propertyId);
     toggleMutation.mutate({ propertyId, next: !ids.has(propertyId) });
   }
 
