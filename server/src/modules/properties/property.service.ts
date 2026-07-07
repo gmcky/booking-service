@@ -221,7 +221,7 @@ export class PropertyService {
       where: { id },
       include: {
         owner: {
-          select: { id: true, firstName: true, lastName: true },
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
         },
         reviews: {
           take: 5,

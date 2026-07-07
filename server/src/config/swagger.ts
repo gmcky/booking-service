@@ -221,6 +221,7 @@ export const swaggerOptions: Options = {
             avatarUrl: { type: "string", nullable: true },
             createdAt: { type: "string", format: "date-time" },
             averageRating: { type: "number", nullable: true },
+            reviewsCount: { type: "integer" },
             listingsCount: { type: "integer" },
           },
           required: [
@@ -230,6 +231,7 @@ export const swaggerOptions: Options = {
             "avatarUrl",
             "createdAt",
             "averageRating",
+            "reviewsCount",
             "listingsCount",
           ],
         },
@@ -258,8 +260,9 @@ export const swaggerOptions: Options = {
             id: { type: "string" },
             firstName: { type: "string" },
             lastName: { type: "string" },
+            avatarUrl: { type: "string", nullable: true },
           },
-          required: ["id", "firstName", "lastName"],
+          required: ["id", "firstName", "lastName", "avatarUrl"],
         },
         Property: {
           type: "object",
