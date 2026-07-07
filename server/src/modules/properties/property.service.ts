@@ -60,6 +60,7 @@ export class PropertyService {
       ...(filters.district && {
         district: { contains: filters.district, mode: "insensitive" as const },
       }),
+      ...(filters.ownerId && { ownerId: filters.ownerId }),
       ...(filters.type && { type: filters.type }),
       // One-directional house-rule filters: only true narrows results.
       ...(filters.petsAllowed && { petsAllowed: true }),

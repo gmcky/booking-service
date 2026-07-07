@@ -39,6 +39,7 @@ export type LocationCity = components["schemas"]["LocationCity"];
 export type LocationDistrict = components["schemas"]["LocationDistrict"];
 
 export interface PropertyQuery {
+  ownerId?: string;
   city?: string;
   country?: string;
   district?: string;
@@ -83,6 +84,7 @@ export const propertyApi = {
     const { data, error, response } = await apiClient.GET("/properties", {
       params: {
         query: {
+          ownerId: query.ownerId,
           city: query.city,
           country: query.country,
           district: query.district,

@@ -1,28 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Star, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { userApi } from "@/lib/api/users";
 import { queryKeys } from "@/lib/query/keys";
 import { formatRating } from "@/lib/utils/money";
+import { hostingDuration } from "@/components/host/hosting-duration";
 
 function initials(firstName: string, lastName: string): string {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
-}
-
-/** Whole years since `iso`; under a year falls back to months, under a month to "New". */
-function hostingDuration(iso: string): { value: string; unit: string } {
-  const started = new Date(iso).getTime();
-  const months = Math.max(0, Math.floor((Date.now() - started) / (30.44 * 24 * 60 * 60 * 1000)));
-  if (months >= 12) {
-    const years = Math.floor(months / 12);
-    return { value: String(years), unit: years === 1 ? "Year hosting" : "Years hosting" };
-  }
-  if (months >= 1) {
-    return { value: String(months), unit: months === 1 ? "Month hosting" : "Months hosting" };
-  }
-  return { value: "New", unit: "Host" };
 }
 
 export function HostSection({ ownerId }: { ownerId: string }) {
@@ -51,7 +39,10 @@ export function HostSection({ ownerId }: { ownerId: string }) {
   return (
     <div id="host" className="scroll-mt-32 border-t border-border py-6">
       <h2 className="mb-[18px] text-[19px] font-semibold tracking-tight">Meet your host</h2>
-      <div className="flex max-w-[560px] items-stretch gap-6 rounded-2xl border border-border px-7 py-6 shadow-sm">
+      <Link
+        href={`/hosts/${ownerId}`}
+        className="flex max-w-[560px] items-stretch gap-6 rounded-2xl border border-border px-7 py-6 shadow-sm transition-shadow hover:shadow-md"
+      >
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
           <Avatar className="size-24">
             {host.avatarUrl ? <AvatarImage src={host.avatarUrl} alt="" /> : null}
@@ -80,7 +71,7 @@ export function HostSection({ ownerId }: { ownerId: string }) {
             </div>
           ))}
         </dl>
-      </div>
+      </Link>
     </div>
   );
 }

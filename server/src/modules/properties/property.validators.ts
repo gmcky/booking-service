@@ -42,6 +42,7 @@ export const propertyQuerySchema = z
     city: z.string().optional(),
     country: z.string().optional(),
     district: z.string().optional(),
+    ownerId: z.string().uuid().optional(),
     type: z.nativeEnum(PropertyType).optional(),
     // Accepts CSV and repeated query params for amenities.
     amenities: z

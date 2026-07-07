@@ -18,6 +18,7 @@ export interface PropertyFilters {
   city?: string;
   country?: string;
   district?: string;
+  ownerId?: string;
   type?: PropertyType;
   petsAllowed?: boolean;
   infantsAllowed?: boolean;

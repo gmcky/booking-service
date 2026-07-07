@@ -63,6 +63,20 @@ describe("PropertyService.getAll location filters", () => {
     expect(whereArg.district).toBeUndefined();
   });
 
+  it("adds ownerId to the where clause when provided", async () => {
+    await PropertyService.getAll({ page: 1, limit: 10 }, { ownerId: "host-1" });
+
+    const whereArg = mockFindMany.mock.calls[0]?.[0]?.where;
+    expect(whereArg.ownerId).toBe("host-1");
+  });
+
+  it("omits ownerId from the where clause when absent", async () => {
+    await PropertyService.getAll({ page: 1, limit: 10 }, {});
+
+    const whereArg = mockFindMany.mock.calls[0]?.[0]?.where;
+    expect(whereArg.ownerId).toBeUndefined();
+  });
+
   it("narrows to allowing listings when house-rule filters are true", async () => {
     await PropertyService.getAll(
       { page: 1, limit: 10 },
