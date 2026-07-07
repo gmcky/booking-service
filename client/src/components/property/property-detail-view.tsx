@@ -150,14 +150,16 @@ export function PropertyDetailView({ id }: { id: string }) {
                   Up to {property.maxGuests} {property.maxGuests === 1 ? "guest" : "guests"}
                 </p>
               </div>
-              <Avatar className="size-12 shrink-0 border border-border">
-                {property.owner.avatarUrl ? (
-                  <AvatarImage src={property.owner.avatarUrl} alt="" />
-                ) : null}
-                <AvatarFallback>
-                  {`${property.owner.firstName[0] ?? ""}${property.owner.lastName[0] ?? ""}`.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <Link href={`/hosts/${property.owner.id}`} className="shrink-0">
+                <Avatar className="size-12 border border-border">
+                  {property.owner.avatarUrl ? (
+                    <AvatarImage src={property.owner.avatarUrl} alt="" />
+                  ) : null}
+                  <AvatarFallback>
+                    {`${property.owner.firstName[0] ?? ""}${property.owner.lastName[0] ?? ""}`.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
             </div>
 
             <Highlights property={property} />

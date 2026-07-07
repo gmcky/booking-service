@@ -15,6 +15,7 @@ import {
   confirmEmailChange,
   getAllUsers,
   getUserById,
+  getHostReviews,
   suspendUser,
   restoreUser,
 } from "./user.controller.js";
@@ -23,6 +24,7 @@ import {
   deleteCurrentUserSchema,
   changePasswordSchema,
   getUsersQuerySchema,
+  getHostReviewsQuerySchema,
   requestEmailChangeSchema,
   confirmEmailChangeSchema,
 } from "./user.validators.js";
@@ -394,6 +396,38 @@ userRouter.patch("/:id/suspend", authenticate, authorize("ADMIN"), asyncHandler(
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 userRouter.patch("/:id/restore", authenticate, authorize("ADMIN"), asyncHandler(restoreUser));
+
+/**
+ * @openapi
+ * /users/{id}/reviews:
+ *   get:
+ *     tags: [Users]
+ *     summary: List reviews across a host's active listings
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 50 } }
+ *     responses:
+ *       200:
+ *         description: Paginated host review list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/HostReview' }
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *               required: [data, pagination]
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+userRouter.get(
+  "/:id/reviews",
+  validate(getHostReviewsQuerySchema, "query"),
+  asyncHandler(getHostReviews),
+);
 
 /**
  * @openapi

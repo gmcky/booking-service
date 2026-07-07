@@ -1,10 +1,17 @@
 import { apiClient } from "./client";
 import { unwrap, unwrapVoid } from "./unwrap";
 import type { components, paths } from "./schema";
+import type { Paginated } from "./properties";
 
 export type UserProfile = components["schemas"]["UserProfile"];
 export type UserStats = components["schemas"]["UserStats"];
 export type PublicUserProfile = components["schemas"]["PublicUserProfile"];
+export type HostReview = components["schemas"]["HostReview"];
+
+export interface HostReviewQuery {
+  page?: number;
+  limit?: number;
+}
 
 export interface UpdateProfileInput {
   firstName?: string;
@@ -59,6 +66,13 @@ export const userApi = {
   publicProfile: async (id: string): Promise<PublicUserProfile> => {
     const { data, error, response } = await apiClient.GET("/users/{id}", {
       params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  hostReviews: async (id: string, query: HostReviewQuery = {}): Promise<Paginated<HostReview>> => {
+    const { data, error, response } = await apiClient.GET("/users/{id}/reviews", {
+      params: { path: { id }, query: { page: query.page, limit: query.limit } },
     });
     return unwrap({ data, error, response });
   },
