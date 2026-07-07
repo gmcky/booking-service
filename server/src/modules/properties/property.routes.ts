@@ -42,6 +42,7 @@ const propertyImageUpload = multer({
  *       - { in: query, name: city, schema: { type: string } }
  *       - { in: query, name: country, schema: { type: string } }
  *       - { in: query, name: district, schema: { type: string } }
+ *       - { in: query, name: ownerId, schema: { type: string, format: uuid }, description: 'Filter to listings owned by this host' }
  *       - { in: query, name: type, schema: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] } }
  *       - { in: query, name: amenities, schema: { type: string }, description: 'CSV of Amenity enum values' }
  *       - { in: query, name: minPrice, schema: { type: number } }
