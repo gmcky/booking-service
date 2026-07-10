@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MapPin, Calendar, X, Loader2 } from "lucide-react";
+import { MapPin, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
@@ -11,23 +11,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { bookingApi, type BookingListItem } from "@/lib/api/bookings";
 import { ReviewFormDialog } from "@/components/reviews/review-form-dialog";
+import { CancelBookingDialog } from "@/components/bookings/cancel-booking-dialog";
 import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange } from "@/lib/utils/dates";
 import { calculateRefundPreview } from "@/lib/utils/refund";
 import { reviewEligibility } from "@/lib/utils/reviews";
 import { queryKeys } from "@/lib/query/keys";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 type Tab = "upcoming" | "past" | "cancelled";
 
@@ -171,11 +161,11 @@ function BookingRow({
   cancelling: boolean;
 }) {
   const badge = statusBadge(booking);
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
   const preview =
     booking.status === "CONFIRMED"
       ? calculateRefundPreview(booking.checkIn, booking.totalPrice)
       : null;
+  const zeroRefund = preview !== null && preview.refundPercent === 0;
   const review =
     booking.status === "COMPLETED"
       ? reviewEligibility(booking.actualCheckOutAt, booking.checkOut)
@@ -206,7 +196,12 @@ function BookingRow({
               #{booking.id.slice(0, 8).toUpperCase()}
             </span>
           </div>
-          <div className="text-[17px] font-semibold tracking-tight">{booking.property.title}</div>
+          <Link
+            href={`/bookings/${booking.id}`}
+            className="text-[17px] font-semibold tracking-tight hover:underline"
+          >
+            {booking.property.title}
+          </Link>
           <div className="flex flex-wrap items-center gap-3.5 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <MapPin className="size-3.5" />
@@ -234,46 +229,22 @@ function BookingRow({
             View
           </Button>
           {tab === "upcoming" ? (
-            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <AlertDialogTrigger
-                render={
-                  <Button variant="destructive" size="sm" className="w-[100px]" disabled={cancelling} />
-                }
-              >
-                {cancelling ? <Loader2 className="animate-spin" /> : <X />}
-                Cancel
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will cancel your reservation at {booking.property.title}. This can&apos;t be undone.
-                    {preview ? (
-                      <>
-                        {" "}
-                        {preview.refundPercent > 0
-                          ? `You'll receive a ${preview.refundPercent}% refund (${formatPrice(preview.refundAmount)}).`
-                          : "This is within 24 hours of check-in, so no refund applies."}
-                      </>
-                    ) : null}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep booking</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() => {
-                      // AlertDialogAction is a plain Button (no Close): close
-                      // explicitly so a pending mutation can't be double-fired.
-                      setConfirmOpen(false);
-                      onCancel();
-                    }}
-                  >
-                    Cancel booking
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            zeroRefund ? (
+              <span className="text-right text-xs text-muted-foreground">
+                Free cancellation ended
+                <br />
+                · non-refundable
+              </span>
+            ) : (
+              <CancelBookingDialog
+                propertyTitle={booking.property.title}
+                checkIn={booking.checkIn}
+                totalPrice={booking.totalPrice}
+                status={booking.status}
+                onConfirm={onCancel}
+                cancelling={cancelling}
+              />
+            )
           ) : tab === "past" ? (
             <>
               {review?.eligible ? (

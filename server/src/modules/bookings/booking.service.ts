@@ -42,6 +42,20 @@ const BOOKING_PROPERTY_SELECT = {
   ownerId: true,
 } as const;
 
+const BOOKING_DETAIL_PROPERTY_SELECT = {
+  ...BOOKING_PROPERTY_SELECT,
+  owner: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+      phoneNumber: true,
+      email: true,
+    },
+  },
+} as const;
+
 // FSM transitions to block backward or skip steps.
 const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
@@ -125,13 +139,15 @@ export class BookingService {
   }
 
   /**
-   * RBAC gate for booking and payment snapshot access.
+   * RBAC gate for booking and payment snapshot access. Host contact details
+   * (phone/email) are only attached for the guest or an admin, and only once
+   * the booking is CONFIRMED or COMPLETED.
    */
   static async getById(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: {
-        property: { select: BOOKING_PROPERTY_SELECT },
+        property: { select: BOOKING_DETAIL_PROPERTY_SELECT },
         payment: {
           select: {
             id: true,
@@ -157,7 +173,20 @@ export class BookingService {
       throw new AppError(403, "Not authorized to view this booking");
     }
 
-    return booking;
+    const { phoneNumber, email, ...ownerPublic } = booking.property.owner;
+
+    const canSeeHostContact =
+      (booking.status === "CONFIRMED" || booking.status === "COMPLETED") &&
+      (role === "GUEST" || role === "ADMIN");
+
+    return {
+      ...booking,
+      property: {
+        ...booking.property,
+        owner: ownerPublic,
+      },
+      hostContact: canSeeHostContact ? { phoneNumber, email } : null,
+    };
   }
 
   /**
