@@ -131,6 +131,18 @@ describe("BookingDetailView", () => {
     expect(screen.getByText("123 Pine Ridge Rd")).toBeInTheDocument();
   });
 
+  it("shows the reveal-window message when CONFIRMED without hostContact", async () => {
+    const { bookingApi } = await import("@/lib/api/bookings");
+    (bookingApi.byId as ReturnType<typeof vi.fn>).mockResolvedValue(
+      makeBooking({ status: "CONFIRMED", hostContact: null }),
+    );
+
+    renderView();
+    await screen.findByText("Pine Ridge Cabin");
+
+    expect(screen.getByText("Host contact appears 2 days before check-in.")).toBeInTheDocument();
+  });
+
   it("shows a pending message without contact links when booking is PENDING", async () => {
     const { bookingApi } = await import("@/lib/api/bookings");
     (bookingApi.byId as ReturnType<typeof vi.fn>).mockResolvedValue(
