@@ -131,7 +131,7 @@ describe("BookingDetailView", () => {
     expect(screen.getByText("123 Pine Ridge Rd")).toBeInTheDocument();
   });
 
-  it("shows a pending message and hides address when hostContact is null and booking is PENDING", async () => {
+  it("shows a pending message without contact links when booking is PENDING", async () => {
     const { bookingApi } = await import("@/lib/api/bookings");
     (bookingApi.byId as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeBooking({ status: "PENDING", hostContact: null }),
@@ -143,7 +143,7 @@ describe("BookingDetailView", () => {
     expect(
       screen.getByText("Host contact appears once your booking is confirmed."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Address available after confirmation")).toBeInTheDocument();
-    expect(screen.queryByText("123 Pine Ridge Rd")).not.toBeInTheDocument();
+    expect(screen.getByText("123 Pine Ridge Rd")).toBeInTheDocument();
+    expect(screen.queryByText("+380501234567")).not.toBeInTheDocument();
   });
 });

@@ -229,15 +229,7 @@ function BookingDetailBody({
               value={`${booking.guests} ${booking.guests === 1 ? "guest" : "guests"}`}
               icon={<Users className="size-3.5" />}
             />
-            <DetailRow
-              label="Address"
-              value={
-                booking.hostContact
-                  ? booking.property.address
-                  : "Address available after confirmation"
-              }
-              muted={!booking.hostContact}
-            />
+            <DetailRow label="Address" value={booking.property.address} />
           </dl>
         </section>
 

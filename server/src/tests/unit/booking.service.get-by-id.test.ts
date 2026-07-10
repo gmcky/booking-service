@@ -75,6 +75,14 @@ describe("BookingService.getById", () => {
     expect(result.hostContact).toBeNull();
   });
 
+  it("returns hostContact null for guest when booking is CANCELLED", async () => {
+    (mockPrisma.booking.findUnique as any).mockResolvedValue(buildBooking({ status: "CANCELLED" }));
+
+    const result = await BookingService.getById("booking-1", "guest-1", "USER");
+
+    expect(result.hostContact).toBeNull();
+  });
+
   it("attaches hostContact for admin when booking is COMPLETED", async () => {
     (mockPrisma.booking.findUnique as any).mockResolvedValue(buildBooking({ status: "COMPLETED" }));
 
