@@ -141,7 +141,10 @@ export class BookingService {
   /**
    * RBAC gate for booking and payment snapshot access. Host contact details
    * (phone/email) are only attached for the guest or an admin, and only once
-   * the booking is CONFIRMED or COMPLETED.
+   * the booking is CONFIRMED or COMPLETED. For guests the reveal additionally
+   * waits until check-in is inside the free-cancellation cutoff: revealing
+   * while a 100% refund is still available would make book-peek-cancel a
+   * zero-cost contact-harvesting loop.
    */
   static async getById(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
@@ -175,9 +178,14 @@ export class BookingService {
 
     const { phoneNumber, email, ...ownerPublic } = booking.property.owner;
 
+    const insideCancellationCutoff =
+      booking.checkIn.getTime() - Date.now() <= REFUND_POLICY.fullRefundAfterHours * 60 * 60 * 1000;
     const canSeeHostContact =
-      (booking.status === "CONFIRMED" || booking.status === "COMPLETED") &&
-      (role === "GUEST" || role === "ADMIN");
+      role === "ADMIN"
+        ? booking.status === "CONFIRMED" || booking.status === "COMPLETED"
+        : role === "GUEST" &&
+          (booking.status === "COMPLETED" ||
+            (booking.status === "CONFIRMED" && insideCancellationCutoff));
 
     return {
       ...booking,
