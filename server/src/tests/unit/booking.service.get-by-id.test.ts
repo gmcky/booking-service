@@ -16,6 +16,8 @@ function buildBooking(overrides: Partial<Record<string, unknown>> = {}) {
     id: "booking-1",
     userId: "guest-1",
     status: "CONFIRMED",
+    // Inside the 48h free-cancellation cutoff — contact reveal window.
+    checkIn: new Date(Date.now() + 12 * 60 * 60 * 1000),
     property: {
       id: "property-1",
       ownerId: "host-1",
@@ -40,7 +42,7 @@ describe("BookingService.getById", () => {
     vi.clearAllMocks();
   });
 
-  it("attaches hostContact for guest when booking is CONFIRMED", async () => {
+  it("attaches hostContact for guest when CONFIRMED inside the cancellation cutoff", async () => {
     (mockPrisma.booking.findUnique as any).mockResolvedValue(buildBooking());
 
     const result = await BookingService.getById("booking-1", "guest-1", "USER");
@@ -73,6 +75,32 @@ describe("BookingService.getById", () => {
     const result = await BookingService.getById("booking-1", "host-1", "USER");
 
     expect(result.hostContact).toBeNull();
+  });
+
+  it("returns hostContact null for guest when CONFIRMED but check-in is far out", async () => {
+    (mockPrisma.booking.findUnique as any).mockResolvedValue(
+      buildBooking({ checkIn: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) }),
+    );
+
+    const result = await BookingService.getById("booking-1", "guest-1", "USER");
+
+    expect(result.hostContact).toBeNull();
+  });
+
+  it("attaches hostContact for guest when COMPLETED regardless of dates", async () => {
+    (mockPrisma.booking.findUnique as any).mockResolvedValue(
+      buildBooking({
+        status: "COMPLETED",
+        checkIn: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      }),
+    );
+
+    const result = await BookingService.getById("booking-1", "guest-1", "USER");
+
+    expect(result.hostContact).toEqual({
+      phoneNumber: "+380501234567",
+      email: "owner@demo.com",
+    });
   });
 
   it("returns hostContact null for guest when booking is CANCELLED", async () => {
