@@ -118,6 +118,21 @@ describe("propertyQuerySchema bounding box", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects an inverted bbox", () => {
+    const result = propertyQuerySchema.safeParse({
+      minLat: "53",
+      maxLat: "52",
+      minLng: "5",
+      maxLng: "4",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path[0]);
+      expect(paths).toEqual(expect.arrayContaining(["minLat", "minLng"]));
+    }
+  });
+
   it("rejects out-of-range latitude", () => {
     const result = propertyQuerySchema.safeParse({
       minLat: "-95",

@@ -62,17 +62,16 @@ export function BrowseMapPanel({
   fitBoundsKey,
 }: BrowseMapPanelProps) {
   const [map, setMap] = React.useState<maplibregl.Map | null>(null);
-  const [userMovedMap, setUserMovedMap] = React.useState(false);
   const [pendingBounds, setPendingBounds] = React.useState<MapBounds | null>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const geoProperties = React.useMemo(() => properties.filter(hasCoords), [properties]);
   const selected = geoProperties.find((p) => p.id === selectedId) ?? null;
 
-  // New search (city/filters/sort changed, not a map pan) — refit to results,
-  // and forget any prior "user moved the map" state.
+  // New search (city/filters/sort changed, not a map pan) — refit to results.
+  // A new search also drops bbox params, so yanking the camera is correct;
+  // pans that keep the current search (bbox-only changes) never land here.
   React.useEffect(() => {
-    setUserMovedMap(false);
     setPendingBounds(null);
     if (!map) return;
     const bounds = boundsOf(geoProperties);
@@ -85,7 +84,6 @@ export function BrowseMapPanel({
 
   function handleMoveEnd(bounds: MapBounds, isUserGesture: boolean) {
     if (!isUserGesture) return;
-    setUserMovedMap(true);
 
     if (searchAsMove) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -133,6 +131,7 @@ export function BrowseMapPanel({
           checked={searchAsMove}
           onCheckedChange={(checked) => {
             onSearchAsMoveChange(checked);
+            if (!checked && debounceRef.current) clearTimeout(debounceRef.current);
             if (checked && pendingBounds) {
               onBoundsChange(pendingBounds);
               setPendingBounds(null);

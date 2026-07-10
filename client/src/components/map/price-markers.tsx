@@ -57,14 +57,31 @@ export function PriceMarkers({
     }
 
     for (const property of properties) {
-      if (markers.has(property.id)) continue;
+      const label = formatPrice(property.pricePerNight);
+      const existing = markers.get(property.id);
+      if (existing) {
+        existing.setLngLat([property.longitude, property.latitude]);
+        const el = existing.getElement();
+        if (el.textContent !== label) el.textContent = label;
+        el.setAttribute("aria-label", `${label} per night, view listing`);
+        continue;
+      }
 
       const el = document.createElement("div");
-      el.textContent = formatPrice(property.pricePerNight);
+      el.textContent = label;
       el.className = pillClassName({ selected: false, hovered: false });
+      el.setAttribute("role", "button");
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("aria-label", `${label} per night, view listing`);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         onSelectRef.current?.(property.id);
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectRef.current?.(property.id);
+        }
       });
       el.addEventListener("mouseenter", () => onHoverRef.current?.(property.id));
       el.addEventListener("mouseleave", () => onHoverRef.current?.(null));

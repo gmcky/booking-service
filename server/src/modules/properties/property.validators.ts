@@ -130,4 +130,20 @@ export const propertyQuerySchema = z
         }
       }
     }
+    if (presentCount === bboxFields.length) {
+      if (val.minLat! > val.maxLat!) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "minLat must not exceed maxLat",
+          path: ["minLat"],
+        });
+      }
+      if (val.minLng! > val.maxLng!) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "minLng must not exceed maxLng",
+          path: ["minLng"],
+        });
+      }
+    }
   });
