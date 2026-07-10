@@ -2745,8 +2745,17 @@ export interface components {
                 lastName: string;
             };
         };
-        BookingDetail: components["schemas"]["BookingWithProperty"] & {
+        BookingPropertyWithOwner: components["schemas"]["BookingProperty"] & {
+            owner: components["schemas"]["PropertyOwner"];
+        };
+        HostContact: {
+            phoneNumber: string | null;
+            email: string;
+        } | null;
+        BookingDetail: components["schemas"]["Booking"] & {
+            property: components["schemas"]["BookingPropertyWithOwner"];
             payment: components["schemas"]["Payment"] | null;
+            hostContact: components["schemas"]["HostContact"] | null;
         };
         Review: {
             id: string;

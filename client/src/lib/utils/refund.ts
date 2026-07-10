@@ -1,6 +1,6 @@
 /** Mirrors server/src/modules/payments/payment.helpers.ts calculateRefundPolicy exactly. */
-const FULL_REFUND_AFTER_HOURS = 48;
-const PARTIAL_REFUND_AFTER_HOURS = 24;
+export const FULL_REFUND_AFTER_HOURS = 48;
+export const PARTIAL_REFUND_AFTER_HOURS = 24;
 const PARTIAL_REFUND_PERCENT = 50;
 
 export interface RefundPreview {

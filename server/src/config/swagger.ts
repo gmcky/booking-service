@@ -638,18 +638,44 @@ export const swaggerOptions: Options = {
             },
           ],
         },
-        BookingDetail: {
+        BookingPropertyWithOwner: {
           allOf: [
-            { $ref: "#/components/schemas/BookingWithProperty" },
+            { $ref: "#/components/schemas/BookingProperty" },
             {
               type: "object",
               properties: {
+                owner: { $ref: "#/components/schemas/PropertyOwner" },
+              },
+              required: ["owner"],
+            },
+          ],
+        },
+        HostContact: {
+          type: "object",
+          nullable: true,
+          properties: {
+            phoneNumber: { type: "string", nullable: true },
+            email: { type: "string" },
+          },
+          required: ["phoneNumber", "email"],
+        },
+        BookingDetail: {
+          allOf: [
+            { $ref: "#/components/schemas/Booking" },
+            {
+              type: "object",
+              properties: {
+                property: { $ref: "#/components/schemas/BookingPropertyWithOwner" },
                 payment: {
                   allOf: [{ $ref: "#/components/schemas/Payment" }],
                   nullable: true,
                 },
+                hostContact: {
+                  allOf: [{ $ref: "#/components/schemas/HostContact" }],
+                  nullable: true,
+                },
               },
-              required: ["payment"],
+              required: ["property", "payment", "hostContact"],
             },
           ],
         },
