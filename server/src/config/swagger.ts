@@ -315,6 +315,8 @@ export const swaggerOptions: Options = {
             country: { type: "string" },
             district: { type: "string", nullable: true },
             address: { type: "string" },
+            latitude: { type: "number", nullable: true },
+            longitude: { type: "number", nullable: true },
             images: { type: "array", items: { type: "string" } },
             pricePerNight: {
               type: "string",
@@ -347,6 +349,8 @@ export const swaggerOptions: Options = {
             "country",
             "district",
             "address",
+            "latitude",
+            "longitude",
             "images",
             "pricePerNight",
             "maxGuests",

@@ -109,6 +109,29 @@ function resolvePassword(
   return { value: random, origin: "generated" };
 }
 
+// City-center coordinates for every city used in the templates below. Each
+// property gets a small deterministic jitter (by template index) applied on
+// top so pins don't stack exactly on the city center.
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  Kyiv: { lat: 50.4501, lng: 30.5234 },
+  Lviv: { lat: 49.8397, lng: 24.0297 },
+  Odesa: { lat: 46.4825, lng: 30.7233 },
+  Berlin: { lat: 52.52, lng: 13.405 },
+  Paris: { lat: 48.8566, lng: 2.3522 },
+  Rome: { lat: 41.9028, lng: 12.4964 },
+  Amsterdam: { lat: 52.3676, lng: 4.9041 },
+};
+
+function jitterCoords(city: string, rowIndexInCity: number) {
+  const base = CITY_COORDS[city];
+  if (!base) return { latitude: null, longitude: null };
+
+  return {
+    latitude: base.lat + ((rowIndexInCity % 7) - 3) * 0.006,
+    longitude: base.lng + ((Math.floor(rowIndexInCity / 7) % 7) - 3) * 0.009,
+  };
+}
+
 const propertyTemplates: Array<{
   title: string;
   description: string;
@@ -783,9 +806,12 @@ async function main() {
     pricePerNight: number;
     maxGuests: number;
   }> = [];
+  const cityRowCounters = new Map<string, number>();
 
   for (const [index, template] of propertyTemplates.entries()) {
     const assignedOwnerId = index % 2 === 0 ? owner1Id : owner2Id;
+    const rowIndexInCity = cityRowCounters.get(template.city) ?? 0;
+    cityRowCounters.set(template.city, rowIndexInCity + 1);
 
     const createdProperty = await prisma.property.create({
       data: {
@@ -793,6 +819,7 @@ async function main() {
         pricePerNight: template.pricePerNight,
         ownerId: assignedOwnerId,
         isActive: true,
+        ...jitterCoords(template.city, rowIndexInCity),
       },
       select: {
         id: true,
