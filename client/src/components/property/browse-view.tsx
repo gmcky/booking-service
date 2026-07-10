@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Map as MapIcon, Search } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
 import { SearchPill, type DetectedLocation, type SearchPillHandle } from "@/components/search/search-pill";
 import { QuickFilters } from "@/components/search/quick-filters";
 import { FiltersDialog } from "@/components/search/filters-dialog";
 import { Button } from "@/components/ui/button";
+import type { MapBounds } from "@/components/map/base-map";
 import {
   propertyApi,
   type PropertyQuery,
@@ -18,7 +20,14 @@ import {
 } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 
+const BrowseMapPanel = dynamic(
+  () => import("@/components/map/browse-map-panel").then((m) => m.BrowseMapPanel),
+  { ssr: false, loading: () => <div className="size-full animate-pulse rounded-xl bg-muted" /> },
+);
+
 const PAGE_SIZE = 12;
+/** Bbox query params are rounded to this many decimals (~1m precision). */
+const BBOX_PRECISION = 5;
 
 const SORTS: { value: PropertySort; label: string }[] = [
   { value: "newest", label: "Recommended" },
@@ -48,7 +57,18 @@ function parseFilters(params: URLSearchParams): PropertyQuery {
     sort: (params.get("sort") as PropertySort | null) ?? "newest",
     checkIn: params.get("checkIn") ?? undefined,
     checkOut: params.get("checkOut") ?? undefined,
+    minLat: parseNumber(params.get("minLat")),
+    maxLat: parseNumber(params.get("maxLat")),
+    minLng: parseNumber(params.get("minLng")),
+    maxLng: parseNumber(params.get("maxLng")),
   };
+}
+
+/** Filters that define "a new search" — bbox is excluded since panning the
+ *  map isn't a new search, it's a refinement of the current one. */
+function nonBboxKey(filters: PropertyQuery): string {
+  const { minLat: _minLat, maxLat: _maxLat, minLng: _minLng, maxLng: _maxLng, ...rest } = filters;
+  return JSON.stringify(rest);
 }
 
 export function BrowseView({ detected }: { detected?: DetectedLocation }) {
@@ -79,6 +99,20 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [geoDismissed, setGeoDismissed] = React.useState(false);
+  const [mapMode, setMapMode] = React.useState<"split" | "list">("split");
+  const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [searchAsMove, setSearchAsMove] = React.useState(false);
+
+  /** Bbox-only URL update — preserves every other param, no history spam. */
+  function updateBounds(bounds: MapBounds) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("minLat", bounds.minLat.toFixed(BBOX_PRECISION));
+    params.set("maxLat", bounds.maxLat.toFixed(BBOX_PRECISION));
+    params.set("minLng", bounds.minLng.toFixed(BBOX_PRECISION));
+    params.set("maxLng", bounds.maxLng.toFixed(BBOX_PRECISION));
+    router.replace(`/browse?${params.toString()}`, { scroll: false });
+  }
 
   React.useEffect(() => {
     setGeoDismissed(sessionStorage.getItem("geo-dismissed") === "1");
@@ -130,6 +164,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
   const total = query.data?.pages[0]?.pagination.total ?? 0;
+  const fitBoundsKey = React.useMemo(() => nonBboxKey(effectiveFilters), [effectiveFilters]);
 
   function applyFilters(next: PropertyQuery) {
     const params = new URLSearchParams();
@@ -169,7 +204,15 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     <div className="flex flex-1 flex-col">
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-[1180px] px-6 pt-6">
+      <main
+        className={
+          mapMode === "split"
+            ? "mx-auto w-full max-w-[1600px] px-6 pt-6"
+            : "mx-auto w-full max-w-[1180px] px-6 pt-6"
+        }
+      >
+        <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
+        <div className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}>
         <div className="mb-4">
           <SearchPill ref={searchPillRef} detected={detected} initialFilters={filters} collapsible />
         </div>
@@ -263,7 +306,12 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           <>
             <section className="grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6">
               {items.map((property) => (
-                <PropertyCard key={property.id} property={property} />
+                <PropertyCard
+                  key={property.id}
+                  property={property}
+                  highlighted={hoveredId === property.id || selectedId === property.id}
+                  onHoverChange={(hovering) => setHoveredId(hovering ? property.id : null)}
+                />
               ))}
             </section>
 
@@ -289,7 +337,35 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
             </div>
           </>
         )}
+        </div>
+
+        {mapMode === "split" ? (
+          <div className="sticky top-22 hidden h-[calc(100vh-7rem)] flex-1 lg:block lg:max-w-[45%]">
+            <BrowseMapPanel
+              properties={items}
+              hoveredId={hoveredId}
+              onHoverChange={setHoveredId}
+              selectedId={selectedId}
+              onSelectChange={setSelectedId}
+              searchAsMove={searchAsMove}
+              onSearchAsMoveChange={setSearchAsMove}
+              onBoundsChange={updateBounds}
+              fitBoundsKey={fitBoundsKey}
+            />
+          </div>
+        ) : null}
+        </div>
       </main>
+
+      <div className="fixed inset-x-0 bottom-6 z-30 hidden justify-center lg:flex">
+        <Button
+          className="gap-1.5 rounded-full px-4 shadow-lg"
+          onClick={() => setMapMode((m) => (m === "split" ? "list" : "split"))}
+        >
+          <MapIcon className="size-4" />
+          {mapMode === "split" ? "Show list" : "Show map"}
+        </Button>
+      </div>
     </div>
   );
 }
