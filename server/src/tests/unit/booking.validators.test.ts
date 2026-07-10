@@ -18,8 +18,8 @@ describe("createBookingSchema", () => {
     vi.useRealTimers();
   });
 
-  it("rejects check-in less than 24 hours from now", () => {
-    const checkIn = new Date(now.getTime() + 23 * 60 * 60 * 1000);
+  it("rejects check-in dated yesterday", () => {
+    const checkIn = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const checkOut = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     const result = createBookingSchema.safeParse({
@@ -35,11 +35,26 @@ describe("createBookingSchema", () => {
         expect.arrayContaining([
           expect.objectContaining({
             path: ["checkIn"],
-            message: "Check-in must be at least 24 hours from now",
+            message: "Check-in cannot be in the past",
           }),
         ]),
       );
     }
+  });
+
+  it("accepts check-in dated today (UTC midnight)", () => {
+    const checkIn = new Date(now);
+    checkIn.setUTCHours(0, 0, 0, 0);
+    const checkOut = new Date(checkIn.getTime() + 24 * 60 * 60 * 1000);
+
+    const result = createBookingSchema.safeParse({
+      propertyId,
+      checkIn: toIso(checkIn),
+      checkOut: toIso(checkOut),
+      guests: 2,
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("rejects check-out earlier than check-in", () => {

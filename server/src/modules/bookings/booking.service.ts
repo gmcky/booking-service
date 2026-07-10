@@ -18,7 +18,7 @@ import {
   getStripePayloadObject,
   toInputJsonObject,
 } from "../payments/payment.helpers.js";
-import { MAX_STAY_NIGHTS, MIN_ADVANCE_HOURS } from "./booking.constants.js";
+import { MAX_STAY_NIGHTS } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
@@ -167,10 +167,8 @@ export class BookingService {
     const { propertyId, userId, checkIn, checkOut, guests } = data;
 
     // Fail fast on guards before opening Serializable tx.
-    const now = new Date();
-    const hoursUntilCheckIn = (checkIn.getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (hoursUntilCheckIn < MIN_ADVANCE_HOURS) {
-      throw new AppError(400, "Check-in must be at least 24 hours from now");
+    if (checkIn.getTime() < new Date().setUTCHours(0, 0, 0, 0)) {
+      throw new AppError(400, "Check-in cannot be in the past");
     }
 
     const nights = calculateNights(checkIn, checkOut);
