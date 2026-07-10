@@ -2,11 +2,7 @@ import { z } from "zod";
 import prismaClientPkg from "@prisma/client";
 const { BookingStatus } = prismaClientPkg;
 import { calculateNights } from "../../shared/utils/date.helpers.js";
-import {
-  MAX_BOOKING_ADVANCE_YEARS,
-  MAX_STAY_NIGHTS,
-  MIN_ADVANCE_HOURS,
-} from "./booking.constants.js";
+import { MAX_BOOKING_ADVANCE_YEARS, MAX_STAY_NIGHTS } from "./booking.constants.js";
 
 export const createBookingSchema = z
   .object({
@@ -25,8 +21,8 @@ export const createBookingSchema = z
     message: "Check-out must be after check-in",
     path: ["checkOut"],
   })
-  .refine((data) => data.checkIn.getTime() >= Date.now() + MIN_ADVANCE_HOURS * 60 * 60 * 1000, {
-    message: `Check-in must be at least ${MIN_ADVANCE_HOURS} hours from now`,
+  .refine((data) => data.checkIn.getTime() >= new Date().setUTCHours(0, 0, 0, 0), {
+    message: "Check-in cannot be in the past",
     path: ["checkIn"],
   })
   .refine((data) => calculateNights(data.checkIn, data.checkOut) >= 1, {

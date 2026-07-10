@@ -12,6 +12,15 @@ export interface UnwrapArgs<T> {
 }
 
 function extractMessage(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "details" in error) {
+    const details = (error as { details?: unknown }).details;
+    if (Array.isArray(details) && details.length > 0) {
+      const first = details[0] as { message?: unknown };
+      if (first && typeof first.message === "string" && first.message.length > 0) {
+        return first.message;
+      }
+    }
+  }
   if (error && typeof error === "object" && "error" in error) {
     const value = (error as { error?: unknown }).error;
     if (typeof value === "string" && value.length > 0) return value;
