@@ -60,6 +60,8 @@ const property: PropertyDetail = {
   country: "United States",
   district: null,
   address: "1240 Lakeshore Dr",
+  latitude: null,
+  longitude: null,
   images: [],
   pricePerNight: "200",
   maxGuests: 4,

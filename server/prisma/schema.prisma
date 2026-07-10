@@ -47,6 +47,8 @@ model Property {
   country       String
   district      String?
   address       String
+  latitude      Float?
+  longitude     Float?
   pricePerNight Decimal      @db.Decimal(10, 2)
   maxGuests     Int
   // House rules — filterable, distinct from display amenities.

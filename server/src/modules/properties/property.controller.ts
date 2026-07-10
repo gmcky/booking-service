@@ -28,6 +28,10 @@ export async function getProperties(req: Request, res: Response) {
     sort,
     checkIn,
     checkOut,
+    minLat,
+    maxLat,
+    minLng,
+    maxLng,
   } = req.query as unknown as PropertyQueryInput;
 
   const result = await PropertyService.getAll(
@@ -47,6 +51,10 @@ export async function getProperties(req: Request, res: Response) {
       sort,
       checkIn,
       checkOut,
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
     },
   );
 

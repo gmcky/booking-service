@@ -4,6 +4,7 @@ import type { Property } from "@/lib/api/properties";
 import { formatPrice, formatRating } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { FavoriteButton } from "@/components/property/favorite-button";
+import { cn } from "@/lib/utils";
 
 /**
  * Only the fields the card renders. `Property` (search results, PropertyWithOwner)
@@ -15,13 +16,27 @@ type PropertyCardData = Pick<
   "id" | "title" | "city" | "pricePerNight" | "averageRating" | "images"
 >;
 
-export function PropertyCard({ property }: { property: PropertyCardData }) {
+export function PropertyCard({
+  property,
+  highlighted = false,
+  onHoverChange,
+}: {
+  property: PropertyCardData;
+  /** Ring highlight driven by hovering the matching pin on the browse map. */
+  highlighted?: boolean;
+  onHoverChange?: (hovering: boolean) => void;
+}) {
   const rating = formatRating(property.averageRating);
 
   return (
     <Link
       href={`/properties/${property.id}`}
-      className="block overflow-hidden rounded-xl border border-border bg-card transition-[box-shadow,border-color] hover:border-ring hover:shadow-sm"
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => onHoverChange?.(false)}
+      className={cn(
+        "block overflow-hidden rounded-xl border border-border bg-card transition-[box-shadow,border-color] hover:border-ring hover:shadow-sm",
+        highlighted && "border-ring shadow-sm ring-2 ring-ring",
+      )}
     >
       <div
         className="relative flex aspect-[4/3] items-center justify-center"
