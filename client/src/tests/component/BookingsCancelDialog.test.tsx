@@ -92,7 +92,7 @@ describe("BookingsPage cancel dialog", () => {
     expect(dialog).toHaveTextContent(`You'll receive a 100% refund (${formatPrice(500)}).`);
   });
 
-  it("shows a no-refund preview for a CONFIRMED booking within 24h of check-in", async () => {
+  it("hides the cancel button for a CONFIRMED booking within 24h of check-in (0% refund)", async () => {
     const { bookingApi } = await import("@/lib/api/bookings");
     (bookingApi.list as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: [makeBooking({ checkIn: hoursFromNow(12), totalPrice: "500" })],
@@ -102,10 +102,9 @@ describe("BookingsPage cancel dialog", () => {
     renderPage();
     await screen.findByText("Pine Ridge Cabin");
 
-    const dialog = await openCancelDialog();
-    expect(dialog).toHaveTextContent(
-      "This is within 24 hours of check-in, so no refund applies.",
-    );
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Free cancellation ended/)).toBeInTheDocument();
+    expect(screen.getByText(/non-refundable/)).toBeInTheDocument();
   });
 
   it("shows no refund preview line for a PENDING booking (gate is status === CONFIRMED)", async () => {

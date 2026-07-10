@@ -200,7 +200,7 @@ function ConfirmationInner() {
                 nativeButton={false}
                 size="lg"
                 className="w-full"
-                render={<Link href={`/bookings`} />}
+                render={<Link href={`/bookings/${booking.id}`} />}
               >
                 View booking
               </Button>
