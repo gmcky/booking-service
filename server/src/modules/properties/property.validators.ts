@@ -3,39 +3,60 @@ const { Amenity, PropertyType } = prismaClientPkg;
 import { z } from "zod";
 import { sanitizeString } from "../../shared/utils/sanitize.js";
 
-export const createPropertySchema = z.object({
-  title: z.string().min(5).max(200),
-  description: z.string().trim().min(20).transform(sanitizeString),
-  type: z.nativeEnum(PropertyType),
-  city: z.string().min(2),
-  country: z.string().min(2),
-  district: z.string().min(2).max(100).optional(),
-  address: z.string().min(5),
-  pricePerNight: z.number().positive(),
-  maxGuests: z.number().int().positive(),
-  petsAllowed: z.boolean().default(false),
-  infantsAllowed: z.boolean().default(true),
-  amenities: z.array(z.nativeEnum(Amenity)).max(20).default([]),
-  // Accept temp upload paths; worker resolves final URLs asynchronously.
-  rawImagePaths: z.array(z.string()).max(10).default([]),
-});
+// Both-or-neither: a lone latitude/longitude can't place a pin on the map.
+function refineCoordPair(val: { latitude?: number; longitude?: number }, ctx: z.RefinementCtx) {
+  const hasLat = val.latitude !== undefined;
+  const hasLng = val.longitude !== undefined;
+  if (hasLat !== hasLng) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "latitude and longitude must both be provided or both omitted",
+      path: hasLat ? ["longitude"] : ["latitude"],
+    });
+  }
+}
 
-export const updatePropertySchema = z.object({
-  title: z.string().min(5).max(200).optional(),
-  description: z.string().trim().min(20).transform(sanitizeString).optional(),
-  type: z.nativeEnum(PropertyType).optional(),
-  city: z.string().min(2).optional(),
-  country: z.string().min(2).optional(),
-  district: z.string().min(2).max(100).optional(),
-  address: z.string().min(5).optional(),
-  pricePerNight: z.number().positive().optional(),
-  maxGuests: z.number().int().positive().optional(),
-  petsAllowed: z.boolean().optional(),
-  infantsAllowed: z.boolean().optional(),
-  amenities: z.array(z.nativeEnum(Amenity)).max(20).optional(),
-  // Expects finalized CDN URLs only.
-  images: z.array(z.string().url()).max(10).optional(),
-});
+export const createPropertySchema = z
+  .object({
+    title: z.string().min(5).max(200),
+    description: z.string().trim().min(20).transform(sanitizeString),
+    type: z.nativeEnum(PropertyType),
+    city: z.string().min(2),
+    country: z.string().min(2),
+    district: z.string().min(2).max(100).optional(),
+    address: z.string().min(5),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    pricePerNight: z.number().positive(),
+    maxGuests: z.number().int().positive(),
+    petsAllowed: z.boolean().default(false),
+    infantsAllowed: z.boolean().default(true),
+    amenities: z.array(z.nativeEnum(Amenity)).max(20).default([]),
+    // Accept temp upload paths; worker resolves final URLs asynchronously.
+    rawImagePaths: z.array(z.string()).max(10).default([]),
+  })
+  .superRefine(refineCoordPair);
+
+export const updatePropertySchema = z
+  .object({
+    title: z.string().min(5).max(200).optional(),
+    description: z.string().trim().min(20).transform(sanitizeString).optional(),
+    type: z.nativeEnum(PropertyType).optional(),
+    city: z.string().min(2).optional(),
+    country: z.string().min(2).optional(),
+    district: z.string().min(2).max(100).optional(),
+    address: z.string().min(5).optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    pricePerNight: z.number().positive().optional(),
+    maxGuests: z.number().int().positive().optional(),
+    petsAllowed: z.boolean().optional(),
+    infantsAllowed: z.boolean().optional(),
+    amenities: z.array(z.nativeEnum(Amenity)).max(20).optional(),
+    // Expects finalized CDN URLs only.
+    images: z.array(z.string().url()).max(10).optional(),
+  })
+  .superRefine(refineCoordPair);
 
 export const propertyQuerySchema = z
   .object({
@@ -67,6 +88,10 @@ export const propertyQuerySchema = z
     limit: z.coerce.number().int().positive().max(100).default(10),
     checkIn: z.coerce.date().optional(),
     checkOut: z.coerce.date().optional(),
+    minLat: z.coerce.number().min(-90).max(90).optional(),
+    maxLat: z.coerce.number().min(-90).max(90).optional(),
+    minLng: z.coerce.number().min(-180).max(180).optional(),
+    maxLng: z.coerce.number().min(-180).max(180).optional(),
   })
   .superRefine((val, ctx) => {
     const hasIn = val.checkIn !== undefined;
@@ -84,5 +109,25 @@ export const propertyQuerySchema = z
         message: "checkIn must be before checkOut",
         path: ["checkIn"],
       });
+    }
+
+    // Bounding box is all-or-nothing: a partial box can't bound a search.
+    const bboxFields = [
+      ["minLat", val.minLat] as const,
+      ["maxLat", val.maxLat] as const,
+      ["minLng", val.minLng] as const,
+      ["maxLng", val.maxLng] as const,
+    ];
+    const presentCount = bboxFields.filter(([, v]) => v !== undefined).length;
+    if (presentCount > 0 && presentCount < bboxFields.length) {
+      for (const [field, v] of bboxFields) {
+        if (v === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "minLat, maxLat, minLng, maxLng must all be provided or all omitted",
+            path: [field],
+          });
+        }
+      }
     }
   });
