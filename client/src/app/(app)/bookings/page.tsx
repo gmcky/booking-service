@@ -223,10 +223,10 @@ function BookingRow({
             nativeButton={false}
             variant="outline"
             size="sm"
-            className="w-[100px]"
-            render={<Link href={`/properties/${booking.propertyId}`} />}
+            className="w-[110px]"
+            render={<Link href={`/bookings/${booking.id}`} />}
           >
-            View
+            Trip details
           </Button>
           {tab === "upcoming" ? (
             zeroRefund ? (
