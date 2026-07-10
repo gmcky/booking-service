@@ -270,6 +270,10 @@ function BookingDetailBody({
             <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
               Host contact appears once your booking is confirmed.
             </p>
+          ) : booking.status === "CONFIRMED" ? (
+            <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+              Host contact appears {FULL_REFUND_AFTER_HOURS / 24} days before check-in.
+            </p>
           ) : null}
         </section>
 
