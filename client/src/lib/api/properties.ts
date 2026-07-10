@@ -55,6 +55,11 @@ export interface PropertyQuery {
   limit?: number;
   checkIn?: string;
   checkOut?: string;
+  /** Bounding-box filter — provide all four together or omit all four. */
+  minLat?: number;
+  maxLat?: number;
+  minLng?: number;
+  maxLng?: number;
 }
 
 export interface CreatePropertyInput {
@@ -100,6 +105,10 @@ export const propertyApi = {
           limit: query.limit,
           checkIn: query.checkIn,
           checkOut: query.checkOut,
+          minLat: query.minLat,
+          maxLat: query.maxLat,
+          minLng: query.minLng,
+          maxLng: query.maxLng,
         },
       },
     });

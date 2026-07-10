@@ -27,6 +27,7 @@ import { Highlights } from "@/components/property/highlights";
 import { AmenitiesSection } from "@/components/property/amenities-section";
 import { AvailabilitySection } from "@/components/property/availability-section";
 import { LocationSection } from "@/components/property/location-section";
+import { WhereYoullBe } from "@/components/property/where-youll-be";
 import { HostSection } from "@/components/property/host-section";
 import { useBlockedDates } from "@/components/property/use-blocked-dates";
 import { FavoriteButton } from "@/components/property/favorite-button";
@@ -183,7 +184,11 @@ export function PropertyDetailView({ id }: { id: string }) {
 
             <PropertyReviews propertyId={property.id} propertyOwnerId={property.owner.id} />
 
-            <LocationSection property={property} />
+            {property.latitude != null && property.longitude != null ? (
+              <WhereYoullBe property={property} />
+            ) : (
+              <LocationSection property={property} />
+            )}
 
             <HostSection ownerId={property.owner.id} />
           </div>

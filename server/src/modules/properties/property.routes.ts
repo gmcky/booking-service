@@ -55,6 +55,10 @@ const propertyImageUpload = multer({
  *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 100 } }
  *       - { in: query, name: checkIn, schema: { type: string, format: date-time } }
  *       - { in: query, name: checkOut, schema: { type: string, format: date-time } }
+ *       - { in: query, name: minLat, schema: { type: number, minimum: -90, maximum: 90 }, description: 'Bounding-box filter — provide all four of minLat/maxLat/minLng/maxLng together' }
+ *       - { in: query, name: maxLat, schema: { type: number, minimum: -90, maximum: 90 } }
+ *       - { in: query, name: minLng, schema: { type: number, minimum: -180, maximum: 180 } }
+ *       - { in: query, name: maxLng, schema: { type: number, minimum: -180, maximum: 180 } }
  *     responses:
  *       200:
  *         description: Paginated property list
@@ -201,6 +205,8 @@ propertyRouter.post(
  *               country: { type: string, minLength: 2 }
  *               district: { type: string, minLength: 2, maxLength: 100 }
  *               address: { type: string }
+ *               latitude: { type: number, minimum: -90, maximum: 90 }
+ *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
  *               amenities: { type: array, items: { $ref: '#/components/schemas/Amenity' }, maxItems: 20 }
@@ -244,6 +250,8 @@ propertyRouter.post(
  *               country: { type: string, minLength: 2 }
  *               district: { type: string, minLength: 2, maxLength: 100 }
  *               address: { type: string }
+ *               latitude: { type: number, minimum: -90, maximum: 90 }
+ *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
  *               amenities: { type: array, items: { $ref: '#/components/schemas/Amenity' } }

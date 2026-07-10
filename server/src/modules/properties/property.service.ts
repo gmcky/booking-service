@@ -78,6 +78,14 @@ export class PropertyService {
       ...(filters.maxGuests !== undefined && {
         maxGuests: { gte: filters.maxGuests },
       }),
+      // Bbox filter is all-or-nothing; validator already enforces this.
+      ...(filters.minLat !== undefined &&
+        filters.maxLat !== undefined &&
+        filters.minLng !== undefined &&
+        filters.maxLng !== undefined && {
+          latitude: { gte: filters.minLat, lte: filters.maxLat },
+          longitude: { gte: filters.minLng, lte: filters.maxLng },
+        }),
       // Advisory availability — final check performed under Serializable tx during booking.
       ...(filters.checkIn &&
         filters.checkOut && {

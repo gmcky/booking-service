@@ -29,4 +29,8 @@ export interface PropertyFilters {
   sort?: "price_asc" | "price_desc" | "newest";
   checkIn?: Date;
   checkOut?: Date;
+  minLat?: number;
+  maxLat?: number;
+  minLng?: number;
+  maxLng?: number;
 }

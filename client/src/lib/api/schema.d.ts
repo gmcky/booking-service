@@ -1236,6 +1236,11 @@ export interface paths {
                     limit?: number;
                     checkIn?: string;
                     checkOut?: string;
+                    /** @description Bounding-box filter — provide all four of minLat/maxLat/minLng/maxLng together */
+                    minLat?: number;
+                    maxLat?: number;
+                    minLng?: number;
+                    maxLng?: number;
                 };
                 header?: never;
                 path?: never;
@@ -1278,6 +1283,8 @@ export interface paths {
                         country: string;
                         district?: string;
                         address: string;
+                        latitude?: number;
+                        longitude?: number;
                         pricePerNight: number;
                         maxGuests: number;
                         amenities?: components["schemas"]["Amenity"][];
@@ -1461,6 +1468,8 @@ export interface paths {
                         country?: string;
                         district?: string;
                         address?: string;
+                        latitude?: number;
+                        longitude?: number;
                         pricePerNight?: number;
                         maxGuests?: number;
                         amenities?: components["schemas"]["Amenity"][];
@@ -2603,6 +2612,8 @@ export interface components {
             country: string;
             district: string | null;
             address: string;
+            latitude: number | null;
+            longitude: number | null;
             images: string[];
             /** @description Decimal serialized as string */
             pricePerNight: string;
