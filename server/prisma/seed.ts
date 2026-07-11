@@ -139,7 +139,9 @@ const propertyTemplates: Array<{
   city: string;
   country: string;
   district?: string;
-  address: string;
+  street: string;
+  houseNumber?: string;
+  apartment?: string;
   pricePerNight: number;
   maxGuests: number;
   petsAllowed?: boolean;
@@ -155,7 +157,8 @@ const propertyTemplates: Array<{
     city: "Kyiv",
     country: "Ukraine",
     district: "Podil",
-    address: "Kontraktova Square 4, Podil",
+    street: "Kontraktova Square",
+    houseNumber: "4",
     pricePerNight: 55,
     maxGuests: 2,
     amenities: [
@@ -177,7 +180,9 @@ const propertyTemplates: Array<{
     city: "Kyiv",
     country: "Ukraine",
     district: "Shevchenkivskyi",
-    address: "Shevchenka Blvd 12, apt 7",
+    street: "Shevchenka Blvd",
+    houseNumber: "12",
+    apartment: "7",
     pricePerNight: 85,
     maxGuests: 4,
     amenities: [
@@ -201,7 +206,8 @@ const propertyTemplates: Array<{
     city: "Kyiv",
     country: "Ukraine",
     district: "Pechersk",
-    address: "Lypska St 3, Pechersk",
+    street: "Lypska St",
+    houseNumber: "3",
     pricePerNight: 30,
     maxGuests: 1,
     infantsAllowed: false,
@@ -223,7 +229,8 @@ const propertyTemplates: Array<{
     city: "Kyiv",
     country: "Ukraine",
     district: "Podil",
-    address: "Vozdvyzhenka St 10",
+    street: "Vozdvyzhenka St",
+    houseNumber: "10",
     pricePerNight: 120,
     maxGuests: 3,
     infantsAllowed: false,
@@ -247,7 +254,8 @@ const propertyTemplates: Array<{
     city: "Kyiv",
     country: "Ukraine",
     district: "Obolon",
-    address: "Obolonska St 22, Obolon",
+    street: "Obolonska St",
+    houseNumber: "22",
     pricePerNight: 150,
     maxGuests: 8,
     petsAllowed: true,
@@ -274,7 +282,8 @@ const propertyTemplates: Array<{
     city: "Lviv",
     country: "Ukraine",
     district: "Old Town",
-    address: "Shevska St 5, Old Town",
+    street: "Shevska St",
+    houseNumber: "5",
     pricePerNight: 65,
     maxGuests: 2,
     amenities: [
@@ -296,7 +305,8 @@ const propertyTemplates: Array<{
     city: "Lviv",
     country: "Ukraine",
     district: "Lychakiv",
-    address: "Mechnikova St 18",
+    street: "Mechnikova St",
+    houseNumber: "18",
     pricePerNight: 90,
     maxGuests: 4,
     petsAllowed: true,
@@ -320,7 +330,8 @@ const propertyTemplates: Array<{
     city: "Lviv",
     country: "Ukraine",
     district: "Old Town",
-    address: "Stavropigijska St 9",
+    street: "Stavropigijska St",
+    houseNumber: "9",
     pricePerNight: 75,
     maxGuests: 3,
     amenities: [
@@ -344,7 +355,8 @@ const propertyTemplates: Array<{
     city: "Odesa",
     country: "Ukraine",
     district: "Arcadia",
-    address: "Genuezska St 24, Arcadia",
+    street: "Genuezska St",
+    houseNumber: "24",
     pricePerNight: 95,
     maxGuests: 3,
     amenities: [
@@ -368,7 +380,8 @@ const propertyTemplates: Array<{
     city: "Odesa",
     country: "Ukraine",
     district: "City Centre",
-    address: "Derybasivska St 16",
+    street: "Derybasivska St",
+    houseNumber: "16",
     pricePerNight: 80,
     maxGuests: 2,
     amenities: [
@@ -390,7 +403,8 @@ const propertyTemplates: Array<{
     city: "Odesa",
     country: "Ukraine",
     district: "Fontanka",
-    address: "Fontanska Rd 40, Fontanka",
+    street: "Fontanska Rd",
+    houseNumber: "40",
     pricePerNight: 280,
     maxGuests: 10,
     petsAllowed: true,
@@ -417,7 +431,8 @@ const propertyTemplates: Array<{
     city: "Berlin",
     country: "Germany",
     district: "Mitte",
-    address: "Rosenthaler Str 25, Mitte",
+    street: "Rosenthaler Str",
+    houseNumber: "25",
     pricePerNight: 110,
     maxGuests: 2,
     infantsAllowed: false,
@@ -440,7 +455,8 @@ const propertyTemplates: Array<{
     city: "Berlin",
     country: "Germany",
     district: "Kreuzberg",
-    address: "Oranienstr 58, Kreuzberg",
+    street: "Oranienstr",
+    houseNumber: "58",
     pricePerNight: 135,
     maxGuests: 4,
     petsAllowed: true,
@@ -464,7 +480,8 @@ const propertyTemplates: Array<{
     city: "Berlin",
     country: "Germany",
     district: "Prenzlauer Berg",
-    address: "Kastanienallee 12, Prenzlauer Berg",
+    street: "Kastanienallee",
+    houseNumber: "12",
     pricePerNight: 100,
     maxGuests: 5,
     amenities: [
@@ -488,7 +505,8 @@ const propertyTemplates: Array<{
     city: "Paris",
     country: "France",
     district: "7th arrondissement",
-    address: "Rue de Grenelle 42, 7ème",
+    street: "Rue de Grenelle",
+    houseNumber: "42",
     pricePerNight: 160,
     maxGuests: 2,
     amenities: [
@@ -511,7 +529,8 @@ const propertyTemplates: Array<{
     city: "Paris",
     country: "France",
     district: "Le Marais",
-    address: "Rue de Bretagne 18, Le Marais, 3ème",
+    street: "Rue de Bretagne",
+    houseNumber: "18",
     pricePerNight: 210,
     maxGuests: 4,
     amenities: [
@@ -535,7 +554,8 @@ const propertyTemplates: Array<{
     city: "Rome",
     country: "Italy",
     district: "Trastevere",
-    address: "Via della Lungara 15, Trastevere",
+    street: "Via della Lungara",
+    houseNumber: "15",
     pricePerNight: 130,
     maxGuests: 3,
     amenities: [
@@ -558,7 +578,8 @@ const propertyTemplates: Array<{
     city: "Rome",
     country: "Italy",
     district: "Centro Storico",
-    address: "Via Sacra 8, Centro Storico",
+    street: "Via Sacra",
+    houseNumber: "8",
     pricePerNight: 175,
     maxGuests: 4,
     amenities: [
@@ -582,7 +603,8 @@ const propertyTemplates: Array<{
     city: "Amsterdam",
     country: "Netherlands",
     district: "Jordaan",
-    address: "Prinsengracht 204, Jordaan",
+    street: "Prinsengracht",
+    houseNumber: "204",
     pricePerNight: 195,
     maxGuests: 2,
     amenities: [
@@ -605,7 +627,7 @@ const propertyTemplates: Array<{
     city: "Amsterdam",
     country: "Netherlands",
     district: "Noord",
-    address: "NDSM Wharf, Amsterdam Noord",
+    street: "NDSM Wharf",
     pricePerNight: 220,
     maxGuests: 4,
     amenities: [

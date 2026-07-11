@@ -1282,7 +1282,9 @@ export interface paths {
                         city: string;
                         country: string;
                         district?: string;
-                        address: string;
+                        street: string;
+                        houseNumber?: string;
+                        apartment?: string;
                         latitude?: number;
                         longitude?: number;
                         pricePerNight: number;
@@ -1523,8 +1525,10 @@ export interface paths {
                         type?: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
                         city?: string;
                         country?: string;
-                        district?: string;
-                        address?: string;
+                        district?: string | null;
+                        street?: string;
+                        houseNumber?: string | null;
+                        apartment?: string | null;
                         latitude?: number;
                         longitude?: number;
                         pricePerNight?: number;
@@ -2668,7 +2672,9 @@ export interface components {
             city: string;
             country: string;
             district: string | null;
-            address: string;
+            street: string;
+            houseNumber: string | null;
+            apartment: string | null;
             latitude: number | null;
             longitude: number | null;
             images: string[];
@@ -2755,7 +2761,10 @@ export interface components {
             description: string;
             type: components["schemas"]["PropertyType"];
             city: string;
-            address: string;
+            district: string | null;
+            street: string;
+            houseNumber: string | null;
+            apartment: string | null;
             images: string[];
             /** @description Decimal serialized as string */
             pricePerNight: string;

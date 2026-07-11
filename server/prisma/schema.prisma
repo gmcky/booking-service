@@ -46,7 +46,9 @@ model Property {
   city          String
   country       String
   district      String?
-  address       String
+  street        String
+  houseNumber   String?
+  apartment     String?
   latitude      Float?
   longitude     Float?
   pricePerNight Decimal      @db.Decimal(10, 2)

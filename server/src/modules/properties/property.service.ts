@@ -12,6 +12,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { cleanupQueue, type CleanupJobName } from "../../shared/queues/cleanup.queue.js";
+import { geocodeQueue } from "../../shared/queues/geocode.queue.js";
 import {
   cacheGet,
   cacheSet,
@@ -366,6 +367,12 @@ export class PropertyService {
       });
     }
 
+    // No explicit pin from the host — resolve the address off the request
+    // path. Until the job lands the listing simply has no map pin.
+    if (property.latitude === null) {
+      await geocodeQueue.add("geocode-property", { propertyId: property.id });
+    }
+
     await emailQueue.add("property-created-host", {
       ownerEmail: property.owner.email,
       ownerFirstName: property.owner.firstName,
@@ -391,10 +398,28 @@ export class PropertyService {
   static async update(id: string, ownerId: string, data: UpdatePropertyInput) {
     const current = await this.verifyOwnership(id, ownerId);
 
+    // An address edit invalidates the existing pin: clear it and re-geocode,
+    // unless the patch pins coordinates explicitly (host's pin always wins).
+    // Compared against current values, not field presence — the edit form
+    // sends the full address block on every save, and an unrelated edit
+    // must not wipe the pin. District is display-only; the geocoder never
+    // queries with it, so it isn't a trigger.
+    const addressChanged = (["street", "houseNumber", "city", "country"] as const).some(
+      (field) => data[field] !== undefined && data[field] !== current[field],
+    );
+    const needsGeocode = addressChanged && data.latitude === undefined;
+
     const updated = await prisma.property.update({
       where: { id },
-      data: omitUndefined(data),
+      data: {
+        ...omitUndefined(data),
+        ...(needsGeocode && { latitude: null, longitude: null }),
+      },
     });
+
+    if (needsGeocode) {
+      await geocodeQueue.add("geocode-property", { propertyId: id });
+    }
 
     // Explicit orphaning triggers cleanup job.
     if (data.images !== undefined) {
@@ -473,7 +498,15 @@ export class PropertyService {
   private static async verifyOwnership(propertyId: string, ownerId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
-      select: { ownerId: true, images: true },
+      // Address fields feed update()'s changed-address check.
+      select: {
+        ownerId: true,
+        images: true,
+        street: true,
+        houseNumber: true,
+        city: true,
+        country: true,
+      },
     });
 
     if (!property) {

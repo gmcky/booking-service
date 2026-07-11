@@ -36,6 +36,10 @@ vi.mock("../../shared/queues/cleanup.queue.js", () => ({
   cleanupQueue: { add: vi.fn().mockResolvedValue(undefined) },
 }));
 
+vi.mock("../../shared/queues/geocode.queue.js", () => ({
+  geocodeQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
 vi.mock("../../modules/users/user.stats.cache.js", () => ({
   invalidateUserStatsCache: vi.fn().mockResolvedValue(undefined),
 }));
@@ -130,7 +134,8 @@ describe("PropertyService.create rawImagePaths ownership guard", () => {
       description: "A description long enough to pass validation checks",
       type: "APARTMENT",
       city: "Kyiv",
-      address: "1 Test Street",
+      street: "Test Street",
+      houseNumber: "1",
       pricePerNight: 100,
       maxGuests: 2,
       amenities: [],
