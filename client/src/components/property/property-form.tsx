@@ -112,13 +112,16 @@ export function PropertyForm({
   const [apartment, setApartment] = React.useState(initial?.apartment ?? "");
   const [district, setDistrict] = React.useState(initial?.district ?? "");
   const [city, setCity] = React.useState(initial?.city ?? "");
-  // Picking a street suggestion pins exact coordinates; typing anything
-  // address-related afterwards un-pins them so the backend geocoder
-  // resolves the edited address instead.
-  const [pickedCoords, setPickedCoords] = React.useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  // The last street suggestion the host picked. Fields display its local
+  // names; on submit its `en` canonical is sent instead of the visible
+  // text, plus the exact coordinates while `pickPinned` holds. Typing a
+  // house number keeps the pick (numbers are language-neutral, the English
+  // street/city stay right) but un-pins the coordinates so the geocoder
+  // re-resolves at house precision; editing any other address field drops
+  // the pick entirely — the typed address goes out as-is and the backend
+  // geocoder resolves and anglicizes it.
+  const [picked, setPicked] = React.useState<AddressSuggestion | null>(null);
+  const [pickPinned, setPickPinned] = React.useState(false);
   const [country, setCountry] = React.useState(initial?.country ?? "");
   const [maxGuests, setMaxGuests] = React.useState(initial ? String(initial.maxGuests) : "");
   const [price, setPrice] = React.useState(initial ? String(Number(initial.pricePerNight)) : "");
@@ -222,16 +225,27 @@ export function PropertyForm({
   // street by hand, keep it". Null once the host edits the street manually.
   const streetPickCityRef = React.useRef<string | null>(null);
 
+  function dropPick() {
+    setPicked(null);
+    setPickPinned(false);
+  }
+
+  /** A street block auto-filled for one city is invalid the moment the
+   *  city (or country) changes — picked or typed. Manually typed streets
+   *  are left alone. */
+  function clearAutoFilledStreet(keepFor?: string) {
+    if (!streetPickCityRef.current || streetPickCityRef.current === keepFor) return;
+    setStreet("");
+    setHouseNumber("");
+    setDistrict("");
+    streetPickCityRef.current = null;
+  }
+
   function pickCity(s: AddressSuggestion) {
-    if (streetPickCityRef.current && streetPickCityRef.current !== s.city) {
-      setStreet("");
-      setHouseNumber("");
-      setDistrict("");
-      streetPickCityRef.current = null;
-    }
+    clearAutoFilledStreet(s.city);
     setCity(s.city);
     setCountry(s.country);
-    setPickedCoords(null);
+    dropPick();
   }
 
   function pickStreet(s: AddressSuggestion) {
@@ -242,7 +256,8 @@ export function PropertyForm({
     setDistrict(s.district ?? "");
     setCity(s.city);
     setCountry(s.country);
-    setPickedCoords({ latitude: s.latitude, longitude: s.longitude });
+    setPicked(s);
+    setPickPinned(true);
     streetPickCityRef.current = s.city;
   }
 
@@ -271,17 +286,21 @@ export function PropertyForm({
       setLocalError("Fix the highlighted fields before saving.");
       return;
     }
+    // A live pick submits its English canonical; coordinates ride along
+    // only while still pinned (a typed house number un-pins them so the
+    // geocoder re-resolves at house precision). Without a pick the typed
+    // text goes out and the backend geocoder resolves and anglicizes it.
     onSubmit({
       title: title.trim(),
       description: description.trim(),
-      street: street.trim(),
+      street: picked ? (picked.en.street ?? picked.street ?? "") : street.trim(),
       houseNumber: houseNumber.trim() || null,
       apartment: apartment.trim() || null,
-      district: district.trim() || null,
-      city: city.trim(),
-      country: country.trim(),
-      latitude: pickedCoords?.latitude ?? null,
-      longitude: pickedCoords?.longitude ?? null,
+      district: picked ? picked.en.district : district.trim() || null,
+      city: picked ? picked.en.city : city.trim(),
+      country: picked ? picked.en.country : country.trim(),
+      latitude: picked && pickPinned ? picked.latitude : null,
+      longitude: picked && pickPinned ? picked.longitude : null,
       maxGuests: Number(maxGuests),
       pricePerNight: Number(price),
       type,
@@ -334,11 +353,13 @@ export function PropertyForm({
                 suggestions={countrySuggestions}
                 onValueChange={(v) => {
                   setCountry(v);
-                  setPickedCoords(null);
+                  clearAutoFilledStreet();
+                  dropPick();
                 }}
                 onPick={(s) => {
                   setCountry(s.label);
-                  setPickedCoords(null);
+                  clearAutoFilledStreet();
+                  dropPick();
                 }}
               />
             </Field>
@@ -351,7 +372,8 @@ export function PropertyForm({
                 suggestions={citySuggestions}
                 onValueChange={(v) => {
                   setCity(v);
-                  setPickedCoords(null);
+                  clearAutoFilledStreet();
+                  dropPick();
                 }}
                 onPick={pickCity}
               />
@@ -366,7 +388,7 @@ export function PropertyForm({
                   suggestions={streetSuggestions}
                   onValueChange={(v) => {
                     setStreet(v);
-                    setPickedCoords(null);
+                    dropPick();
                     streetPickCityRef.current = null;
                   }}
                   onPick={pickStreet}
@@ -379,7 +401,9 @@ export function PropertyForm({
                   value={houseNumber}
                   onChange={(e) => {
                     setHouseNumber(e.target.value);
-                    setPickedCoords(null);
+                    // Numbers are language-neutral: the pick's English
+                    // street/city stay valid, only the pin is stale now.
+                    setPickPinned(false);
                   }}
                 />
               </Field>
@@ -397,7 +421,12 @@ export function PropertyForm({
                 id="district"
                 placeholder="e.g. Podil"
                 value={district}
-                onChange={(e) => setDistrict(e.target.value)}
+                onChange={(e) => {
+                  setDistrict(e.target.value);
+                  // District is part of the pick's canonical — editing it
+                  // switches submission back to the typed-text path.
+                  dropPick();
+                }}
               />
             </Field>
             <p className="text-[13px] text-muted-foreground">
