@@ -75,7 +75,10 @@ export function PropertyEditView({ id }: { id: string }) {
             initial={{
               title: data.title,
               description: data.description,
-              address: data.address,
+              street: data.street,
+              houseNumber: data.houseNumber,
+              apartment: data.apartment,
+              district: data.district,
               city: data.city,
               country: data.country,
               maxGuests: data.maxGuests,

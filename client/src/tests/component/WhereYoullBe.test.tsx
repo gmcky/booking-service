@@ -11,7 +11,9 @@ const baseProperty: PropertyDetail = {
   city: "Amsterdam",
   country: "Netherlands",
   district: null,
-  address: "1240 Lakeshore Dr",
+  street: "Lakeshore Dr",
+  houseNumber: "1240",
+  apartment: null,
   latitude: null,
   longitude: null,
   images: [],
@@ -43,7 +45,7 @@ describe("WhereYoullBe", () => {
     // Subtitle ("{city}, {country}") and the locality line coincide here
     // since district is null — both legitimately render the same text.
     expect(screen.getAllByText("Amsterdam, Netherlands").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("1240 Lakeshore Dr")).toBeInTheDocument();
+    expect(screen.getByText("Lakeshore Dr 1240")).toBeInTheDocument();
     // The map itself is lazy-loaded client-side (dynamic, ssr: false) — its
     // loading skeleton renders synchronously either way.
     expect(document.getElementById("location")).not.toBeEmptyDOMElement();

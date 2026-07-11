@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { MapPin } from "lucide-react";
 import type { PropertyDetail } from "@/lib/api/properties";
+import { formatStreetAddress } from "@/lib/utils/address";
 
 const WhereYoullBeMap = dynamic(
   () => import("./where-youll-be-map").then((m) => m.WhereYoullBeMap),
@@ -38,7 +39,7 @@ export function WhereYoullBe({ property }: { property: PropertyDetail }) {
         <MapPin className="size-[17px] shrink-0 text-muted-foreground" />
         {locality}
       </p>
-      <p className="mt-1 text-sm text-muted-foreground">{property.address}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{formatStreetAddress(property)}</p>
     </div>
   );
 }

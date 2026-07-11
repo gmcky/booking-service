@@ -28,8 +28,10 @@ test.describe("host: create with photo → edit → deactivate", () => {
     await page
       .getByLabel("Description")
       .fill("Created by an automated e2e smoke test — safe to remove.");
-    await page.getByLabel("Street address").fill("1 Test Street");
+    await page.getByLabel("Street", { exact: true }).fill("Test Street");
+    await page.getByLabel("House no.").fill("1");
     await page.getByLabel("City").fill("Testville");
+    await page.getByLabel("Country").fill("Ukraine");
     await page.getByLabel("Max guests").fill("4");
     await page.getByLabel("Price / night").fill("100");
 

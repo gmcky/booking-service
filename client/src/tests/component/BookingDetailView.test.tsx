@@ -50,7 +50,10 @@ function makeBooking(overrides: Partial<BookingDetail> = {}): BookingDetail {
       description: "A cabin",
       type: "HOUSE",
       city: "Austin",
-      address: "123 Pine Ridge Rd",
+      district: null,
+      street: "Pine Ridge Rd",
+      houseNumber: "123",
+      apartment: null,
       images: [],
       pricePerNight: "100",
       maxGuests: 4,
@@ -128,7 +131,7 @@ describe("BookingDetailView", () => {
 
     expect(screen.getByText("+380501234567")).toBeInTheDocument();
     expect(screen.getByText("owner@demo.com")).toBeInTheDocument();
-    expect(screen.getByText("123 Pine Ridge Rd")).toBeInTheDocument();
+    expect(screen.getByText("Pine Ridge Rd 123")).toBeInTheDocument();
   });
 
   it("shows the reveal-window message when CONFIRMED without hostContact", async () => {
@@ -155,7 +158,7 @@ describe("BookingDetailView", () => {
     expect(
       screen.getByText("Host contact appears once your booking is confirmed."),
     ).toBeInTheDocument();
-    expect(screen.getByText("123 Pine Ridge Rd")).toBeInTheDocument();
+    expect(screen.getByText("Pine Ridge Rd 123")).toBeInTheDocument();
     expect(screen.queryByText("+380501234567")).not.toBeInTheDocument();
   });
 });

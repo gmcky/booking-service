@@ -10,7 +10,9 @@ const baseCreateInput = {
   type: "APARTMENT",
   city: "Kyiv",
   country: "Ukraine",
-  address: "Kontraktova Square 4, Podil",
+  district: "Podil",
+  street: "Kontraktova Square",
+  houseNumber: "4",
   pricePerNight: 55,
   maxGuests: 2,
 };
