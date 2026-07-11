@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Star, X } from "lucide-react";
+import { ChevronsRight, Star, X } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import { BaseMap, type MapBounds } from "@/components/map/base-map";
 import { PriceMarkers } from "@/components/map/price-markers";
@@ -42,6 +42,8 @@ export interface BrowseMapPanelProps {
   onSearchAsMoveChange: (checked: boolean) => void;
   /** Debounced (search-as-I-move) or immediate ("Search this area") bbox push into the URL. */
   onBoundsChange: (bounds: MapBounds) => void;
+  /** Collapses the map back to list-only view. */
+  onCollapse: () => void;
   /**
    * Changes only when a "real" new search happened (filters other than the
    * map's own bbox) — re-fits the camera to the new result set, unless the
@@ -59,6 +61,7 @@ export function BrowseMapPanel({
   searchAsMove,
   onSearchAsMoveChange,
   onBoundsChange,
+  onCollapse,
   fitBoundsKey,
 }: BrowseMapPanelProps) {
   const [map, setMap] = React.useState<maplibregl.Map | null>(null);
@@ -125,23 +128,34 @@ export function BrowseMapPanel({
         onHover={onHoverChange}
       />
 
-      <Card className="absolute top-3 left-3 z-10 flex-row items-center gap-2 px-3 py-2 shadow-md">
-        <Switch
-          id="search-as-move"
-          checked={searchAsMove}
-          onCheckedChange={(checked) => {
-            onSearchAsMoveChange(checked);
-            if (!checked && debounceRef.current) clearTimeout(debounceRef.current);
-            if (checked && pendingBounds) {
-              onBoundsChange(pendingBounds);
-              setPendingBounds(null);
-            }
-          }}
-        />
-        <Label htmlFor="search-as-move" className="text-xs font-medium">
-          Search as I move the map
-        </Label>
-      </Card>
+      <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label="Hide map"
+          onClick={onCollapse}
+          className="rounded-full border border-border bg-card shadow-md hover:bg-card"
+        >
+          <ChevronsRight className="size-4" />
+        </Button>
+        <Card className="flex-row items-center gap-2 px-3 py-2 shadow-md">
+          <Switch
+            id="search-as-move"
+            checked={searchAsMove}
+            onCheckedChange={(checked) => {
+              onSearchAsMoveChange(checked);
+              if (!checked && debounceRef.current) clearTimeout(debounceRef.current);
+              if (checked && pendingBounds) {
+                onBoundsChange(pendingBounds);
+                setPendingBounds(null);
+              }
+            }}
+          />
+          <Label htmlFor="search-as-move" className="text-xs font-medium">
+            Search as I move the map
+          </Label>
+        </Card>
+      </div>
 
       {!searchAsMove && pendingBounds ? (
         <div className="absolute top-3 left-1/2 z-10 -translate-x-1/2">
