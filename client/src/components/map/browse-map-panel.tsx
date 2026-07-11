@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronsRight, Star, X } from "lucide-react";
+import { ChevronsRight, Loader2, Star, X } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import { BaseMap, type MapBounds } from "@/components/map/base-map";
 import { PriceMarkers } from "@/components/map/price-markers";
@@ -28,6 +28,12 @@ export interface BrowseMapPanelProps {
   markers: PropertyMapMarker[];
   /** True while the markers query for the current filters is still loading. */
   markersPending: boolean;
+  /**
+   * True while list/marker results for the current viewport are being
+   * fetched — shows the top-center spinner. Kept separate from
+   * markersPending, which gates the camera refit.
+   */
+  searching?: boolean;
   hoveredId: string | null;
   onHoverChange: (id: string | null) => void;
   selectedId: string | null;
@@ -52,6 +58,7 @@ export interface BrowseMapPanelProps {
 export function BrowseMapPanel({
   markers,
   markersPending,
+  searching = false,
   hoveredId,
   onHoverChange,
   selectedId,
@@ -120,6 +127,16 @@ export function BrowseMapPanel({
         onSelect={onSelectChange}
         onHover={onHoverChange}
       />
+
+      {searching ? (
+        <div
+          role="status"
+          aria-label="Loading results"
+          className="absolute top-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-card p-2 shadow-md"
+        >
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : null}
 
       <div className="absolute top-3 left-3 z-10">
         <Button

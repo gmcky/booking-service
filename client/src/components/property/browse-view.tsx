@@ -20,7 +20,6 @@ import {
 } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
-import { cn } from "@/lib/utils";
 
 const BrowseMapPanel = dynamic(
   () => import("@/components/map/browse-map-panel").then((m) => m.BrowseMapPanel),
@@ -214,14 +213,17 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
   const total = query.data?.pages[0]?.pagination.total ?? 0;
-  // Skeleton shows immediately when there's nothing else to render (first
-  // load), otherwise only for loads slow enough to be worth announcing —
-  // a sub-300ms refetch swapping cards in place beats a skeleton blink.
-  const listLoading = query.isPending || query.isPlaceholderData;
-  const showSkeleton = useDeferredLoading(listLoading) || (query.isPending && !query.data);
-  // The dim is gated too: most map pans resolve fast (and often to the very
-  // same result set) — dimming those reads as a pointless blink.
-  const dimStale = useDeferredLoading(query.isPlaceholderData, 150, 300);
+  // Skeleton only when there's nothing to render yet (first load). Any
+  // refetch that has placeholder cards keeps them fully visible — the
+  // loading cue lives in a spinner decoupled from the content, so a pan
+  // that resolves to the same stays never touches the grid at all.
+  const showSkeleton = query.isPending;
+  // Deferred so instant cache hits never flash the spinner.
+  const searching = useDeferredLoading(
+    query.isPlaceholderData || markersQuery.isFetching,
+    150,
+    300,
+  );
   // Remount (and fade in) the grid only when the visible result set actually
   // changes — a pan that lands on the same stays must not animate at all.
   const resultsKey = query.data?.pages[0]?.data.map((p) => p.id).join(",") ?? "";
@@ -335,7 +337,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-lg font-semibold tracking-tight">
-            {showSkeleton
+            {/* In list mode there's no map spinner, and every refetch there is
+                a real new search (bbox pans only exist in split view) — the
+                heading is the loading cue. */}
+            {showSkeleton || (searching && mapMode === "list")
               ? "Searching…"
               : `${total} ${total === 1 ? "stay" : "stays"}${
                   locationLabel ? ` in ${locationLabel}` : ""
@@ -385,15 +390,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         ) : (
           <>
             {/* Keyed by result identity: new stays fade in, identical results
-                after a pan keep the exact same DOM. Slow loads dim first. */}
+                after a pan keep the exact same DOM. */}
             <section
               key={resultsKey}
-              className={cn(
-                "grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6",
-                "animate-in fade-in duration-300 motion-reduce:animate-none",
-                "transition-opacity motion-reduce:transition-none",
-                dimStale ? "opacity-50" : "opacity-100",
-              )}
+              className="animate-in fade-in grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6 duration-300 motion-reduce:animate-none"
             >
               {items.map((property) => (
                 <PropertyCard
@@ -434,6 +434,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
             <BrowseMapPanel
               markers={markersQuery.data ?? []}
               markersPending={markersQuery.isPending || markersQuery.isPlaceholderData}
+              searching={searching}
               hoveredId={hoveredId}
               onHoverChange={setHoveredId}
               selectedId={selectedId}
