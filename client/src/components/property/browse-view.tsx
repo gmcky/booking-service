@@ -19,6 +19,8 @@ import {
   type PropertyType,
 } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
+import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
+import { cn } from "@/lib/utils";
 
 const BrowseMapPanel = dynamic(
   () => import("@/components/map/browse-map-panel").then((m) => m.BrowseMapPanel),
@@ -190,9 +192,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       const totalPages = last.pagination.totalPages ?? page;
       return page < totalPages ? page + 1 : undefined;
     },
-    // No placeholderData here on purpose: a map-driven refetch should show
-    // the skeleton grid (stale cards for a different area are misleading).
-    // The map's markers are the opposite case — see markersQuery.
+    // Previous pages stay as placeholder; whether they remain visible or a
+    // skeleton covers them is decided by the deferred gate below, so fast
+    // refetches swap in place and only slow ones surface a skeleton.
+    placeholderData: keepPreviousData,
   });
 
   // The map draws every match in the filter set, not the loaded list pages —
@@ -211,6 +214,11 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
   const total = query.data?.pages[0]?.pagination.total ?? 0;
+  // Skeleton shows immediately when there's nothing else to render (first
+  // load), otherwise only for loads slow enough to be worth announcing —
+  // a sub-300ms refetch swapping cards in place beats a skeleton blink.
+  const listLoading = query.isPending || query.isPlaceholderData;
+  const showSkeleton = useDeferredLoading(listLoading) || (query.isPending && !query.data);
   /** Empty while a bbox drives the search — the camera must never re-fit
    *  in response to its own pan. */
   const fitBoundsKey = React.useMemo(
@@ -321,7 +329,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-lg font-semibold tracking-tight">
-            {query.isPending
+            {showSkeleton
               ? "Searching…"
               : `${total} ${total === 1 ? "stay" : "stays"}${
                   locationLabel ? ` in ${locationLabel}` : ""
@@ -364,13 +372,20 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
               Try again
             </Button>
           </div>
-        ) : query.isPending ? (
+        ) : showSkeleton ? (
           <ResultsSkeleton />
         ) : items.length === 0 ? (
           <EmptyState onClear={() => applyFilters({ sort: filters.sort })} />
         ) : (
           <>
-            <section className="grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6">
+            {/* Stale cards dim while the next map area loads, then fade back
+                up as fresh results swap in — softer than an instant switch. */}
+            <section
+              className={cn(
+                "grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6 transition-opacity duration-300 motion-reduce:transition-none",
+                query.isPlaceholderData ? "opacity-50" : "opacity-100",
+              )}
+            >
               {items.map((property) => (
                 <PropertyCard
                   key={property.id}
