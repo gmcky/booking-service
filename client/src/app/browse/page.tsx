@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { BrowseView } from "@/components/property/browse-view";
 
 export const metadata: Metadata = {
-  title: "Browse stays — GMCK Booking",
+  title: "Browse stays",
   description: "Search unique places to stay by city, dates, price, and amenities.",
 };
 

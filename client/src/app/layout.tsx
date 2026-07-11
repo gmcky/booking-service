@@ -14,7 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GMCK Booking",
+  title: {
+    default: "GMCK Booking",
+    template: "%s · GMCK Booking",
+  },
   description: "Find and book unique places to stay",
   openGraph: {
     title: "GMCK Booking",

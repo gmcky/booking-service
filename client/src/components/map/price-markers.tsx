@@ -21,11 +21,25 @@ export interface PriceMarkersProps {
   onHover?: (id: string | null) => void;
 }
 
+interface MarkerEntry {
+  marker: maplibregl.Marker;
+  label: string;
+}
+
+/** Estimated pill footprint in screen px, used for collision detection. */
+const PILL_HEIGHT = 32;
+const PILL_CHAR_WIDTH = 8;
+const PILL_PADDING = 24;
+
 /**
  * Imperatively manages maplibregl.Marker price pills against a live map
  * instance. Markers are plain DOM (maplibre's Marker API takes an
  * HTMLElement, not JSX) so this renders nothing itself — it's a
  * synchronization effect, not a visual component.
+ *
+ * Markers self-declutter Airbnb-style: pills that would overlap an
+ * already-placed pill collapse into small dots, recomputed on every camera
+ * change. Selected/hovered markers always win a pill slot.
  */
 export function PriceMarkers({
   map,
@@ -35,11 +49,56 @@ export function PriceMarkers({
   onSelect,
   onHover,
 }: PriceMarkersProps) {
-  const markersRef = React.useRef(new Map<string, maplibregl.Marker>());
+  const markersRef = React.useRef(new Map<string, MarkerEntry>());
   const onSelectRef = React.useRef(onSelect);
   const onHoverRef = React.useRef(onHover);
   onSelectRef.current = onSelect;
   onHoverRef.current = onHover;
+
+  // Read by declutter() so camera-event listeners never need re-binding
+  // when the selection changes.
+  const selectionRef = React.useRef({ selectedId, hoveredId });
+  selectionRef.current = { selectedId, hoveredId };
+
+  const declutterRef = React.useRef(() => {});
+  declutterRef.current = () => {
+    if (!map) return;
+    const { selectedId, hoveredId } = selectionRef.current;
+    const entries = [...markersRef.current.entries()];
+    // Selected/hovered first so they always claim their pill slot.
+    entries.sort(
+      ([a], [b]) => priorityOf(b, selectedId, hoveredId) - priorityOf(a, selectedId, hoveredId),
+    );
+
+    const placed: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (const [id, { marker, label }] of entries) {
+      const { x, y } = map.project(marker.getLngLat());
+      const w = label.length * PILL_CHAR_WIDTH + PILL_PADDING;
+      const rect = {
+        x1: x - w / 2,
+        y1: y - PILL_HEIGHT / 2,
+        x2: x + w / 2,
+        y2: y + PILL_HEIGHT / 2,
+      };
+      const collides = placed.some(
+        (r) => rect.x1 < r.x2 && rect.x2 > r.x1 && rect.y1 < r.y2 && rect.y2 > r.y1,
+      );
+
+      const selected = id === selectedId;
+      const hovered = id === hoveredId;
+      const pill = pillOf(marker);
+      if (collides) {
+        pill.className = dotClassName({ selected, hovered });
+        pill.textContent = "";
+      } else {
+        pill.className = pillClassName({ selected, hovered });
+        if (pill.textContent !== label) pill.textContent = label;
+        // Dots don't claim space — they may crowd, pills may not.
+        placed.push(rect);
+      }
+      marker.getElement().style.zIndex = selected || hovered ? "30" : collides ? "0" : "10";
+    }
+  };
 
   // Reconcile the marker set against the current property list. Callback
   // identity is read from refs (not a dep here) so a fresh onSelect/onHover
@@ -49,9 +108,9 @@ export function PriceMarkers({
     const markers = markersRef.current;
     const nextIds = new Set(properties.map((p) => p.id));
 
-    for (const [id, marker] of markers) {
+    for (const [id, entry] of markers) {
       if (!nextIds.has(id)) {
-        marker.remove();
+        entry.marker.remove();
         markers.delete(id);
       }
     }
@@ -60,10 +119,9 @@ export function PriceMarkers({
       const label = formatPrice(property.pricePerNight);
       const existing = markers.get(property.id);
       if (existing) {
-        existing.setLngLat([property.longitude, property.latitude]);
-        const pill = pillOf(existing);
-        if (pill.textContent !== label) pill.textContent = label;
-        pill.setAttribute("aria-label", `${label} per night, view listing`);
+        existing.marker.setLngLat([property.longitude, property.latitude]);
+        existing.label = label;
+        pillOf(existing.marker).setAttribute("aria-label", `${label} per night, view listing`);
         continue;
       }
 
@@ -73,8 +131,6 @@ export function PriceMarkers({
       // (and className rewrites on state sync) never clobbers that.
       const el = document.createElement("div");
       const pill = document.createElement("div");
-      pill.textContent = label;
-      pill.className = pillClassName({ selected: false, hovered: false });
       pill.setAttribute("role", "button");
       pill.setAttribute("tabindex", "0");
       pill.setAttribute("aria-label", `${label} per night, view listing`);
@@ -100,31 +156,51 @@ export function PriceMarkers({
       // real control — keeping both would nest interactive elements.
       el.removeAttribute("role");
       el.removeAttribute("aria-label");
-      markers.set(property.id, marker);
+      markers.set(property.id, { marker, label });
     }
+
+    declutterRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, properties]);
 
-  // Style sync only — selected/hovered state never recreates a marker.
+  // Pill/dot style is selection-dependent, so a selection change is a
+  // declutter pass too (the hovered marker must win back a pill slot).
   React.useEffect(() => {
-    for (const [id, marker] of markersRef.current) {
-      const selected = id === selectedId;
-      const hovered = id === hoveredId;
-      pillOf(marker).className = pillClassName({ selected, hovered });
-      marker.getElement().style.zIndex = selected || hovered ? "10" : "0";
-    }
-  }, [selectedId, hoveredId, properties]);
+    declutterRef.current();
+  }, [selectedId, hoveredId]);
+
+  // Live declutter while the camera moves, rAF-throttled.
+  React.useEffect(() => {
+    if (!map) return;
+    let raf = 0;
+    const onMove = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        declutterRef.current();
+      });
+    };
+    map.on("move", onMove);
+    return () => {
+      map.off("move", onMove);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [map]);
 
   // Full cleanup on unmount (or if the map instance itself changes).
   React.useEffect(() => {
     const markers = markersRef.current;
     return () => {
-      for (const marker of markers.values()) marker.remove();
+      for (const entry of markers.values()) entry.marker.remove();
       markers.clear();
     };
   }, [map]);
 
   return null;
+}
+
+function priorityOf(id: string, selectedId?: string | null, hoveredId?: string | null): number {
+  return id === selectedId ? 2 : id === hoveredId ? 1 : 0;
 }
 
 function pillOf(marker: maplibregl.Marker): HTMLElement {
@@ -138,5 +214,13 @@ function pillClassName({ selected, hovered }: { selected: boolean; hovered: bool
       ? "border-foreground bg-foreground text-background"
       : "border-border bg-card text-foreground hover:shadow-md",
     hovered && !selected ? "scale-110" : "scale-100",
+  );
+}
+
+function dotClassName({ selected, hovered }: { selected: boolean; hovered: boolean }): string {
+  return cn(
+    "block size-3 rounded-full border shadow-sm cursor-pointer select-none transition-transform",
+    selected ? "border-foreground bg-foreground" : "border-border bg-card",
+    hovered && !selected ? "scale-125" : "scale-100",
   );
 }

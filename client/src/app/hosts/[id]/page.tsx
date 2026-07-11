@@ -12,12 +12,12 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const fallback: Metadata = { title: "Host — GMCK Booking" };
+  const fallback: Metadata = { title: "Host" };
   try {
     const res = await fetch(`${BASE_URL}/users/${encodeURIComponent(id)}`);
     if (!res.ok) return fallback;
     const host = (await res.json()) as PublicUserProfile;
-    return { title: `${host.firstName} — GMCK Booking` };
+    return { title: host.firstName };
   } catch (err) {
     console.error("generateMetadata: host fetch failed", err);
     return fallback;
