@@ -71,7 +71,13 @@ export function BrowseMapPanel({
   // per key, and only after the markers for that search have arrived. Pans
   // keep fitBoundsKey empty, so the camera is never yanked mid-exploration.
   React.useEffect(() => {
-    if (!map || !fitBoundsKey || markersPending) return;
+    // A pan (empty key) resets the gate: re-running the previous named
+    // search afterwards must still yank the camera back to its results.
+    if (!fitBoundsKey) {
+      lastFitKeyRef.current = null;
+      return;
+    }
+    if (!map || markersPending) return;
     if (lastFitKeyRef.current === fitBoundsKey) return;
     lastFitKeyRef.current = fitBoundsKey;
     const bounds = boundsOf(markers);
