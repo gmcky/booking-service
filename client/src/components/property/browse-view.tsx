@@ -3,7 +3,7 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Map as MapIcon, Search } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
@@ -71,6 +71,15 @@ function nonBboxKey(filters: PropertyQuery): string {
   return JSON.stringify(rest);
 }
 
+function hasBboxFilter(filters: PropertyQuery): boolean {
+  return (
+    filters.minLat !== undefined &&
+    filters.maxLat !== undefined &&
+    filters.minLng !== undefined &&
+    filters.maxLng !== undefined
+  );
+}
+
 export function BrowseView({ detected }: { detected?: DetectedLocation }) {
   return (
     <React.Suspense
@@ -102,16 +111,35 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   const [mapMode, setMapMode] = React.useState<"split" | "list">("split");
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [searchAsMove, setSearchAsMove] = React.useState(false);
 
-  /** Bbox-only URL update — preserves every other param, no history spam. */
+  const hasBbox = hasBboxFilter(filters);
+
+  /** Bbox URL update — once the user moves the map, the viewport IS the
+   *  location: named-location params are dropped (Airbnb's "map area"). */
   function updateBounds(bounds: MapBounds) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("city");
+    params.delete("country");
+    params.delete("district");
     params.set("minLat", bounds.minLat.toFixed(BBOX_PRECISION));
     params.set("maxLat", bounds.maxLat.toFixed(BBOX_PRECISION));
     params.set("minLng", bounds.minLng.toFixed(BBOX_PRECISION));
     params.set("maxLng", bounds.maxLng.toFixed(BBOX_PRECISION));
     router.replace(`/browse?${params.toString()}`, { scroll: false });
+  }
+
+  /** Closing the map returns to the plain list search — the bbox belongs to
+   *  the map, so it leaves with it. */
+  function collapseMap() {
+    setMapMode("list");
+    if (!hasBbox) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("minLat");
+    params.delete("maxLat");
+    params.delete("minLng");
+    params.delete("maxLng");
+    const qs = params.toString();
+    router.replace(qs ? `/browse?${qs}` : "/browse", { scroll: false });
   }
 
   React.useEffect(() => {
@@ -128,8 +156,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   // Detection only ever supplies a rendering-time default — it must never
   // overwrite explicit URL params, and is never written back to the URL.
+  // Once the map has a bbox, the viewport is the location and detection
+  // stays out of it entirely.
   const detectedMatch = React.useMemo(() => {
-    if (hasExplicitLocation || geoDismissed || !detected?.city) return undefined;
+    if (hasExplicitLocation || hasBbox || geoDismissed || !detected?.city) return undefined;
     const target = detected.city.toLowerCase();
     // Same-named cities in different countries: the detected country wins,
     // city-only match is only a fallback when the country didn't resolve.
@@ -144,7 +174,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       }
     }
     return detected.country ? undefined : fallback;
-  }, [hasExplicitLocation, geoDismissed, detected?.city, detected?.country, locationsQuery.data]);
+  }, [hasExplicitLocation, hasBbox, geoDismissed, detected?.city, detected?.country, locationsQuery.data]);
 
   const effectiveFilters = detectedMatch
     ? { ...filters, city: detectedMatch.city, country: detectedMatch.country }
@@ -160,11 +190,44 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       const totalPages = last.pagination.totalPages ?? page;
       return page < totalPages ? page + 1 : undefined;
     },
+    // Map-driven refetches keep the previous list on screen instead of
+    // flashing a skeleton on every pan.
+    placeholderData: keepPreviousData,
+  });
+
+  // The map draws every match in the filter set, not the loaded list pages —
+  // otherwise pins for unloaded pages simply don't exist.
+  const markerFilters = React.useMemo(() => {
+    const { sort: _sort, page: _page, limit: _limit, ...rest } = effectiveFilters;
+    return rest;
+  }, [effectiveFilters]);
+  const markersQuery = useQuery({
+    queryKey: queryKeys.properties.mapMarkers(markerFilters),
+    queryFn: () => propertyApi.mapMarkers(markerFilters),
+    enabled: mapMode === "split",
+    placeholderData: keepPreviousData,
   });
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
   const total = query.data?.pages[0]?.pagination.total ?? 0;
-  const fitBoundsKey = React.useMemo(() => nonBboxKey(effectiveFilters), [effectiveFilters]);
+  /** Empty while a bbox drives the search — the camera must never re-fit
+   *  in response to its own pan. */
+  const fitBoundsKey = React.useMemo(
+    () => (hasBbox ? "" : nonBboxKey(effectiveFilters)),
+    [hasBbox, effectiveFilters],
+  );
+  const initialMapBounds = React.useMemo<[[number, number], [number, number]] | undefined>(
+    () =>
+      hasBbox
+        ? [
+            [filters.minLng!, filters.minLat!],
+            [filters.maxLng!, filters.maxLat!],
+          ]
+        : undefined,
+    // Mount-only camera restore; live values reach the map via user gestures.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   function applyFilters(next: PropertyQuery) {
     const params = new URLSearchParams();
@@ -198,7 +261,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   const locationLabel = effectiveFilters.district
     ? `${effectiveFilters.district}, ${effectiveFilters.city}`
-    : effectiveFilters.city;
+    : (effectiveFilters.city ?? (hasBbox ? "map area" : undefined));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -226,7 +289,9 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           />
         </div>
 
-        {detectedMatch ? (
+        {/* In split view the map itself communicates the detected location
+            (camera fits it) — the banner is list-only UI. */}
+        {detectedMatch && mapMode === "list" ? (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm">
             <span>
               Showing stays in {detectedMatch.city} — based on your location
@@ -342,15 +407,15 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         {mapMode === "split" ? (
           <div className="sticky top-22 hidden h-[calc(100vh-7rem)] flex-1 lg:block lg:max-w-[45%]">
             <BrowseMapPanel
-              properties={items}
+              markers={markersQuery.data ?? []}
+              markersPending={markersQuery.isPending || markersQuery.isPlaceholderData}
               hoveredId={hoveredId}
               onHoverChange={setHoveredId}
               selectedId={selectedId}
               onSelectChange={setSelectedId}
-              searchAsMove={searchAsMove}
-              onSearchAsMoveChange={setSearchAsMove}
               onBoundsChange={updateBounds}
-              onCollapse={() => setMapMode("list")}
+              onCollapse={collapseMap}
+              initialBounds={initialMapBounds}
               fitBoundsKey={fitBoundsKey}
             />
           </div>
@@ -361,7 +426,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       <div className="fixed inset-x-0 bottom-6 z-30 hidden justify-center lg:flex">
         <Button
           className="gap-1.5 rounded-full px-4 shadow-lg"
-          onClick={() => setMapMode((m) => (m === "split" ? "list" : "split"))}
+          onClick={() => (mapMode === "split" ? collapseMap() : setMapMode("split"))}
         >
           <MapIcon className="size-4" />
           {mapMode === "split" ? "Show list" : "Show map"}
