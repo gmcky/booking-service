@@ -21,7 +21,6 @@ const miss = {
 const address = {
   street: "Khreshchatyk St",
   houseNumber: "22",
-  district: "Pechersk",
   city: "Kyiv",
   country: "Ukraine",
 };

@@ -1,10 +1,11 @@
 import { env } from "../../config/env.js";
 import { logger } from "./logger.js";
 
+// District deliberately absent: Nominatim's structured query has no slot
+// for it, so it never affects the result and must not trigger re-geocodes.
 export interface GeocodeAddress {
   street: string;
   houseNumber?: string | null;
-  district?: string | null;
   city: string;
   country: string;
 }

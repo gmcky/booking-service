@@ -400,8 +400,12 @@ export class PropertyService {
 
     // An address edit invalidates the existing pin: clear it and re-geocode,
     // unless the patch pins coordinates explicitly (host's pin always wins).
-    const addressChanged = (["street", "houseNumber", "district", "city", "country"] as const).some(
-      (field) => data[field] !== undefined,
+    // Compared against current values, not field presence — the edit form
+    // sends the full address block on every save, and an unrelated edit
+    // must not wipe the pin. District is display-only; the geocoder never
+    // queries with it, so it isn't a trigger.
+    const addressChanged = (["street", "houseNumber", "city", "country"] as const).some(
+      (field) => data[field] !== undefined && data[field] !== current[field],
     );
     const needsGeocode = addressChanged && data.latitude === undefined;
 
@@ -494,7 +498,15 @@ export class PropertyService {
   private static async verifyOwnership(propertyId: string, ownerId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
-      select: { ownerId: true, images: true },
+      // Address fields feed update()'s changed-address check.
+      select: {
+        ownerId: true,
+        images: true,
+        street: true,
+        houseNumber: true,
+        city: true,
+        country: true,
+      },
     });
 
     if (!property) {

@@ -20,7 +20,6 @@ async function geocodeProperty(propertyId: string): Promise<void> {
     select: {
       street: true,
       houseNumber: true,
-      district: true,
       city: true,
       country: true,
       latitude: true,
