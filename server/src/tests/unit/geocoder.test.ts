@@ -122,6 +122,8 @@ const streetFeature = {
   },
 };
 
+const streetOpts = { limit: 5, kind: "street" } as const;
+
 describe("suggestAddresses", () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -130,7 +132,7 @@ describe("suggestAddresses", () => {
   it("maps street features and requests English names", async () => {
     fetchMock.mockResolvedValueOnce(photonResponse([streetFeature]));
 
-    const result = await suggestAddresses("Хрещатик", 5);
+    const result = await suggestAddresses("Хрещатик", streetOpts);
 
     expect(result).toEqual([
       {
@@ -147,6 +149,15 @@ describe("suggestAddresses", () => {
     const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
     expect(url.searchParams.get("lang")).toBe("en");
     expect(url.searchParams.get("q")).toBe("Хрещатик");
+  });
+
+  it("appends picked city/country to the query for street lookups", async () => {
+    fetchMock.mockResolvedValueOnce(photonResponse([streetFeature]));
+
+    await suggestAddresses("Хрещатик", { ...streetOpts, city: "Kyiv", country: "Ukraine" });
+
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("q")).toBe("Хрещатик, Kyiv, Ukraine");
   });
 
   it("maps house features and drops non-street noise and duplicates", async () => {
@@ -166,13 +177,54 @@ describe("suggestAddresses", () => {
     };
     fetchMock.mockResolvedValueOnce(photonResponse([house, poi, house]));
 
-    const result = await suggestAddresses("khresh 22", 5);
+    const result = await suggestAddresses("khresh 22", streetOpts);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       label: "Khreshchatyk Street 22, Kyiv, Ukraine",
       houseNumber: "22",
     });
+  });
+
+  it("filters street results to the picked country, falling back when none match", async () => {
+    const kyivStreet = streetFeature;
+    const berlinStreet = {
+      geometry: { coordinates: [13.4, 52.52] },
+      properties: { type: "street", name: "Hauptstrasse", city: "Berlin", country: "Germany" },
+    };
+    fetchMock.mockResolvedValue(photonResponse([berlinStreet, kyivStreet]));
+
+    const filtered = await suggestAddresses("street", { ...streetOpts, country: "Ukraine" });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]).toMatchObject({ country: "Ukraine" });
+
+    // Constraint typed in another script matches nothing — better to show
+    // everything than an empty dropdown.
+    const fallback = await suggestAddresses("street", { ...streetOpts, country: "Україна" });
+    expect(fallback).toHaveLength(2);
+  });
+
+  it("maps city features for kind=city and ignores streets", async () => {
+    const cityFeature = {
+      geometry: { coordinates: [30.5234, 50.4501] },
+      properties: { type: "city", name: "Kyiv", country: "Ukraine" },
+    };
+    fetchMock.mockResolvedValueOnce(photonResponse([streetFeature, cityFeature]));
+
+    const result = await suggestAddresses("Kyi", { limit: 5, kind: "city" });
+
+    expect(result).toEqual([
+      {
+        label: "Kyiv, Ukraine",
+        street: null,
+        houseNumber: null,
+        district: null,
+        city: "Kyiv",
+        country: "Ukraine",
+        latitude: 50.4501,
+        longitude: 30.5234,
+      },
+    ]);
   });
 
   it("caps results at the requested limit", async () => {
@@ -187,12 +239,12 @@ describe("suggestAddresses", () => {
     }));
     fetchMock.mockResolvedValueOnce(photonResponse(features));
 
-    await expect(suggestAddresses("street", 3)).resolves.toHaveLength(3);
+    await expect(suggestAddresses("street", { limit: 3, kind: "street" })).resolves.toHaveLength(3);
   });
 
   it("returns empty on provider errors instead of throwing", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) });
 
-    await expect(suggestAddresses("khresh", 5)).resolves.toEqual([]);
+    await expect(suggestAddresses("khresh", streetOpts)).resolves.toEqual([]);
   });
 });
