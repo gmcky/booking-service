@@ -2740,6 +2740,7 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @description Display fields carry local names; `en` is the English canonical stored on publish. */
         AddressSuggestion: {
             label: string;
             street: string | null;
@@ -2747,6 +2748,12 @@ export interface components {
             district: string | null;
             city: string;
             country: string;
+            en: {
+                street: string | null;
+                district: string | null;
+                city: string;
+                country: string;
+            };
             latitude: number;
             longitude: number;
         };

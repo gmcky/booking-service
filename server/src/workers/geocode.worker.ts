@@ -48,14 +48,30 @@ async function geocodeProperty(propertyId: string): Promise<void> {
     return;
   }
 
+  // Canonicalize free-typed addresses to English alongside the pin: hosts
+  // may type in any language, but storage is English (display language is a
+  // client concern). Conservative rules — never blank out a field the
+  // result lacks, never touch the street on a city-level fallback (that
+  // would swap the host's street for a neighbor's or nothing), and house/
+  // apartment numbers are language-neutral so they stay untouched.
+  const { canonical } = result;
   await prisma.property.update({
     where: { id: propertyId },
-    data: { latitude: result.latitude, longitude: result.longitude },
+    data: {
+      latitude: result.latitude,
+      longitude: result.longitude,
+      ...(canonical.country && { country: canonical.country }),
+      ...(canonical.city && { city: canonical.city }),
+      ...(canonical.district && { district: canonical.district }),
+      ...(result.precision !== "city" && canonical.street && { street: canonical.street }),
+    },
   });
 
   await Promise.all([
     cacheDel(`property:${propertyId}`),
     cacheInvalidateNamespace("properties:search"),
+    // City/country may have been rewritten — the location facets tree too.
+    cacheDel("properties:locations"),
   ]);
 
   logger.info(

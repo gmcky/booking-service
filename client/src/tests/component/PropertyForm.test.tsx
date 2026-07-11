@@ -144,16 +144,22 @@ describe("PropertyForm", () => {
     expect(screen.queryByText("Click to add photos")).not.toBeInTheDocument();
   });
 
-  it("picking a street suggestion fills the address block and pins coordinates", async () => {
+  it("picking a street suggestion shows local names, submits English + coordinates", async () => {
     const { propertyApi } = await import("@/lib/api/properties");
     (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
       {
-        label: "Khreshchatyk Street, Pecherskyi district, Kyiv, Ukraine",
-        street: "Khreshchatyk Street",
+        label: "Хрещатик, Печерськ, Київ, Україна",
+        street: "Хрещатик",
         houseNumber: null,
-        district: "Pecherskyi district",
-        city: "Kyiv",
-        country: "Ukraine",
+        district: "Печерськ",
+        city: "Київ",
+        country: "Україна",
+        en: {
+          street: "Khreshchatyk Street",
+          district: "Pechersk",
+          city: "Kyiv",
+          country: "Ukraine",
+        },
         latitude: 50.4471871,
         longitude: 30.5229456,
       },
@@ -173,18 +179,16 @@ describe("PropertyForm", () => {
     // otherwise it silently mismatches the pinned coordinates.
     await userEvent.type(screen.getByLabelText("House no."), "7");
 
-    // Cyrillic input; the suggestion arrives already normalized to English.
     await userEvent.type(screen.getByLabelText("Street"), "Хрещатик");
-    const option = await screen.findByText(
-      "Khreshchatyk Street, Pecherskyi district, Kyiv, Ukraine",
-    );
+    const option = await screen.findByText("Хрещатик, Печерськ, Київ, Україна");
     await userEvent.click(option);
 
-    expect(screen.getByLabelText("Street")).toHaveValue("Khreshchatyk Street");
+    // Visible fields carry the local names the host recognizes…
+    expect(screen.getByLabelText("Street")).toHaveValue("Хрещатик");
     expect(screen.getByLabelText("House no.")).toHaveValue("");
-    expect(screen.getByLabelText("District (optional)")).toHaveValue("Pecherskyi district");
-    expect(screen.getByLabelText("City")).toHaveValue("Kyiv");
-    expect(screen.getByLabelText("Country")).toHaveValue("Ukraine");
+    expect(screen.getByLabelText("District (optional)")).toHaveValue("Печерськ");
+    expect(screen.getByLabelText("City")).toHaveValue("Київ");
+    expect(screen.getByLabelText("Country")).toHaveValue("Україна");
 
     await userEvent.type(screen.getByLabelText("Title"), "Kyiv Center Flat");
     await userEvent.type(
@@ -195,9 +199,11 @@ describe("PropertyForm", () => {
     await userEvent.type(screen.getByLabelText("Price / night"), "90");
     await userEvent.click(screen.getByRole("button", { name: /publish listing/i }));
 
+    // …while the submitted values are the English canonical plus the pin.
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0]).toMatchObject({
       street: "Khreshchatyk Street",
+      district: "Pechersk",
       city: "Kyiv",
       country: "Ukraine",
       latitude: 50.4471871,
@@ -215,6 +221,7 @@ describe("PropertyForm", () => {
         district: null,
         city: "Kyiv",
         country: "Ukraine",
+        en: { street: "Khreshchatyk Street", district: null, city: "Kyiv", country: "Ukraine" },
         latitude: 50.4471871,
         longitude: 30.5229456,
       },
@@ -257,6 +264,7 @@ describe("PropertyForm", () => {
         district: null,
         city: "Kyiv",
         country: "Ukraine",
+        en: { street: null, district: null, city: "Kyiv", country: "Ukraine" },
         latitude: 50.4501,
         longitude: 30.5234,
       },
@@ -296,6 +304,7 @@ describe("PropertyForm", () => {
       district: "Halytskyi",
       city: "Lviv",
       country: "Ukraine",
+      en: { street: "Rynok Square", district: "Halytskyi", city: "Lviv", country: "Ukraine" },
       latitude: 49.8419,
       longitude: 24.0315,
     };
@@ -306,6 +315,7 @@ describe("PropertyForm", () => {
       district: null,
       city: "Kyiv",
       country: "Ukraine",
+      en: { street: null, district: null, city: "Kyiv", country: "Ukraine" },
       latitude: 50.4501,
       longitude: 30.5234,
     };
