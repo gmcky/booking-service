@@ -80,4 +80,7 @@ export const env = cleanEnv(process.env, {
   // descriptive User-Agent and max 1 request per second)
   GEOCODER_URL: url({ default: "https://nominatim.openstreetmap.org/search" }),
   GEOCODER_USER_AGENT: str({ default: "gmck-booking-portfolio/1.0 (booking.gmcky.dev)" }),
+  // Address autocomplete (Photon — Nominatim's policy forbids autocomplete,
+  // Photon is built for it; also OSM data, returns names in English)
+  PHOTON_URL: url({ default: "https://photon.komoot.io/api" }),
 });

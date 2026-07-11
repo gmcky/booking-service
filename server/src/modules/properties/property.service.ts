@@ -13,6 +13,7 @@ import { resolve, dirname } from "node:path";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { cleanupQueue, type CleanupJobName } from "../../shared/queues/cleanup.queue.js";
 import { geocodeQueue } from "../../shared/queues/geocode.queue.js";
+import { suggestAddresses } from "../../shared/lib/geocoder.js";
 import {
   cacheGet,
   cacheSet,
@@ -245,6 +246,25 @@ export class PropertyService {
 
     await cacheSet(cacheKey, tree, 5 * 60);
     return tree;
+  }
+
+  /**
+   * Host-form address autocomplete, proxied through the backend so the
+   * client never talks to Photon directly and repeated prefixes are served
+   * from cache instead of hammering the public instance.
+   */
+  static async suggestAddresses(query: string, limit: number) {
+    const cacheKey = `geo:suggest:${limit}:${query.toLowerCase()}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
+
+    const suggestions = await suggestAddresses(query, limit);
+
+    // Only cache non-empty results: a miss may be Photon hiccuping.
+    if (suggestions.length > 0) {
+      await cacheSet(cacheKey, suggestions, 24 * 60 * 60);
+    }
+    return suggestions;
   }
 
   static async getMyProperties(ownerId: string, params: PaginationParams) {
