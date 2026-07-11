@@ -17,7 +17,14 @@ export default function HostListingPage() {
   const [formError, setFormError] = React.useState("");
 
   const mutation = useMutation({
-    mutationFn: (values: PropertyFormValues) => propertyApi.create(values),
+    // Create takes optional fields as absent, not null (only PATCH clears).
+    mutationFn: ({ houseNumber, apartment, district, ...values }: PropertyFormValues) =>
+      propertyApi.create({
+        ...values,
+        houseNumber: houseNumber ?? undefined,
+        apartment: apartment ?? undefined,
+        district: district ?? undefined,
+      }),
     onSuccess: () => {
       toast.success("Listing published");
       queryClient.invalidateQueries({ queryKey: queryKeys.properties.mine });

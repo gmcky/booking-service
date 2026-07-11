@@ -33,7 +33,7 @@ describe("PropertyForm", () => {
     );
 
     expect(screen.getByLabelText("Title")).toHaveValue("");
-    expect(screen.getByLabelText("Street address")).toHaveValue("");
+    expect(screen.getByLabelText("Street")).toHaveValue("");
     expect(screen.getByLabelText("City")).toHaveValue("");
     expect(screen.getByLabelText("Country")).toHaveValue("");
 
@@ -42,7 +42,7 @@ describe("PropertyForm", () => {
     await waitFor(() => {
       expect(screen.getByText("Title must be at least 5 characters.")).toBeInTheDocument();
       expect(screen.getByText("Write at least 20 characters.")).toBeInTheDocument();
-      expect(screen.getByText("Enter a street address.")).toBeInTheDocument();
+      expect(screen.getByText("Enter a street.")).toBeInTheDocument();
       expect(screen.getByText("Enter a city.")).toBeInTheDocument();
       expect(screen.getByText("Enter a country.")).toBeInTheDocument();
       expect(screen.getByText("Set max guests.")).toBeInTheDocument();
@@ -69,7 +69,8 @@ describe("PropertyForm", () => {
       screen.getByLabelText("Description"),
       "A cozy cabin in the woods with a view.",
     );
-    await userEvent.type(screen.getByLabelText("Street address"), "1240 Lakeshore Dr");
+    await userEvent.type(screen.getByLabelText("Street"), "Lakeshore Dr");
+    await userEvent.type(screen.getByLabelText("House no."), "1240");
     await userEvent.type(screen.getByLabelText("City"), "South Lake Tahoe");
     await userEvent.type(screen.getByLabelText("Country"), "United States");
     await userEvent.type(screen.getByLabelText("Max guests"), "6");
@@ -81,7 +82,10 @@ describe("PropertyForm", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       title: "Pine Ridge Cabin",
       description: "A cozy cabin in the woods with a view.",
-      address: "1240 Lakeshore Dr",
+      street: "Lakeshore Dr",
+      houseNumber: "1240",
+      apartment: null,
+      district: null,
       city: "South Lake Tahoe",
       country: "United States",
       maxGuests: 6,
@@ -98,7 +102,10 @@ describe("PropertyForm", () => {
     const initial: PropertyFormInitial = {
       title: "Old Title",
       description: "An existing description that is long enough.",
-      address: "1 Main St",
+      street: "Main St",
+      houseNumber: "1",
+      apartment: null,
+      district: null,
       city: "Austin",
       country: "United States",
       maxGuests: 4,
@@ -121,7 +128,8 @@ describe("PropertyForm", () => {
     );
 
     expect(screen.getByLabelText("Title")).toHaveValue("Old Title");
-    expect(screen.getByLabelText("Street address")).toHaveValue("1 Main St");
+    expect(screen.getByLabelText("Street")).toHaveValue("Main St");
+    expect(screen.getByLabelText("House no.")).toHaveValue("1");
     expect(screen.getByLabelText("City")).toHaveValue("Austin");
     expect(screen.getByLabelText("Country")).toHaveValue("United States");
     expect(screen.getByLabelText("Max guests")).toHaveValue(4);

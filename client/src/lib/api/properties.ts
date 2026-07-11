@@ -70,7 +70,9 @@ export interface CreatePropertyInput {
   city: string;
   country: string;
   district?: string;
-  address: string;
+  street: string;
+  houseNumber?: string;
+  apartment?: string;
   pricePerNight: number;
   maxGuests: number;
   petsAllowed: boolean;
@@ -79,8 +81,16 @@ export interface CreatePropertyInput {
   rawImagePaths?: string[];
 }
 
-/** PATCH accepts finalized image URLs only — no raw upload paths on update. */
-export type UpdatePropertyInput = Omit<Partial<CreatePropertyInput>, "rawImagePaths">;
+/** PATCH accepts finalized image URLs only — no raw upload paths on update.
+ *  Optional address parts take null so hosts can clear them. */
+export type UpdatePropertyInput = Omit<
+  Partial<CreatePropertyInput>,
+  "rawImagePaths" | "district" | "houseNumber" | "apartment"
+> & {
+  district?: string | null;
+  houseNumber?: string | null;
+  apartment?: string | null;
+};
 
 type UploadImagesBody =
   paths["/properties/images"]["post"]["requestBody"]["content"]["multipart/form-data"];

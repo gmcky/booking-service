@@ -38,7 +38,11 @@ const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export interface PropertyFormValues {
   title: string;
   description: string;
-  address: string;
+  street: string;
+  /** Empty inputs come out as null so edits can clear the field. */
+  houseNumber: string | null;
+  apartment: string | null;
+  district: string | null;
   city: string;
   country: string;
   maxGuests: number;
@@ -53,7 +57,10 @@ export interface PropertyFormValues {
 export interface PropertyFormInitial {
   title: string;
   description: string;
-  address: string;
+  street: string;
+  houseNumber: string | null;
+  apartment: string | null;
+  district: string | null;
   city: string;
   country: string;
   maxGuests: number;
@@ -88,7 +95,10 @@ export function PropertyForm({
   const isEdit = Boolean(initial);
   const [title, setTitle] = React.useState(initial?.title ?? "");
   const [description, setDescription] = React.useState(initial?.description ?? "");
-  const [address, setAddress] = React.useState(initial?.address ?? "");
+  const [street, setStreet] = React.useState(initial?.street ?? "");
+  const [houseNumber, setHouseNumber] = React.useState(initial?.houseNumber ?? "");
+  const [apartment, setApartment] = React.useState(initial?.apartment ?? "");
+  const [district, setDistrict] = React.useState(initial?.district ?? "");
   const [city, setCity] = React.useState(initial?.city ?? "");
   const [country, setCountry] = React.useState(initial?.country ?? "");
   const [maxGuests, setMaxGuests] = React.useState(initial ? String(initial.maxGuests) : "");
@@ -175,7 +185,7 @@ export function PropertyForm({
     const next: Record<string, string> = {};
     if (title.trim().length < 5) next.title = "Title must be at least 5 characters.";
     if (description.trim().length < 20) next.description = "Write at least 20 characters.";
-    if (address.trim().length < 5) next.address = "Enter a street address.";
+    if (street.trim().length < 2) next.street = "Enter a street.";
     if (city.trim().length < 2) next.city = "Enter a city.";
     if (country.trim().length < 2) next.country = "Enter a country.";
     if (!(Number(maxGuests) > 0)) next.maxGuests = "Set max guests.";
@@ -193,7 +203,10 @@ export function PropertyForm({
     onSubmit({
       title: title.trim(),
       description: description.trim(),
-      address: address.trim(),
+      street: street.trim(),
+      houseNumber: houseNumber.trim() || null,
+      apartment: apartment.trim() || null,
+      district: district.trim() || null,
       city: city.trim(),
       country: country.trim(),
       maxGuests: Number(maxGuests),
@@ -239,13 +252,39 @@ export function PropertyForm({
         <Card className="p-6">
           <h2 className="mb-[18px] text-[17px] font-semibold tracking-tight">Location</h2>
           <div className="flex flex-col gap-4">
-            <Field label="Street address" htmlFor="addr" error={errors.address}>
+            <div className="grid gap-3.5 sm:grid-cols-[1fr_100px_100px]">
+              <Field label="Street" htmlFor="street" error={errors.street}>
+                <Input
+                  id="street"
+                  placeholder="Lakeshore Dr"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  aria-invalid={Boolean(errors.street)}
+                />
+              </Field>
+              <Field label="House no." htmlFor="house">
+                <Input
+                  id="house"
+                  placeholder="1240"
+                  value={houseNumber}
+                  onChange={(e) => setHouseNumber(e.target.value)}
+                />
+              </Field>
+              <Field label="Apt (optional)" htmlFor="apt">
+                <Input
+                  id="apt"
+                  placeholder="12"
+                  value={apartment}
+                  onChange={(e) => setApartment(e.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="District (optional)" htmlFor="district">
               <Input
-                id="addr"
-                placeholder="1240 Lakeshore Dr"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                aria-invalid={Boolean(errors.address)}
+                id="district"
+                placeholder="e.g. Podil"
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
               />
             </Field>
             <Field label="City" htmlFor="city" error={errors.city}>
@@ -266,6 +305,10 @@ export function PropertyForm({
                 aria-invalid={Boolean(errors.country)}
               />
             </Field>
+            <p className="text-[13px] text-muted-foreground">
+              We place your listing on the map from this address — the more
+              precise it is, the more accurate the pin.
+            </p>
           </div>
         </Card>
 

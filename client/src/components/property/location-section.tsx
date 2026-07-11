@@ -1,5 +1,6 @@
 import { MapPin } from "lucide-react";
 import type { PropertyDetail } from "@/lib/api/properties";
+import { formatStreetAddress } from "@/lib/utils/address";
 
 export function LocationSection({ property }: { property: PropertyDetail }) {
   const locality = [property.district, property.city, property.country]
@@ -13,7 +14,7 @@ export function LocationSection({ property }: { property: PropertyDetail }) {
         <MapPin className="size-[17px] shrink-0 text-muted-foreground" />
         {locality}
       </p>
-      <p className="mt-1 text-sm text-muted-foreground">{property.address}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{formatStreetAddress(property)}</p>
     </div>
   );
 }

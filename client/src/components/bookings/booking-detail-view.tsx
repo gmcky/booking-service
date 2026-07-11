@@ -14,6 +14,7 @@ import { CancelBookingDialog } from "@/components/bookings/cancel-booking-dialog
 import { bookingApi, type BookingDetail, type BookingStatus } from "@/lib/api/bookings";
 import { paymentStatusLabel } from "@/lib/api/labels";
 import { formatPrice } from "@/lib/utils/money";
+import { formatStreetAddress } from "@/lib/utils/address";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { formatRange, isoToLocalDate } from "@/lib/utils/dates";
 import {
@@ -229,7 +230,7 @@ function BookingDetailBody({
               value={`${booking.guests} ${booking.guests === 1 ? "guest" : "guests"}`}
               icon={<Users className="size-3.5" />}
             />
-            <DetailRow label="Address" value={booking.property.address} />
+            <DetailRow label="Address" value={formatStreetAddress(booking.property)} />
           </dl>
         </section>
 
