@@ -190,9 +190,9 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       const totalPages = last.pagination.totalPages ?? page;
       return page < totalPages ? page + 1 : undefined;
     },
-    // Map-driven refetches keep the previous list on screen instead of
-    // flashing a skeleton on every pan.
-    placeholderData: keepPreviousData,
+    // No placeholderData here on purpose: a map-driven refetch should show
+    // the skeleton grid (stale cards for a different area are misleading).
+    // The map's markers are the opposite case — see markersQuery.
   });
 
   // The map draws every match in the filter set, not the loaded list pages —
@@ -205,6 +205,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     queryKey: queryKeys.properties.mapMarkers(markerFilters),
     queryFn: () => propertyApi.mapMarkers(markerFilters),
     enabled: mapMode === "split",
+    // Pins must not vanish mid-pan while the next viewport's set loads.
     placeholderData: keepPreviousData,
   });
 
