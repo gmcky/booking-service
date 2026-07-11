@@ -1352,6 +1352,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/properties/map-markers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All matching map markers (no pagination) for the browse map */
+        get: {
+            parameters: {
+                query?: {
+                    city?: string;
+                    country?: string;
+                    district?: string;
+                    ownerId?: string;
+                    type?: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
+                    /** @description CSV of Amenity enum values */
+                    amenities?: string;
+                    minPrice?: number;
+                    maxPrice?: number;
+                    maxGuests?: number;
+                    petsAllowed?: boolean;
+                    infantsAllowed?: boolean;
+                    checkIn?: string;
+                    checkOut?: string;
+                    /** @description Bounding-box filter — provide all four of minLat/maxLat/minLng/maxLng together */
+                    minLat?: number;
+                    maxLat?: number;
+                    minLng?: number;
+                    maxLng?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Markers for every active listing matching the filters, capped at 500 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyMapMarker"][];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/properties/locations": {
         parameters: {
             query?: never;
@@ -2633,6 +2690,17 @@ export interface components {
         };
         PropertyWithOwner: components["schemas"]["Property"] & {
             owner: components["schemas"]["PropertyOwner"];
+        };
+        PropertyMapMarker: {
+            id: string;
+            title: string;
+            latitude: number;
+            longitude: number;
+            /** @description Decimal serialized as string */
+            pricePerNight: string;
+            /** @description Decimal serialized as string */
+            averageRating: string | null;
+            images: string[];
         };
         PropertyReview: {
             id: string;

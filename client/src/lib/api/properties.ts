@@ -25,6 +25,7 @@ export type Amenity = components["schemas"]["Amenity"];
 export type PropertySort = "price_asc" | "price_desc" | "newest";
 
 export type Property = components["schemas"]["PropertyWithOwner"];
+export type PropertyMapMarker = components["schemas"]["PropertyMapMarker"];
 export type PropertyDetail = components["schemas"]["PropertyDetail"];
 export type PropertyReview = components["schemas"]["PropertyReview"];
 export type HostProperty = components["schemas"]["Property"];
@@ -103,6 +104,33 @@ export const propertyApi = {
           sort: query.sort,
           page: query.page,
           limit: query.limit,
+          checkIn: query.checkIn,
+          checkOut: query.checkOut,
+          minLat: query.minLat,
+          maxLat: query.maxLat,
+          minLng: query.minLng,
+          maxLng: query.maxLng,
+        },
+      },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  /** Every match in the filter set (typically a map bbox), no pagination. */
+  mapMarkers: async (query: PropertyQuery = {}): Promise<PropertyMapMarker[]> => {
+    const { data, error, response } = await apiClient.GET("/properties/map-markers", {
+      params: {
+        query: {
+          city: query.city,
+          country: query.country,
+          district: query.district,
+          type: query.type,
+          amenities: query.amenities?.length ? query.amenities.join(",") : undefined,
+          minPrice: query.minPrice,
+          maxPrice: query.maxPrice,
+          maxGuests: query.maxGuests,
+          petsAllowed: query.petsAllowed,
+          infantsAllowed: query.infantsAllowed,
           checkIn: query.checkIn,
           checkOut: query.checkOut,
           minLat: query.minLat,

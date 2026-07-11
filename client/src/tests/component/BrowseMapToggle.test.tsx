@@ -15,6 +15,7 @@ vi.mock("@/lib/api/properties", () => ({
   propertyApi: {
     search: vi.fn(),
     locations: vi.fn(),
+    mapMarkers: vi.fn(),
   },
 }));
 
@@ -67,6 +68,7 @@ describe("BrowseView map toggle", () => {
       pagination: { page: 1, limit: 12, total: 1, totalPages: 1 },
     });
     vi.mocked(propertyApi.locations).mockResolvedValue([]);
+    vi.mocked(propertyApi.mapMarkers).mockResolvedValue([]);
   });
 
   it("defaults to split view (map panel present) and toggles to list-only", async () => {

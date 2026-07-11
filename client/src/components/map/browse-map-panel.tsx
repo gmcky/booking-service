@@ -8,24 +8,16 @@ import { BaseMap, type MapBounds } from "@/components/map/base-map";
 import { PriceMarkers } from "@/components/map/price-markers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { formatPrice, formatRating } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
-import type { Property } from "@/lib/api/properties";
+import type { PropertyMapMarker } from "@/lib/api/properties";
 
 const SEARCH_AS_MOVE_DEBOUNCE_MS = 500;
 
-type GeoProperty = Property & { latitude: number; longitude: number };
-
-function hasCoords(property: Property): property is GeoProperty {
-  return property.latitude != null && property.longitude != null;
-}
-
-function boundsOf(properties: GeoProperty[]): [[number, number], [number, number]] | undefined {
-  if (properties.length === 0) return undefined;
+function boundsOf(markers: PropertyMapMarker[]): [[number, number], [number, number]] | undefined {
+  if (markers.length === 0) return undefined;
   const bounds = new maplibregl.LngLatBounds();
-  for (const p of properties) bounds.extend([p.longitude, p.latitude]);
+  for (const m of markers) bounds.extend([m.longitude, m.latitude]);
   return [
     [bounds.getWest(), bounds.getSouth()],
     [bounds.getEast(), bounds.getNorth()],
@@ -33,67 +25,73 @@ function boundsOf(properties: GeoProperty[]): [[number, number], [number, number
 }
 
 export interface BrowseMapPanelProps {
-  properties: Property[];
+  markers: PropertyMapMarker[];
+  /** True while the markers query for the current filters is still loading. */
+  markersPending: boolean;
   hoveredId: string | null;
   onHoverChange: (id: string | null) => void;
   selectedId: string | null;
   onSelectChange: (id: string | null) => void;
-  searchAsMove: boolean;
-  onSearchAsMoveChange: (checked: boolean) => void;
-  /** Debounced (search-as-I-move) or immediate ("Search this area") bbox push into the URL. */
+  /** Debounced bbox push into the URL — the list always follows the map. */
   onBoundsChange: (bounds: MapBounds) => void;
   /** Collapses the map back to list-only view. */
   onCollapse: () => void;
   /**
+   * Camera restore for remounts (page reload, map reopened) while a bbox
+   * search is active — [[west, south], [east, north]].
+   */
+  initialBounds?: [[number, number], [number, number]];
+  /**
    * Changes only when a "real" new search happened (filters other than the
-   * map's own bbox) — re-fits the camera to the new result set, unless the
-   * user has since panned the map by hand.
+   * map's own bbox); empty while a bbox drives the search. On change the
+   * camera re-fits to the new result set once its markers arrive.
    */
   fitBoundsKey: string;
 }
 
 export function BrowseMapPanel({
-  properties,
+  markers,
+  markersPending,
   hoveredId,
   onHoverChange,
   selectedId,
   onSelectChange,
-  searchAsMove,
-  onSearchAsMoveChange,
   onBoundsChange,
   onCollapse,
+  initialBounds,
   fitBoundsKey,
 }: BrowseMapPanelProps) {
   const [map, setMap] = React.useState<maplibregl.Map | null>(null);
-  const [pendingBounds, setPendingBounds] = React.useState<MapBounds | null>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFitKeyRef = React.useRef<string | null>(null);
 
-  const geoProperties = React.useMemo(() => properties.filter(hasCoords), [properties]);
-  const selected = geoProperties.find((p) => p.id === selectedId) ?? null;
+  const selected = markers.find((m) => m.id === selectedId) ?? null;
 
-  // New search (city/filters/sort changed, not a map pan) — refit to results.
-  // A new search also drops bbox params, so yanking the camera is correct;
-  // pans that keep the current search (bbox-only changes) never land here.
+  // New search (city/filters changed, not a map pan) — refit to results once
+  // per key, and only after the markers for that search have arrived. Pans
+  // keep fitBoundsKey empty, so the camera is never yanked mid-exploration.
   React.useEffect(() => {
-    setPendingBounds(null);
-    if (!map) return;
-    const bounds = boundsOf(geoProperties);
+    // A pan (empty key) resets the gate: re-running the previous named
+    // search afterwards must still yank the camera back to its results.
+    if (!fitBoundsKey) {
+      lastFitKeyRef.current = null;
+      return;
+    }
+    if (!map || markersPending) return;
+    if (lastFitKeyRef.current === fitBoundsKey) return;
+    lastFitKeyRef.current = fitBoundsKey;
+    const bounds = boundsOf(markers);
     if (bounds) {
       map.fitBounds(bounds, { padding: 64, animate: false, maxZoom: 15 });
     }
-    // Only re-fit on an actual new search or once the map first becomes ready.
+    // Markers themselves aren't a refit trigger — only the key flipping is.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fitBoundsKey, map]);
+  }, [fitBoundsKey, map, markersPending]);
 
   function handleMoveEnd(bounds: MapBounds, isUserGesture: boolean) {
     if (!isUserGesture) return;
-
-    if (searchAsMove) {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => onBoundsChange(bounds), SEARCH_AS_MOVE_DEBOUNCE_MS);
-    } else {
-      setPendingBounds(bounds);
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => onBoundsChange(bounds), SEARCH_AS_MOVE_DEBOUNCE_MS);
   }
 
   React.useEffect(() => {
@@ -102,17 +100,12 @@ export function BrowseMapPanel({
     };
   }, []);
 
-  function handleSearchThisArea() {
-    if (!pendingBounds) return;
-    onBoundsChange(pendingBounds);
-    setPendingBounds(null);
-  }
-
   const rating = selected ? formatRating(selected.averageRating) : null;
 
   return (
     <div className="relative size-full overflow-hidden rounded-xl">
       <BaseMap
+        bounds={initialBounds}
         onMapReady={setMap}
         onMoveEnd={handleMoveEnd}
         onMapClick={() => onSelectChange(null)}
@@ -121,14 +114,14 @@ export function BrowseMapPanel({
 
       <PriceMarkers
         map={map}
-        properties={geoProperties}
+        properties={markers}
         selectedId={selectedId}
         hoveredId={hoveredId}
         onSelect={onSelectChange}
         onHover={onHoverChange}
       />
 
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+      <div className="absolute top-3 left-3 z-10">
         <Button
           variant="secondary"
           size="icon"
@@ -138,32 +131,7 @@ export function BrowseMapPanel({
         >
           <ChevronsRight className="size-4" />
         </Button>
-        <Card className="flex-row items-center gap-2 px-3 py-2 shadow-md">
-          <Switch
-            id="search-as-move"
-            checked={searchAsMove}
-            onCheckedChange={(checked) => {
-              onSearchAsMoveChange(checked);
-              if (!checked && debounceRef.current) clearTimeout(debounceRef.current);
-              if (checked && pendingBounds) {
-                onBoundsChange(pendingBounds);
-                setPendingBounds(null);
-              }
-            }}
-          />
-          <Label htmlFor="search-as-move" className="text-xs font-medium">
-            Search as I move the map
-          </Label>
-        </Card>
       </div>
-
-      {!searchAsMove && pendingBounds ? (
-        <div className="absolute top-3 left-1/2 z-10 -translate-x-1/2">
-          <Button size="sm" className="shadow-md" onClick={handleSearchThisArea}>
-            Search this area
-          </Button>
-        </div>
-      ) : null}
 
       {selected ? (
         <Card className="absolute bottom-3 left-3 z-10 w-64 gap-0 overflow-hidden p-0 shadow-lg">
