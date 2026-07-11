@@ -271,8 +271,8 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       <main
         className={
           mapMode === "split"
-            ? "mx-auto w-full max-w-[1600px] px-6 pt-6"
-            : "mx-auto w-full max-w-[1180px] px-6 pt-6"
+            ? "mx-auto w-full max-w-[1600px] px-6 pt-6 lg:pb-24"
+            : "mx-auto w-full max-w-[1180px] px-6 pt-6 lg:pb-24"
         }
       >
         <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
