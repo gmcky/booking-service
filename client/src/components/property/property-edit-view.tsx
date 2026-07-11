@@ -25,8 +25,14 @@ export function PropertyEditView({ id }: { id: string }) {
   const mutation = useMutation({
     mutationFn: (values: PropertyFormValues) => {
       // PATCH takes finalized image URLs only; photos stay unchanged on edit.
-      const { rawImagePaths: _ignored, ...rest } = values;
-      return propertyApi.update(id, rest);
+      // Coordinates go out only when a suggestion pinned them this session —
+      // null means "let the backend decide", not "clear".
+      const { rawImagePaths: _ignored, latitude, longitude, ...rest } = values;
+      return propertyApi.update(id, {
+        ...rest,
+        latitude: latitude ?? undefined,
+        longitude: longitude ?? undefined,
+      });
     },
     onSuccess: () => {
       toast.success("Listing updated");

@@ -5,6 +5,7 @@ import type {
   updatePropertySchema,
   propertyQuerySchema,
   mapMarkersQuerySchema,
+  addressSuggestQuerySchema,
 } from "./property.validators.js";
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema> & {
@@ -16,6 +17,8 @@ export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
 export type PropertyQueryInput = z.infer<typeof propertyQuerySchema>;
 
 export type MapMarkersQueryInput = z.infer<typeof mapMarkersQuerySchema>;
+
+export type AddressSuggestQueryInput = z.infer<typeof addressSuggestQuerySchema>;
 
 export interface PropertyFilters {
   city?: string;

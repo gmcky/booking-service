@@ -22,6 +22,105 @@ interface NominatimHit {
   lon: string;
 }
 
+/** One selectable autocomplete entry, already normalized to English. */
+export interface AddressSuggestion {
+  label: string;
+  street: string;
+  houseNumber: string | null;
+  district: string | null;
+  city: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface PhotonFeature {
+  geometry?: { coordinates?: [number, number] };
+  properties?: {
+    type?: string;
+    name?: string;
+    housenumber?: string;
+    street?: string;
+    district?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    country?: string;
+  };
+}
+
+/**
+ * Search-as-you-type suggestions via Photon (Nominatim's usage policy
+ * forbids autocomplete; Photon is OSM data built for it). `lang=en`
+ * normalizes results to English regardless of the input script, so a host
+ * typing "Хрещатик" is offered "Khreshchatyk Street". Only street- and
+ * house-level features qualify — a suggestion must pin an exact spot.
+ */
+export async function suggestAddresses(query: string, limit: number): Promise<AddressSuggestion[]> {
+  const url = new URL(env.PHOTON_URL);
+  url.search = new URLSearchParams({
+    q: query,
+    lang: "en",
+    // Over-fetch: non-street features get filtered out below.
+    limit: String(limit * 3),
+  }).toString();
+
+  const res = await fetch(url, {
+    headers: { "User-Agent": env.GEOCODER_USER_AGENT },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    logger.warn({ status: res.status }, "Photon rejected suggestion request");
+    return [];
+  }
+
+  const body = (await res.json()) as { features?: PhotonFeature[] };
+  const suggestions: AddressSuggestion[] = [];
+  const seen = new Set<string>();
+
+  for (const feature of body.features ?? []) {
+    const props = feature.properties ?? {};
+    const [longitude, latitude] = feature.geometry?.coordinates ?? [];
+    if (latitude === undefined || longitude === undefined) continue;
+
+    const isHouse = props.type === "house" && Boolean(props.street);
+    const isStreet = props.type === "street" && Boolean(props.name);
+    if (!isHouse && !isStreet) continue;
+
+    const street = (isHouse ? props.street : props.name) as string;
+    const city = props.city ?? props.town ?? props.village;
+    if (!city || !props.country) continue;
+
+    const houseNumber = (isHouse && props.housenumber) || null;
+    const label = [
+      houseNumber ? `${street} ${houseNumber}` : street,
+      props.district,
+      city,
+      props.country,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    if (seen.has(label)) continue;
+    seen.add(label);
+
+    suggestions.push({
+      label,
+      street,
+      houseNumber,
+      district: props.district ?? null,
+      city,
+      country: props.country,
+      latitude,
+      longitude,
+    });
+    if (suggestions.length >= limit) break;
+  }
+
+  return suggestions;
+}
+
 async function queryNominatim(params: Record<string, string>): Promise<GeocodeResult | null> {
   const url = new URL(env.GEOCODER_URL);
   url.search = new URLSearchParams({ format: "jsonv2", limit: "1", ...params }).toString();

@@ -18,12 +18,21 @@ export default function HostListingPage() {
 
   const mutation = useMutation({
     // Create takes optional fields as absent, not null (only PATCH clears).
-    mutationFn: ({ houseNumber, apartment, district, ...values }: PropertyFormValues) =>
+    mutationFn: ({
+      houseNumber,
+      apartment,
+      district,
+      latitude,
+      longitude,
+      ...values
+    }: PropertyFormValues) =>
       propertyApi.create({
         ...values,
         houseNumber: houseNumber ?? undefined,
         apartment: apartment ?? undefined,
         district: district ?? undefined,
+        latitude: latitude ?? undefined,
+        longitude: longitude ?? undefined,
       }),
     onSuccess: () => {
       toast.success("Listing published");
