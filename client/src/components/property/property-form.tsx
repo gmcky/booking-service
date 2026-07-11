@@ -221,9 +221,11 @@ export function PropertyForm({
   }, [street, suggestOpen]);
 
   function applySuggestion(s: AddressSuggestion) {
+    // Full overwrite, including clears: a leftover house number from a
+    // previous street would silently mismatch the pinned coordinates.
     setStreet(s.street);
-    if (s.houseNumber) setHouseNumber(s.houseNumber);
-    if (s.district) setDistrict(s.district);
+    setHouseNumber(s.houseNumber ?? "");
+    setDistrict(s.district ?? "");
     setCity(s.city);
     setCountry(s.country);
     setPickedCoords({ latitude: s.latitude, longitude: s.longitude });

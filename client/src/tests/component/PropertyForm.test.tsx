@@ -169,6 +169,10 @@ describe("PropertyForm", () => {
       />,
     );
 
+    // Stale house number from before the pick must be cleared by the pick —
+    // otherwise it silently mismatches the pinned coordinates.
+    await userEvent.type(screen.getByLabelText("House no."), "7");
+
     // Cyrillic input; the suggestion arrives already normalized to English.
     await userEvent.type(screen.getByLabelText("Street"), "Хрещатик");
     const option = await screen.findByText(
@@ -177,6 +181,7 @@ describe("PropertyForm", () => {
     await userEvent.click(option);
 
     expect(screen.getByLabelText("Street")).toHaveValue("Khreshchatyk Street");
+    expect(screen.getByLabelText("House no.")).toHaveValue("");
     expect(screen.getByLabelText("District (optional)")).toHaveValue("Pecherskyi district");
     expect(screen.getByLabelText("City")).toHaveValue("Kyiv");
     expect(screen.getByLabelText("Country")).toHaveValue("Ukraine");
