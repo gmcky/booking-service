@@ -61,34 +61,45 @@ export function PriceMarkers({
       const existing = markers.get(property.id);
       if (existing) {
         existing.setLngLat([property.longitude, property.latitude]);
-        const el = existing.getElement();
-        if (el.textContent !== label) el.textContent = label;
-        el.setAttribute("aria-label", `${label} per night, view listing`);
+        const pill = pillOf(existing);
+        if (pill.textContent !== label) pill.textContent = label;
+        pill.setAttribute("aria-label", `${label} per night, view listing`);
         continue;
       }
 
+      // The marker element belongs to maplibre — it adds the
+      // "maplibregl-marker" class (position: absolute) and positions via
+      // inline transform. The pill lives on a child element so our styling
+      // (and className rewrites on state sync) never clobbers that.
       const el = document.createElement("div");
-      el.textContent = label;
-      el.className = pillClassName({ selected: false, hovered: false });
-      el.setAttribute("role", "button");
-      el.setAttribute("tabindex", "0");
-      el.setAttribute("aria-label", `${label} per night, view listing`);
-      el.addEventListener("click", (e) => {
+      const pill = document.createElement("div");
+      pill.textContent = label;
+      pill.className = pillClassName({ selected: false, hovered: false });
+      pill.setAttribute("role", "button");
+      pill.setAttribute("tabindex", "0");
+      pill.setAttribute("aria-label", `${label} per night, view listing`);
+      pill.addEventListener("click", (e) => {
         e.stopPropagation();
         onSelectRef.current?.(property.id);
       });
-      el.addEventListener("keydown", (e) => {
+      pill.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelectRef.current?.(property.id);
         }
       });
-      el.addEventListener("mouseenter", () => onHoverRef.current?.(property.id));
-      el.addEventListener("mouseleave", () => onHoverRef.current?.(null));
+      pill.addEventListener("mouseenter", () => onHoverRef.current?.(property.id));
+      pill.addEventListener("mouseleave", () => onHoverRef.current?.(null));
+      el.appendChild(pill);
 
       const marker = new maplibregl.Marker({ element: el, anchor: "center" })
         .setLngLat([property.longitude, property.latitude])
         .addTo(map);
+      // addTo() gives the marker root role="button" / aria-label="Map marker"
+      // (only when absent, so this strip is one-time). The pill child is the
+      // real control — keeping both would nest interactive elements.
+      el.removeAttribute("role");
+      el.removeAttribute("aria-label");
       markers.set(property.id, marker);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,11 +108,10 @@ export function PriceMarkers({
   // Style sync only — selected/hovered state never recreates a marker.
   React.useEffect(() => {
     for (const [id, marker] of markersRef.current) {
-      const el = marker.getElement();
       const selected = id === selectedId;
       const hovered = id === hoveredId;
-      el.className = pillClassName({ selected, hovered });
-      el.style.zIndex = selected || hovered ? "10" : "0";
+      pillOf(marker).className = pillClassName({ selected, hovered });
+      marker.getElement().style.zIndex = selected || hovered ? "10" : "0";
     }
   }, [selectedId, hoveredId, properties]);
 
@@ -115,6 +125,10 @@ export function PriceMarkers({
   }, [map]);
 
   return null;
+}
+
+function pillOf(marker: maplibregl.Marker): HTMLElement {
+  return marker.getElement().firstElementChild as HTMLElement;
 }
 
 function pillClassName({ selected, hovered }: { selected: boolean; hovered: boolean }): string {

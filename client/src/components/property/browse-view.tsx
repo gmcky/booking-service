@@ -350,6 +350,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
               searchAsMove={searchAsMove}
               onSearchAsMoveChange={setSearchAsMove}
               onBoundsChange={updateBounds}
+              onCollapse={() => setMapMode("list")}
               fitBoundsKey={fitBoundsKey}
             />
           </div>

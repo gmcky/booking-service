@@ -35,6 +35,26 @@ function isChipActive(chip: QuickChip, filters: PropertyQuery): boolean {
 }
 
 export function QuickFilters({ filters, activeFilterCount, onApply, onOpenFilters }: QuickFiltersProps) {
+  const scrollerRef = React.useRef<HTMLDivElement>(null);
+  // Chips scroll horizontally with the scrollbar hidden — without a fade at
+  // the clipped edge the row looks abruptly cut off by whatever sits next
+  // to it (e.g. the map panel in split view).
+  const [clippedRight, setClippedRight] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => setClippedRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 1);
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, []);
+
   function toggleChip(chip: QuickChip) {
     if (chip.kind === "pets") {
       onApply({ ...filters, petsAllowed: filters.petsAllowed ? undefined : true });
@@ -67,26 +87,34 @@ export function QuickFilters({ filters, activeFilterCount, onApply, onOpenFilter
 
       <div className="h-6 w-px shrink-0 bg-border" />
 
-      <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {QUICK_CHIPS.map((chip) => {
-          const active = isChipActive(chip, filters);
-          return (
-            <button
-              key={chip.label}
-              type="button"
-              onClick={() => toggleChip(chip)}
-              aria-pressed={active}
-              className={cn(
-                "shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
-                active
-                  ? "border-foreground ring-1 ring-inset ring-foreground"
-                  : "border-border hover:border-foreground/50",
-              )}
-            >
-              {chip.label}
-            </button>
-          );
-        })}
+      <div className="relative min-w-0 flex-1">
+        <div
+          ref={scrollerRef}
+          className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {QUICK_CHIPS.map((chip) => {
+            const active = isChipActive(chip, filters);
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => toggleChip(chip)}
+                aria-pressed={active}
+                className={cn(
+                  "shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
+                  active
+                    ? "border-foreground ring-1 ring-inset ring-foreground"
+                    : "border-border hover:border-foreground/50",
+                )}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+        {clippedRight ? (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background to-transparent" />
+        ) : null}
       </div>
     </div>
   );
