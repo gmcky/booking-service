@@ -217,7 +217,18 @@ export function PropertyForm({
     3,
   );
 
+  // City the street block was auto-filled for. Lets a later city pick tell
+  // "street belongs to another city, clear it" apart from "host typed the
+  // street by hand, keep it". Null once the host edits the street manually.
+  const streetPickCityRef = React.useRef<string | null>(null);
+
   function pickCity(s: AddressSuggestion) {
+    if (streetPickCityRef.current && streetPickCityRef.current !== s.city) {
+      setStreet("");
+      setHouseNumber("");
+      setDistrict("");
+      streetPickCityRef.current = null;
+    }
     setCity(s.city);
     setCountry(s.country);
     setPickedCoords(null);
@@ -232,6 +243,7 @@ export function PropertyForm({
     setCity(s.city);
     setCountry(s.country);
     setPickedCoords({ latitude: s.latitude, longitude: s.longitude });
+    streetPickCityRef.current = s.city;
   }
 
   function toggleAmenity(value: string) {
@@ -355,6 +367,7 @@ export function PropertyForm({
                   onValueChange={(v) => {
                     setStreet(v);
                     setPickedCoords(null);
+                    streetPickCityRef.current = null;
                   }}
                   onPick={pickStreet}
                 />

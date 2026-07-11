@@ -287,6 +287,57 @@ describe("PropertyForm", () => {
     });
   });
 
+  it("picking a different city after a street pick clears the stale street block", async () => {
+    const { propertyApi } = await import("@/lib/api/properties");
+    const streetSuggestion = {
+      label: "Rynok Square 24, Lviv, Ukraine",
+      street: "Rynok Square",
+      houseNumber: "24",
+      district: "Halytskyi",
+      city: "Lviv",
+      country: "Ukraine",
+      latitude: 49.8419,
+      longitude: 24.0315,
+    };
+    const citySuggestion = {
+      label: "Kyiv, Ukraine",
+      street: null,
+      houseNumber: null,
+      district: null,
+      city: "Kyiv",
+      country: "Ukraine",
+      latitude: 50.4501,
+      longitude: 30.5234,
+    };
+    (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_q: string, opts?: { kind?: string }) =>
+        opts?.kind === "city" ? [citySuggestion] : [streetSuggestion],
+    );
+    renderWithClient(
+      <PropertyForm
+        submitLabel="Publish listing"
+        pendingLabel="Publishing…"
+        pending={false}
+        formError=""
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText("Street"), "Ринок");
+    await userEvent.click(await screen.findByText("Rynok Square 24, Lviv, Ukraine"));
+    expect(screen.getByLabelText("House no.")).toHaveValue("24");
+
+    await userEvent.clear(screen.getByLabelText("City"));
+    await userEvent.type(screen.getByLabelText("City"), "Kyi");
+    await userEvent.click(await screen.findByText("Kyiv, Ukraine"));
+
+    // Street block belonged to Lviv — it must not survive the city switch.
+    expect(screen.getByLabelText("Street")).toHaveValue("");
+    expect(screen.getByLabelText("House no.")).toHaveValue("");
+    expect(screen.getByLabelText("District (optional)")).toHaveValue("");
+    expect(screen.getByLabelText("City")).toHaveValue("Kyiv");
+  });
+
   it("uploading a photo shows a preview once the upload resolves", async () => {
     const { propertyApi } = await import("@/lib/api/properties");
     (propertyApi.uploadImages as ReturnType<typeof vi.fn>).mockResolvedValue({

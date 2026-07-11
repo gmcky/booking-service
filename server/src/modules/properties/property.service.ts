@@ -254,7 +254,16 @@ export class PropertyService {
    * from cache instead of hammering the public instance.
    */
   static async suggestAddresses(query: string, options: SuggestOptions) {
-    const cacheKey = `geo:suggest:${hashKey({ query: query.toLowerCase(), options })}`;
+    // Constraints are matched case-insensitively downstream — normalize the
+    // key the same way so "Ukraine" and "ukraine" share a cache entry.
+    const cacheKey = `geo:suggest:${hashKey({
+      query: query.toLowerCase(),
+      options: {
+        ...options,
+        country: options.country?.toLowerCase(),
+        city: options.city?.toLowerCase(),
+      },
+    })}`;
     const cached = await cacheGet(cacheKey);
     if (cached) return cached;
 

@@ -14,9 +14,14 @@ const properties = await prisma.property.findMany({
   select: { id: true, title: true, city: true },
 });
 
-await prisma.property.updateMany({ data: { latitude: null, longitude: null } });
-
+// Clear-then-enqueue per property (the worker skips listings that still
+// have coordinates): a crash mid-run leaves earlier rows queued and later
+// rows untouched, so rerunning the script simply resumes.
 for (const property of properties) {
+  await prisma.property.update({
+    where: { id: property.id },
+    data: { latitude: null, longitude: null },
+  });
   await geocodeQueue.add("geocode-property", { propertyId: property.id });
 }
 
