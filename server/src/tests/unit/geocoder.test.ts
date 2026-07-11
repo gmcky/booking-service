@@ -1,4 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// Real config/env validates the full env at import time and CI has no .env —
+// every other unit suite dodges it by mocking the modules that pull it in.
+vi.mock("../../config/env.js", () => ({
+  env: {
+    GEOCODER_URL: "https://geocoder.test/search",
+    GEOCODER_USER_AGENT: "test-agent/1.0",
+    PHOTON_URL: "https://photon.test/api",
+  },
+}));
+
+vi.mock("../../shared/lib/logger.js", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 import { geocodeAddress, suggestAddresses } from "../../shared/lib/geocoder.js";
 
 const fetchMock = vi.fn();
