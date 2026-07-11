@@ -9,6 +9,7 @@ import { PriceMarkers } from "@/components/map/price-markers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatPrice, formatRating } from "@/lib/utils/money";
+import { isMinorMove } from "@/lib/utils/map-bounds";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import type { PropertyMapMarker } from "@/lib/api/properties";
 
@@ -95,10 +96,18 @@ export function BrowseMapPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitBoundsKey, map, markersPending]);
 
+  const lastSentBoundsRef = React.useRef<MapBounds | null>(null);
+
   function handleMoveEnd(bounds: MapBounds, isUserGesture: boolean) {
     if (!isUserGesture) return;
+    // Micro-drags and inertia wobble don't change what the user sees —
+    // skipping them saves two API requests per twitch.
+    if (lastSentBoundsRef.current && isMinorMove(lastSentBoundsRef.current, bounds)) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => onBoundsChange(bounds), SEARCH_AS_MOVE_DEBOUNCE_MS);
+    debounceRef.current = setTimeout(() => {
+      lastSentBoundsRef.current = bounds;
+      onBoundsChange(bounds);
+    }, SEARCH_AS_MOVE_DEBOUNCE_MS);
   }
 
   React.useEffect(() => {
