@@ -27,6 +27,10 @@ vi.mock("../../shared/queues/cleanup.queue.js", () => ({
   cleanupQueue: { add: vi.fn().mockResolvedValue(undefined) },
 }));
 
+vi.mock("../../shared/queues/geocode.queue.js", () => ({
+  geocodeQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
 vi.mock("../../modules/users/user.stats.cache.js", () => ({
   invalidateUserStatsCache: vi.fn().mockResolvedValue(undefined),
 }));

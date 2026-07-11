@@ -14,7 +14,9 @@ http:
         "description": "Это тестовое описание, которое специально сделано длиннее двадцати символов, чтобы Zod валидатор пропустил запрос.",
         "type": "HOUSE",
         "city": "Kyiv",
-        "address": "123 Async Worker Street",
+        "country": "Ukraine",
+        "street": "Async Worker Street",
+        "houseNumber": "123",
         "pricePerNight": 150,
         "maxGuests": 4,
         "amenities": [

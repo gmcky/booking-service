@@ -237,7 +237,7 @@ propertyRouter.post(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [title, description, type, city, country, address, pricePerNight, maxGuests]
+ *             required: [title, description, type, city, country, street, pricePerNight, maxGuests]
  *             properties:
  *               title: { type: string, minLength: 5, maxLength: 200 }
  *               description: { type: string, minLength: 20 }
@@ -245,7 +245,9 @@ propertyRouter.post(
  *               city: { type: string }
  *               country: { type: string, minLength: 2 }
  *               district: { type: string, minLength: 2, maxLength: 100 }
- *               address: { type: string }
+ *               street: { type: string, minLength: 2, maxLength: 200 }
+ *               houseNumber: { type: string, maxLength: 20 }
+ *               apartment: { type: string, maxLength: 20 }
  *               latitude: { type: number, minimum: -90, maximum: 90 }
  *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               pricePerNight: { type: number }
@@ -289,8 +291,10 @@ propertyRouter.post(
  *               type: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] }
  *               city: { type: string }
  *               country: { type: string, minLength: 2 }
- *               district: { type: string, minLength: 2, maxLength: 100 }
- *               address: { type: string }
+ *               district: { type: string, minLength: 2, maxLength: 100, nullable: true }
+ *               street: { type: string, minLength: 2, maxLength: 200 }
+ *               houseNumber: { type: string, maxLength: 20, nullable: true }
+ *               apartment: { type: string, maxLength: 20, nullable: true }
  *               latitude: { type: number, minimum: -90, maximum: 90 }
  *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               pricePerNight: { type: number }

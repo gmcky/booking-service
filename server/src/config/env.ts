@@ -75,4 +75,9 @@ export const env = cleanEnv(process.env, {
   // Demo cleanup cron — flip to false + restart workers to drop the schedule.
   DEMO_CLEANUP_ENABLED: bool({ default: false }),
   DEMO_CLEANUP_CRON: str({ default: "0 3 * * *" }),
+
+  // Geocoding (Nominatim / OpenStreetMap; usage policy requires a
+  // descriptive User-Agent and max 1 request per second)
+  GEOCODER_URL: url({ default: "https://nominatim.openstreetmap.org/search" }),
+  GEOCODER_USER_AGENT: str({ default: "gmck-booking-portfolio/1.0 (booking.gmcky.dev)" }),
 });
