@@ -15,6 +15,21 @@ export interface MapBounds {
   maxLng: number;
 }
 
+/**
+ * getBounds() returns unwrapped longitudes — at low zoom (or panned across
+ * the antimeridian) west/east can exceed ±180, which the search API rejects.
+ * Clamp to the API's domain; a viewport wider than the world just becomes
+ * "the whole world".
+ */
+function clampBounds(b: maplibregl.LngLatBounds): MapBounds {
+  return {
+    minLat: Math.max(b.getSouth(), -90),
+    maxLat: Math.min(b.getNorth(), 90),
+    minLng: Math.max(b.getWest(), -180),
+    maxLng: Math.min(b.getEast(), 180),
+  };
+}
+
 export interface BaseMapProps {
   /** [lng, lat]. Ignored once `bounds` is provided. */
   center?: [number, number];
@@ -109,16 +124,7 @@ export function BaseMap({
     map.on("moveend", (e) => {
       const isUserGesture = moveByUser || Boolean(e.originalEvent);
       moveByUser = false;
-      const b = map.getBounds();
-      onMoveEndRef.current?.(
-        {
-          minLat: b.getSouth(),
-          maxLat: b.getNorth(),
-          minLng: b.getWest(),
-          maxLng: b.getEast(),
-        },
-        isUserGesture,
-      );
+      onMoveEndRef.current?.(clampBounds(map.getBounds()), isUserGesture);
     });
     map.on("click", () => onMapClickRef.current?.());
     map.on("load", () => onMapReadyRef.current?.(map));
