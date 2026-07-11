@@ -1,5 +1,13 @@
 import { vi } from "vitest";
 
+// config/env.ts validates the entire environment at import time (envalid
+// calls process.exit on failure). CI runs unit tests without any .env, so
+// the three no-default vars must exist before any suite imports a module
+// that transitively pulls in config/env.
+process.env.DATABASE_URL ??= "postgresql://test:test@localhost:5432/test";
+process.env.JWT_ACCESS_SECRET ??= "unit-test-access-secret";
+process.env.JWT_REFRESH_SECRET ??= "unit-test-refresh-secret";
+
 vi.mock("bcrypt", async () => {
   const actual = await vi.importActual<typeof import("bcrypt")>("bcrypt");
   // bcrypt enforces a minimum cost factor of 4, so use 4 explicitly.
