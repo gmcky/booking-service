@@ -9,6 +9,7 @@ import {
   createPropertySchema,
   updatePropertySchema,
   propertyQuerySchema,
+  mapMarkersQuerySchema,
 } from "./property.validators.js";
 
 export const propertyRouter: IRouter = Router();
@@ -105,6 +106,46 @@ propertyRouter.get(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 propertyRouter.get("/my", authenticate, asyncHandler(propertyController.getMyProperties));
+
+/**
+ * @openapi
+ * /properties/map-markers:
+ *   get:
+ *     tags: [Properties]
+ *     summary: All matching map markers (no pagination) for the browse map
+ *     parameters:
+ *       - { in: query, name: city, schema: { type: string } }
+ *       - { in: query, name: country, schema: { type: string } }
+ *       - { in: query, name: district, schema: { type: string } }
+ *       - { in: query, name: ownerId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: type, schema: { type: string, enum: [HOTEL_ROOM, APARTMENT, HOUSE, MEETING_ROOM] } }
+ *       - { in: query, name: amenities, schema: { type: string }, description: 'CSV of Amenity enum values' }
+ *       - { in: query, name: minPrice, schema: { type: number } }
+ *       - { in: query, name: maxPrice, schema: { type: number } }
+ *       - { in: query, name: maxGuests, schema: { type: integer } }
+ *       - { in: query, name: petsAllowed, schema: { type: boolean } }
+ *       - { in: query, name: infantsAllowed, schema: { type: boolean } }
+ *       - { in: query, name: checkIn, schema: { type: string, format: date-time } }
+ *       - { in: query, name: checkOut, schema: { type: string, format: date-time } }
+ *       - { in: query, name: minLat, schema: { type: number, minimum: -90, maximum: 90 }, description: 'Bounding-box filter — provide all four of minLat/maxLat/minLng/maxLng together' }
+ *       - { in: query, name: maxLat, schema: { type: number, minimum: -90, maximum: 90 } }
+ *       - { in: query, name: minLng, schema: { type: number, minimum: -180, maximum: 180 } }
+ *       - { in: query, name: maxLng, schema: { type: number, minimum: -180, maximum: 180 } }
+ *     responses:
+ *       200:
+ *         description: Markers for every active listing matching the filters, capped at 500
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/PropertyMapMarker' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ */
+propertyRouter.get(
+  "/map-markers",
+  validate(mapMarkersQuerySchema, "query"),
+  asyncHandler(propertyController.getPropertyMapMarkers),
+);
 
 /**
  * @openapi

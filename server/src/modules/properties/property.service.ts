@@ -37,19 +37,13 @@ const RAW_UPLOAD_PREFIX = "uploads/property-temp/";
 // Orphaned raw uploads are reaped after this window.
 const RAW_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Map payload cap — more markers than this can't be usefully rendered anyway. */
+const MAP_MARKERS_LIMIT = 500;
+
 export class PropertyService {
-  /**
-   * Filtered search with short-lived cache-aside.
-   */
-  static async getAll(params: PaginationParams, filters: PropertyFilters) {
-    const { skip, take } = calculatePagination(params.page, params.limit);
-
-    const ver = await cacheGetNamespaceVersion("properties:search");
-    const cacheKey = `properties:search:v${ver}:${hashKey({ params, filters })}`;
-    const cached = await cacheGet(cacheKey);
-    if (cached) return cached;
-
-    const where = {
+  /** Search where-clause shared by the paginated list and the map markers. */
+  private static buildSearchWhere(filters: PropertyFilters) {
+    return {
       isActive: true,
       ...(filters.city && {
         city: { contains: filters.city, mode: "insensitive" as const },
@@ -110,6 +104,20 @@ export class PropertyService {
           ],
         }),
     };
+  }
+
+  /**
+   * Filtered search with short-lived cache-aside.
+   */
+  static async getAll(params: PaginationParams, filters: PropertyFilters) {
+    const { skip, take } = calculatePagination(params.page, params.limit);
+
+    const ver = await cacheGetNamespaceVersion("properties:search");
+    const cacheKey = `properties:search:v${ver}:${hashKey({ params, filters })}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
+
+    const where = this.buildSearchWhere(filters);
 
     const sortMap = {
       price_asc: { pricePerNight: "asc" as const },
@@ -136,6 +144,42 @@ export class PropertyService {
     const result = createPaginatedResponse(properties, total, params);
     await cacheSet(cacheKey, result, 5 * 60);
     return result;
+  }
+
+  /**
+   * Lightweight markers for the browse map: every match in the filter set
+   * (typically a viewport bbox), no pagination — the paginated list can't
+   * feed the map without pins vanishing on pages that aren't loaded yet.
+   * Shares the search cache namespace so listing mutations invalidate both.
+   */
+  static async getMapMarkers(filters: PropertyFilters) {
+    const ver = await cacheGetNamespaceVersion("properties:search");
+    const cacheKey = `properties:map:v${ver}:${hashKey({ filters })}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return cached;
+
+    const markers = await prisma.property.findMany({
+      where: {
+        AND: [
+          this.buildSearchWhere(filters),
+          { latitude: { not: null }, longitude: { not: null } },
+        ],
+      },
+      take: MAP_MARKERS_LIMIT,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        latitude: true,
+        longitude: true,
+        pricePerNight: true,
+        averageRating: true,
+        images: true,
+      },
+    });
+
+    await cacheSet(cacheKey, markers, 5 * 60);
+    return markers;
   }
 
   /**

@@ -3,7 +3,7 @@ import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PropertyService } from "./property.service.js";
-import type { PropertyQueryInput } from "./property.types.js";
+import type { MapMarkersQueryInput, PropertyQueryInput } from "./property.types.js";
 
 /**
  * @server\src\api.routes.ts
@@ -59,6 +59,55 @@ export async function getProperties(req: Request, res: Response) {
   );
 
   res.json(result);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/properties/map-markers
+ * @access Public
+ */
+export async function getPropertyMapMarkers(req: Request, res: Response) {
+  const {
+    city,
+    country,
+    district,
+    ownerId,
+    type,
+    amenities,
+    minPrice,
+    maxPrice,
+    maxGuests,
+    petsAllowed,
+    infantsAllowed,
+    checkIn,
+    checkOut,
+    minLat,
+    maxLat,
+    minLng,
+    maxLng,
+  } = req.query as unknown as MapMarkersQueryInput;
+
+  const markers = await PropertyService.getMapMarkers({
+    city,
+    country,
+    district,
+    ownerId,
+    type,
+    amenities,
+    minPrice,
+    maxPrice,
+    maxGuests,
+    petsAllowed,
+    infantsAllowed,
+    checkIn,
+    checkOut,
+    minLat,
+    maxLat,
+    minLng,
+    maxLng,
+  });
+
+  res.json(markers);
 }
 
 /**

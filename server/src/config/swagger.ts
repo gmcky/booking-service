@@ -377,6 +377,34 @@ export const swaggerOptions: Options = {
             },
           ],
         },
+        PropertyMapMarker: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            title: { type: "string" },
+            latitude: { type: "number" },
+            longitude: { type: "number" },
+            pricePerNight: {
+              type: "string",
+              description: "Decimal serialized as string",
+            },
+            averageRating: {
+              type: "string",
+              nullable: true,
+              description: "Decimal serialized as string",
+            },
+            images: { type: "array", items: { type: "string" } },
+          },
+          required: [
+            "id",
+            "title",
+            "latitude",
+            "longitude",
+            "pricePerNight",
+            "averageRating",
+            "images",
+          ],
+        },
         PropertyReview: {
           type: "object",
           properties: {
