@@ -118,6 +118,18 @@ describe("AuthService.login — user enumeration hardening", () => {
     mockCache.get.mockResolvedValue(null);
   });
 
+  it("uses a well-formed cost-12 bcrypt hash for the timing dummy", async () => {
+    // Guards the timing fix: a malformed constant makes bcrypt.compare return
+    // false instantly, silently reopening the enumeration gap. The real hash
+    // lives in auth.service; assert the format it must keep.
+    const source = await import("node:fs").then((fs) =>
+      fs.readFileSync(new URL("../../modules/auth/auth.service.ts", import.meta.url), "utf8"),
+    );
+    const match = source.match(/DUMMY_PASSWORD_HASH\s*=\s*"([^"]+)"/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toMatch(/^\$2[aby]\$12\$[./A-Za-z0-9]{53}$/);
+  });
+
   it("still runs a bcrypt compare when the email is unknown (timing parity)", async () => {
     mockPrisma.user.findFirst.mockResolvedValue(null);
 
