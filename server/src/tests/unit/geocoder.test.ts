@@ -205,6 +205,30 @@ describe("suggestAddresses", () => {
     expect(langs).toEqual(["default", "en"]);
   });
 
+  it("never merges id-less features — each falls back to its own local name", async () => {
+    const idlessLocal = {
+      geometry: { coordinates: [30.5, 50.4] },
+      properties: { type: "street", name: "Вулиця Один", city: "Київ", country: "Україна" },
+    };
+    const idlessEnOther = {
+      geometry: { coordinates: [99.9, 9.9] },
+      properties: {
+        type: "street",
+        name: "Some Other Street",
+        city: "Bangkok",
+        country: "Thailand",
+      },
+    };
+    fetchMock
+      .mockResolvedValueOnce(photonResponse([idlessLocal]))
+      .mockResolvedValueOnce(photonResponse([idlessEnOther]));
+
+    const result = await suggestAddresses("вулиця", streetOpts);
+
+    // The unrelated id-less English feature must not become this entry's canonical.
+    expect(result[0]?.en).toMatchObject({ street: "Вулиця Один", city: "Київ" });
+  });
+
   it("falls back to local names when the English variant is missing", async () => {
     fetchMock
       .mockResolvedValueOnce(photonResponse([localStreet]))

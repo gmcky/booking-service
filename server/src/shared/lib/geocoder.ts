@@ -84,8 +84,11 @@ interface PhotonFeature {
 }
 
 interface MappedFeature {
-  /** Identity across the two language variants of the same OSM object. */
-  key: string;
+  /** Identity across the two language variants of the same OSM object;
+   *  null when Photon omits the OSM id — such entries never merge (their
+   *  English canonical falls back to the local name) so that two id-less
+   *  features can't be mistaken for each other. */
+  key: string | null;
   street: string | null;
   houseNumber: string | null;
   district: string | null;
@@ -100,7 +103,10 @@ function mapFeature(feature: PhotonFeature, kind: SuggestOptions["kind"]): Mappe
   const [longitude, latitude] = feature.geometry?.coordinates ?? [];
   if (latitude === undefined || longitude === undefined || !props.country) return null;
 
-  const key = `${props.osm_type ?? "?"}:${props.osm_id ?? "?"}`;
+  const key =
+    props.osm_type !== undefined && props.osm_id !== undefined
+      ? `${props.osm_type}:${props.osm_id}`
+      : null;
 
   if (kind === "city") {
     if (!props.name || !["city", "town", "village"].includes(props.type ?? "")) return null;
@@ -211,15 +217,16 @@ export async function suggestAddresses(
   const enByKey = new Map<string, MappedFeature>();
   for (const feature of enFeatures) {
     const mapped = mapFeature(feature, options.kind);
-    if (mapped) enByKey.set(mapped.key, mapped);
+    if (mapped?.key) enByKey.set(mapped.key, mapped);
   }
 
   let entries: AddressSuggestion[] = [];
   for (const feature of localFeatures) {
     const local = mapFeature(feature, options.kind);
     if (!local) continue;
-    // OSM objects without an English name fall back to their local one.
-    const en = enByKey.get(local.key) ?? local;
+    // OSM objects without an English name (or without an id to merge on)
+    // fall back to their local one.
+    const en = (local.key ? enByKey.get(local.key) : undefined) ?? local;
     entries.push({
       label: buildLabel(local, options.kind),
       street: local.street,

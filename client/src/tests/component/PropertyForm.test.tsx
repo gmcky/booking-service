@@ -211,6 +211,58 @@ describe("PropertyForm", () => {
     });
   });
 
+  it("typing a house number after a street pick keeps the English canonical, un-pins coords", async () => {
+    const { propertyApi } = await import("@/lib/api/properties");
+    (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        label: "Хрещатик, Київ, Україна",
+        street: "Хрещатик",
+        houseNumber: null,
+        district: null,
+        city: "Київ",
+        country: "Україна",
+        en: { street: "Khreshchatyk Street", district: null, city: "Kyiv", country: "Ukraine" },
+        latitude: 50.4471871,
+        longitude: 30.5229456,
+      },
+    ]);
+    const onSubmit = vi.fn();
+    renderWithClient(
+      <PropertyForm
+        submitLabel="Publish listing"
+        pendingLabel="Publishing…"
+        pending={false}
+        formError=""
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText("Street"), "Хрещатик");
+    await userEvent.click(await screen.findByText("Хрещатик, Київ, Україна"));
+    // The everyday flow: street-level suggestion, then the house number.
+    await userEvent.type(screen.getByLabelText("House no."), "22");
+
+    await userEvent.type(screen.getByLabelText("Title"), "Kyiv Center Flat");
+    await userEvent.type(
+      screen.getByLabelText("Description"),
+      "A bright flat right on the main street.",
+    );
+    await userEvent.type(screen.getByLabelText("Max guests"), "2");
+    await userEvent.type(screen.getByLabelText("Price / night"), "90");
+    await userEvent.click(screen.getByRole("button", { name: /publish listing/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      street: "Khreshchatyk Street",
+      houseNumber: "22",
+      city: "Kyiv",
+      country: "Ukraine",
+      // pin dropped: the geocoder re-resolves at house precision
+      latitude: null,
+      longitude: null,
+    });
+  });
+
   it("editing the street after picking a suggestion un-pins the coordinates", async () => {
     const { propertyApi } = await import("@/lib/api/properties");
     (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
