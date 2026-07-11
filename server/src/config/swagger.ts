@@ -371,6 +371,8 @@ export const swaggerOptions: Options = {
         },
         AddressSuggestion: {
           type: "object",
+          description:
+            "Display fields carry local names; `en` is the English canonical stored on publish.",
           properties: {
             label: { type: "string" },
             street: { type: "string", nullable: true },
@@ -378,6 +380,16 @@ export const swaggerOptions: Options = {
             district: { type: "string", nullable: true },
             city: { type: "string" },
             country: { type: "string" },
+            en: {
+              type: "object",
+              properties: {
+                street: { type: "string", nullable: true },
+                district: { type: "string", nullable: true },
+                city: { type: "string" },
+                country: { type: "string" },
+              },
+              required: ["street", "district", "city", "country"],
+            },
             latitude: { type: "number" },
             longitude: { type: "number" },
           },
@@ -388,6 +400,7 @@ export const swaggerOptions: Options = {
             "district",
             "city",
             "country",
+            "en",
             "latitude",
             "longitude",
           ],
