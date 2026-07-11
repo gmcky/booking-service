@@ -7,6 +7,7 @@ import { PropertyForm, type PropertyFormInitial } from "@/components/property/pr
 vi.mock("@/lib/api/properties", () => ({
   propertyApi: {
     uploadImages: vi.fn(),
+    suggestAddresses: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -88,6 +89,8 @@ describe("PropertyForm", () => {
       district: null,
       city: "South Lake Tahoe",
       country: "United States",
+      latitude: null,
+      longitude: null,
       maxGuests: 6,
       pricePerNight: 248,
       type: "HOUSE",
@@ -139,6 +142,109 @@ describe("PropertyForm", () => {
       screen.getByText("Changing photos on an existing listing isn't supported yet."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Click to add photos")).not.toBeInTheDocument();
+  });
+
+  it("picking a street suggestion fills the address block and pins coordinates", async () => {
+    const { propertyApi } = await import("@/lib/api/properties");
+    (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        label: "Khreshchatyk Street, Pecherskyi district, Kyiv, Ukraine",
+        street: "Khreshchatyk Street",
+        houseNumber: null,
+        district: "Pecherskyi district",
+        city: "Kyiv",
+        country: "Ukraine",
+        latitude: 50.4471871,
+        longitude: 30.5229456,
+      },
+    ]);
+    const onSubmit = vi.fn();
+    renderWithClient(
+      <PropertyForm
+        submitLabel="Publish listing"
+        pendingLabel="Publishing…"
+        pending={false}
+        formError=""
+        onSubmit={onSubmit}
+      />,
+    );
+
+    // Stale house number from before the pick must be cleared by the pick —
+    // otherwise it silently mismatches the pinned coordinates.
+    await userEvent.type(screen.getByLabelText("House no."), "7");
+
+    // Cyrillic input; the suggestion arrives already normalized to English.
+    await userEvent.type(screen.getByLabelText("Street"), "Хрещатик");
+    const option = await screen.findByText(
+      "Khreshchatyk Street, Pecherskyi district, Kyiv, Ukraine",
+    );
+    await userEvent.click(option);
+
+    expect(screen.getByLabelText("Street")).toHaveValue("Khreshchatyk Street");
+    expect(screen.getByLabelText("House no.")).toHaveValue("");
+    expect(screen.getByLabelText("District (optional)")).toHaveValue("Pecherskyi district");
+    expect(screen.getByLabelText("City")).toHaveValue("Kyiv");
+    expect(screen.getByLabelText("Country")).toHaveValue("Ukraine");
+
+    await userEvent.type(screen.getByLabelText("Title"), "Kyiv Center Flat");
+    await userEvent.type(
+      screen.getByLabelText("Description"),
+      "A bright flat right on the main street.",
+    );
+    await userEvent.type(screen.getByLabelText("Max guests"), "2");
+    await userEvent.type(screen.getByLabelText("Price / night"), "90");
+    await userEvent.click(screen.getByRole("button", { name: /publish listing/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      street: "Khreshchatyk Street",
+      city: "Kyiv",
+      country: "Ukraine",
+      latitude: 50.4471871,
+      longitude: 30.5229456,
+    });
+  });
+
+  it("editing the street after picking a suggestion un-pins the coordinates", async () => {
+    const { propertyApi } = await import("@/lib/api/properties");
+    (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        label: "Khreshchatyk Street, Kyiv, Ukraine",
+        street: "Khreshchatyk Street",
+        houseNumber: null,
+        district: null,
+        city: "Kyiv",
+        country: "Ukraine",
+        latitude: 50.4471871,
+        longitude: 30.5229456,
+      },
+    ]);
+    const onSubmit = vi.fn();
+    renderWithClient(
+      <PropertyForm
+        submitLabel="Publish listing"
+        pendingLabel="Publishing…"
+        pending={false}
+        formError=""
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText("Street"), "Хрещатик");
+    await userEvent.click(await screen.findByText("Khreshchatyk Street, Kyiv, Ukraine"));
+    await userEvent.type(screen.getByLabelText("Street"), " edited");
+
+    await userEvent.type(screen.getByLabelText("Title"), "Kyiv Center Flat");
+    await userEvent.type(
+      screen.getByLabelText("Description"),
+      "A bright flat right on the main street.",
+    );
+    await userEvent.type(screen.getByLabelText("Max guests"), "2");
+    await userEvent.type(screen.getByLabelText("Price / night"), "90");
+    await userEvent.click(screen.getByRole("button", { name: /publish listing/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ latitude: null, longitude: null });
   });
 
   it("uploading a photo shows a preview once the upload resolves", async () => {

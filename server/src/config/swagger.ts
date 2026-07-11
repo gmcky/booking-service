@@ -369,6 +369,29 @@ export const swaggerOptions: Options = {
             "updatedAt",
           ],
         },
+        AddressSuggestion: {
+          type: "object",
+          properties: {
+            label: { type: "string" },
+            street: { type: "string" },
+            houseNumber: { type: "string", nullable: true },
+            district: { type: "string", nullable: true },
+            city: { type: "string" },
+            country: { type: "string" },
+            latitude: { type: "number" },
+            longitude: { type: "number" },
+          },
+          required: [
+            "label",
+            "street",
+            "houseNumber",
+            "district",
+            "city",
+            "country",
+            "latitude",
+            "longitude",
+          ],
+        },
         PropertyWithOwner: {
           allOf: [
             { $ref: "#/components/schemas/Property" },

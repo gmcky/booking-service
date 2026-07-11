@@ -10,6 +10,7 @@ import {
   updatePropertySchema,
   propertyQuerySchema,
   mapMarkersQuerySchema,
+  addressSuggestQuerySchema,
 } from "./property.validators.js";
 
 export const propertyRouter: IRouter = Router();
@@ -163,6 +164,36 @@ propertyRouter.get(
  *               items: { $ref: '#/components/schemas/LocationCountry' }
  */
 propertyRouter.get("/locations", asyncHandler(propertyController.getPropertyLocations));
+
+/**
+ * @openapi
+ * /properties/address-suggest:
+ *   get:
+ *     tags: [Properties]
+ *     summary: Address autocomplete for the host form (English-normalized)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: q, required: true, schema: { type: string, minLength: 3, maxLength: 200 } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
+ *     responses:
+ *       200:
+ *         description: Street- and house-level suggestions with coordinates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/AddressSuggestion' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+// Registered before "/:id" so the literal path wins; authenticated inline
+// because the shared authenticate gate only covers routes below "/:id".
+propertyRouter.get(
+  "/address-suggest",
+  authenticate,
+  validate(addressSuggestQuerySchema, "query"),
+  asyncHandler(propertyController.getAddressSuggestions),
+);
 
 /**
  * @openapi

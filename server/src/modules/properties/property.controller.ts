@@ -3,7 +3,11 @@ import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { PropertyService } from "./property.service.js";
-import type { MapMarkersQueryInput, PropertyQueryInput } from "./property.types.js";
+import type {
+  AddressSuggestQueryInput,
+  MapMarkersQueryInput,
+  PropertyQueryInput,
+} from "./property.types.js";
 
 /**
  * @server\src\api.routes.ts
@@ -117,6 +121,17 @@ export async function getPropertyMapMarkers(req: Request, res: Response) {
  */
 export async function getPropertyLocations(req: Request, res: Response) {
   res.json(await PropertyService.getLocations());
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/properties/address-suggest
+ * @access Private
+ * @security Bearer token required — host-form helper, not a public geocoder.
+ */
+export async function getAddressSuggestions(req: Request, res: Response) {
+  const { q, limit } = req.query as unknown as AddressSuggestQueryInput;
+  res.json(await PropertyService.suggestAddresses(q, limit));
 }
 
 /**

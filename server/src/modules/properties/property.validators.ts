@@ -172,3 +172,8 @@ export const propertyQuerySchema = z
   .superRefine(refineSearchFilters);
 
 export const mapMarkersQuerySchema = z.object(searchFilterShape).superRefine(refineSearchFilters);
+
+export const addressSuggestQuerySchema = z.object({
+  q: z.string().trim().min(3).max(200),
+  limit: z.coerce.number().int().min(1).max(10).default(5),
+});

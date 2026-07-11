@@ -1447,6 +1447,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/properties/address-suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Address autocomplete for the host form (English-normalized) */
+        get: {
+            parameters: {
+                query: {
+                    q: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Street- and house-level suggestions with coordinates */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AddressSuggestion"][];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/properties/{id}": {
         parameters: {
             query?: never;
@@ -2693,6 +2734,16 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        AddressSuggestion: {
+            label: string;
+            street: string;
+            houseNumber: string | null;
+            district: string | null;
+            city: string;
+            country: string;
+            latitude: number;
+            longitude: number;
         };
         PropertyWithOwner: components["schemas"]["Property"] & {
             owner: components["schemas"]["PropertyOwner"];

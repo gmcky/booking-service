@@ -35,6 +35,8 @@ export interface Paginated<T> {
   pagination: components["schemas"]["Pagination"];
 }
 
+export type AddressSuggestion = components["schemas"]["AddressSuggestion"];
+
 export type LocationCountry = components["schemas"]["LocationCountry"];
 export type LocationCity = components["schemas"]["LocationCity"];
 export type LocationDistrict = components["schemas"]["LocationDistrict"];
@@ -73,6 +75,10 @@ export interface CreatePropertyInput {
   street: string;
   houseNumber?: string;
   apartment?: string;
+  /** Present only when the host picked an autocomplete suggestion —
+   *  stores the suggestion's exact coordinates, skipping the geocoder. */
+  latitude?: number;
+  longitude?: number;
   pricePerNight: number;
   maxGuests: number;
   petsAllowed: boolean;
@@ -167,6 +173,14 @@ export const propertyApi = {
 
   locations: async (): Promise<LocationCountry[]> => {
     const { data, error, response } = await apiClient.GET("/properties/locations");
+    return unwrap({ data, error, response });
+  },
+
+  /** Host-form autocomplete; suggestions carry exact coordinates. */
+  suggestAddresses: async (q: string): Promise<AddressSuggestion[]> => {
+    const { data, error, response } = await apiClient.GET("/properties/address-suggest", {
+      params: { query: { q } },
+    });
     return unwrap({ data, error, response });
   },
 
