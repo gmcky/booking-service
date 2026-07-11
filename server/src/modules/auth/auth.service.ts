@@ -16,6 +16,12 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const REFRESH_SECRET = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 
+// A real (cost-12) bcrypt hash that no password verifies against. The
+// no-such-user login path compares against this so its latency matches a
+// genuine wrong-password attempt — otherwise the missing bcrypt call makes
+// unknown emails answer measurably faster, enabling user enumeration.
+const DUMMY_PASSWORD_HASH = "$2b$12$D1WSx5rWJnI9DP7/o6ZsWuvQxA86RqoD73x3ZSVCfV3TfLmoZAhzW";
+
 export class AuthService {
   /**
    * Atomic user creation and initial refresh session.
@@ -154,22 +160,17 @@ export class AuthService {
       },
     });
 
-    // Consistent 401 response for absent user or bad password.
+    // Consistent 401 response for absent user or bad password. The dummy
+    // compare keeps this branch's latency in line with a real wrong-password
+    // attempt so an unknown email can't be told apart by timing.
     if (!user || !user.passwordHash) {
       logger.warn(
         { email, ip: meta?.ip, userAgent: meta?.userAgent },
         "Login failed: user not found",
       );
+      await bcrypt.compare(data.password, DUMMY_PASSWORD_HASH);
       await this.recordFailedAttempt(email, meta);
       throw new AppError(401, "Invalid credentials");
-    }
-
-    if (user.isSuspended) {
-      logger.warn(
-        { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
-        "Login blocked: account is suspended",
-      );
-      throw new AppError(403, "Account is suspended");
     }
 
     const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
@@ -180,6 +181,16 @@ export class AuthService {
       );
       await this.recordFailedAttempt(email, meta);
       throw new AppError(401, "Invalid credentials");
+    }
+
+    // Suspension is disclosed only after the password checks out — otherwise
+    // any password would reveal that an email belongs to a suspended account.
+    if (user.isSuspended) {
+      logger.warn(
+        { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Login blocked: account is suspended",
+      );
+      throw new AppError(403, "Account is suspended");
     }
 
     await this.clearLockout(email);
