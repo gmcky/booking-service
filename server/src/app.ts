@@ -36,9 +36,13 @@ const redisStore = (prefix: string) =>
       cacheClient.call(args[0]!, ...args.slice(1))) as SendCommandFn,
   });
 
+// Read ceiling. Generous by design: map browse legitimately fires two
+// requests per pan (list + markers), so an active session easily passes a
+// few hundred reads per window. Abuse-sensitive paths have their own much
+// stricter limiters below.
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.RATE_LIMIT_MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
   store: redisStore("api"),

@@ -373,7 +373,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           onApply={applyFilters}
         />
 
-        {query.isError ? (
+        {/* Full error state only when there's nothing to show — a failed
+            background refetch (e.g. transient 429 mid-pan) keeps the stale
+            grid on screen instead of blanking the page into a retry loop. */}
+        {query.isError && items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <p className="text-sm text-destructive">{(query.error as Error).message}</p>
             <Button variant="outline" size="sm" onClick={() => query.refetch()}>

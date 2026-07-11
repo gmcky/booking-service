@@ -33,9 +33,11 @@ export const env = cleanEnv(process.env, {
   // CORS
   CORS_ORIGIN: str({ default: "http://localhost:3000" }),
 
-  // Rate Limiting
+  // Rate limiting (global read ceiling; auth/write limiters are separate
+  // and hardcoded stricter). Map browse fires 2 requests per pan — 100 was
+  // exhausted by ~50 pans and locked real users out for a whole window.
   RATE_LIMIT_WINDOW_MS: num({ default: 900000 }), // 15 minutes
-  RATE_LIMIT_MAX_REQUESTS: num({ default: 100 }),
+  RATE_LIMIT_MAX_REQUESTS: num({ default: 1000 }),
 
   // Account Lockout (login brute-force protection)
   LOGIN_MAX_ATTEMPTS: num({ default: 5 }),
