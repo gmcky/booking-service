@@ -130,8 +130,8 @@ export async function getPropertyLocations(req: Request, res: Response) {
  * @security Bearer token required — host-form helper, not a public geocoder.
  */
 export async function getAddressSuggestions(req: Request, res: Response) {
-  const { q, limit } = req.query as unknown as AddressSuggestQueryInput;
-  res.json(await PropertyService.suggestAddresses(q, limit));
+  const { q, limit, kind, country, city } = req.query as unknown as AddressSuggestQueryInput;
+  res.json(await PropertyService.suggestAddresses(q, { limit, kind, country, city }));
 }
 
 /**

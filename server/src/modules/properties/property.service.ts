@@ -13,7 +13,7 @@ import { resolve, dirname } from "node:path";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { cleanupQueue, type CleanupJobName } from "../../shared/queues/cleanup.queue.js";
 import { geocodeQueue } from "../../shared/queues/geocode.queue.js";
-import { suggestAddresses } from "../../shared/lib/geocoder.js";
+import { suggestAddresses, type SuggestOptions } from "../../shared/lib/geocoder.js";
 import {
   cacheGet,
   cacheSet,
@@ -253,12 +253,12 @@ export class PropertyService {
    * client never talks to Photon directly and repeated prefixes are served
    * from cache instead of hammering the public instance.
    */
-  static async suggestAddresses(query: string, limit: number) {
-    const cacheKey = `geo:suggest:${limit}:${query.toLowerCase()}`;
+  static async suggestAddresses(query: string, options: SuggestOptions) {
+    const cacheKey = `geo:suggest:${hashKey({ query: query.toLowerCase(), options })}`;
     const cached = await cacheGet(cacheKey);
     if (cached) return cached;
 
-    const suggestions = await suggestAddresses(query, limit);
+    const suggestions = await suggestAddresses(query, options);
 
     // Only cache non-empty results: a miss may be Photon hiccuping.
     if (suggestions.length > 0) {

@@ -174,6 +174,10 @@ export const propertyQuerySchema = z
 export const mapMarkersQuerySchema = z.object(searchFilterShape).superRefine(refineSearchFilters);
 
 export const addressSuggestQuerySchema = z.object({
-  q: z.string().trim().min(3).max(200),
+  // min 2, not 3: real city prefixes like "Ky" already rank well.
+  q: z.string().trim().min(2).max(200),
   limit: z.coerce.number().int().min(1).max(10).default(5),
+  kind: z.enum(["street", "city"]).default("street"),
+  country: z.string().trim().min(2).max(100).optional(),
+  city: z.string().trim().min(2).max(100).optional(),
 });

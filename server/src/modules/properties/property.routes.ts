@@ -173,8 +173,11 @@ propertyRouter.get("/locations", asyncHandler(propertyController.getPropertyLoca
  *     summary: Address autocomplete for the host form (English-normalized)
  *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - { in: query, name: q, required: true, schema: { type: string, minLength: 3, maxLength: 200 } }
+ *       - { in: query, name: q, required: true, schema: { type: string, minLength: 2, maxLength: 200 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
+ *       - { in: query, name: kind, schema: { type: string, enum: [street, city], default: street } }
+ *       - { in: query, name: country, schema: { type: string, minLength: 2, maxLength: 100 }, description: 'Prefer results from this country' }
+ *       - { in: query, name: city, schema: { type: string, minLength: 2, maxLength: 100 }, description: 'Prefer results from this city (street kind only)' }
  *     responses:
  *       200:
  *         description: Street- and house-level suggestions with coordinates

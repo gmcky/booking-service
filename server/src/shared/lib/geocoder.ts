@@ -22,16 +22,26 @@ interface NominatimHit {
   lon: string;
 }
 
-/** One selectable autocomplete entry, already normalized to English. */
+/** One selectable autocomplete entry, already normalized to English.
+ *  `street` is null for city-kind suggestions. */
 export interface AddressSuggestion {
   label: string;
-  street: string;
+  street: string | null;
   houseNumber: string | null;
   district: string | null;
   city: string;
   country: string;
   latitude: number;
   longitude: number;
+}
+
+export interface SuggestOptions {
+  limit: number;
+  /** "street" (default) matches streets and houses; "city" matches places. */
+  kind: "street" | "city";
+  /** Narrow results to the country / city the host already picked. */
+  country?: string;
+  city?: string;
 }
 
 interface PhotonFeature {
@@ -49,20 +59,95 @@ interface PhotonFeature {
   };
 }
 
+function mapFeature(
+  feature: PhotonFeature,
+  kind: SuggestOptions["kind"],
+): AddressSuggestion | null {
+  const props = feature.properties ?? {};
+  const [longitude, latitude] = feature.geometry?.coordinates ?? [];
+  if (latitude === undefined || longitude === undefined || !props.country) return null;
+
+  if (kind === "city") {
+    if (!props.name || !["city", "town", "village"].includes(props.type ?? "")) return null;
+    return {
+      label: `${props.name}, ${props.country}`,
+      street: null,
+      houseNumber: null,
+      district: null,
+      city: props.name,
+      country: props.country,
+      latitude,
+      longitude,
+    };
+  }
+
+  const isHouse = props.type === "house" && Boolean(props.street);
+  const isStreet = props.type === "street" && Boolean(props.name);
+  if (!isHouse && !isStreet) return null;
+
+  const street = (isHouse ? props.street : props.name) as string;
+  const city = props.city ?? props.town ?? props.village;
+  if (!city) return null;
+
+  const houseNumber = (isHouse && props.housenumber) || null;
+  const label = [
+    houseNumber ? `${street} ${houseNumber}` : street,
+    props.district,
+    city,
+    props.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return {
+    label,
+    street,
+    houseNumber,
+    district: props.district ?? null,
+    city,
+    country: props.country,
+    latitude,
+    longitude,
+  };
+}
+
+/** Keeps only entries matching `expected` (case-insensitive) — unless that
+ *  would empty the list: hosts may have typed the constraint in another
+ *  language or script, and wrong-country suggestions beat none at all. */
+function preferMatching(
+  entries: AddressSuggestion[],
+  field: "country" | "city",
+  expected: string | undefined,
+): AddressSuggestion[] {
+  if (!expected) return entries;
+  const target = expected.trim().toLowerCase();
+  if (!target) return entries;
+  const matching = entries.filter((e) => e[field].toLowerCase() === target);
+  return matching.length > 0 ? matching : entries;
+}
+
 /**
  * Search-as-you-type suggestions via Photon (Nominatim's usage policy
  * forbids autocomplete; Photon is OSM data built for it). `lang=en`
  * normalizes results to English regardless of the input script, so a host
- * typing "Хрещатик" is offered "Khreshchatyk Street". Only street- and
- * house-level features qualify — a suggestion must pin an exact spot.
+ * typing "Хрещатик" is offered "Khreshchatyk Street". Street suggestions
+ * must pin an exact spot; city suggestions seed the city/country fields.
  */
-export async function suggestAddresses(query: string, limit: number): Promise<AddressSuggestion[]> {
+export async function suggestAddresses(
+  query: string,
+  options: SuggestOptions,
+): Promise<AddressSuggestion[]> {
+  // Already-picked fields sharpen Photon's free-text ranking.
+  const q = [query, options.kind === "street" ? options.city : undefined, options.country]
+    .filter(Boolean)
+    .join(", ");
+
   const url = new URL(env.PHOTON_URL);
   url.search = new URLSearchParams({
-    q: query,
+    q,
     lang: "en",
-    // Over-fetch: non-street features get filtered out below.
-    limit: String(limit * 3),
+    // Over-fetch: non-matching feature types get filtered out below.
+    limit: String(options.limit * 3),
   }).toString();
 
   const res = await fetch(url, {
@@ -76,46 +161,22 @@ export async function suggestAddresses(query: string, limit: number): Promise<Ad
   }
 
   const body = (await res.json()) as { features?: PhotonFeature[] };
-  const suggestions: AddressSuggestion[] = [];
+  let entries = (body.features ?? [])
+    .map((feature) => mapFeature(feature, options.kind))
+    .filter((entry): entry is AddressSuggestion => entry !== null);
+
+  entries = preferMatching(entries, "country", options.country);
+  if (options.kind === "street") {
+    entries = preferMatching(entries, "city", options.city);
+  }
+
   const seen = new Set<string>();
-
-  for (const feature of body.features ?? []) {
-    const props = feature.properties ?? {};
-    const [longitude, latitude] = feature.geometry?.coordinates ?? [];
-    if (latitude === undefined || longitude === undefined) continue;
-
-    const isHouse = props.type === "house" && Boolean(props.street);
-    const isStreet = props.type === "street" && Boolean(props.name);
-    if (!isHouse && !isStreet) continue;
-
-    const street = (isHouse ? props.street : props.name) as string;
-    const city = props.city ?? props.town ?? props.village;
-    if (!city || !props.country) continue;
-
-    const houseNumber = (isHouse && props.housenumber) || null;
-    const label = [
-      houseNumber ? `${street} ${houseNumber}` : street,
-      props.district,
-      city,
-      props.country,
-    ]
-      .filter(Boolean)
-      .join(", ");
-
-    if (seen.has(label)) continue;
-    seen.add(label);
-
-    suggestions.push({
-      label,
-      street,
-      houseNumber,
-      district: props.district ?? null,
-      city,
-      country: props.country,
-      latitude,
-      longitude,
-    });
-    if (suggestions.length >= limit) break;
+  const suggestions: AddressSuggestion[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.label)) continue;
+    seen.add(entry.label);
+    suggestions.push(entry);
+    if (suggestions.length >= options.limit) break;
   }
 
   return suggestions;
