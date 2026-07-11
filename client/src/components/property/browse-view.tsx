@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
+import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
 
 const BrowseMapPanel = dynamic(
   () => import("@/components/map/browse-map-panel").then((m) => m.BrowseMapPanel),
@@ -27,8 +28,12 @@ const BrowseMapPanel = dynamic(
 );
 
 const PAGE_SIZE = 12;
-/** Bbox query params are rounded to this many decimals (~1m precision). */
-const BBOX_PRECISION = 5;
+/** Bbox query params are rounded to this many decimals (~110m precision) —
+ *  coarse on purpose, so near-identical viewports share one query key and
+ *  hit the client cache instead of the network. */
+const BBOX_PRECISION = 3;
+/** Re-panning over a recently seen area is served from cache. */
+const BROWSE_STALE_TIME_MS = 60 * 1000;
 
 const SORTS: { value: PropertySort; label: string }[] = [
   { value: "newest", label: "Recommended" },
@@ -195,13 +200,30 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     // skeleton covers them is decided by the deferred gate below, so fast
     // refetches swap in place and only slow ones surface a skeleton.
     placeholderData: keepPreviousData,
+    staleTime: BROWSE_STALE_TIME_MS,
   });
 
   // The map draws every match in the filter set, not the loaded list pages —
-  // otherwise pins for unloaded pages simply don't exist.
+  // otherwise pins for unloaded pages simply don't exist. The bbox is padded
+  // and grid-snapped (paddedMarkerBounds) so small pans reuse the cached
+  // marker set — only the list refetches.
   const markerFilters = React.useMemo(() => {
     const { sort: _sort, page: _page, limit: _limit, ...rest } = effectiveFilters;
-    return rest;
+    if (
+      rest.minLat === undefined ||
+      rest.maxLat === undefined ||
+      rest.minLng === undefined ||
+      rest.maxLng === undefined
+    ) {
+      return rest;
+    }
+    const padded = paddedMarkerBounds({
+      minLat: rest.minLat,
+      maxLat: rest.maxLat,
+      minLng: rest.minLng,
+      maxLng: rest.maxLng,
+    });
+    return { ...rest, ...padded };
   }, [effectiveFilters]);
   const markersQuery = useQuery({
     queryKey: queryKeys.properties.mapMarkers(markerFilters),
@@ -209,6 +231,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     enabled: mapMode === "split",
     // Pins must not vanish mid-pan while the next viewport's set loads.
     placeholderData: keepPreviousData,
+    staleTime: BROWSE_STALE_TIME_MS,
   });
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
