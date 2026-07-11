@@ -16,7 +16,9 @@ import {
 } from "@/lib/api/properties";
 import { amenityLabel } from "@/lib/api/labels";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
-import { cn } from "@/lib/utils";
+import { AutocompleteInput } from "@/components/property/autocomplete-input";
+import { useAddressSuggestions } from "@/lib/hooks/use-address-suggestions";
+import { matchCountries } from "@/lib/utils/countries";
 
 const TYPES: { value: PropertyType; label: string }[] = [
   { value: "HOUSE", label: "House" },
@@ -110,12 +112,9 @@ export function PropertyForm({
   const [apartment, setApartment] = React.useState(initial?.apartment ?? "");
   const [district, setDistrict] = React.useState(initial?.district ?? "");
   const [city, setCity] = React.useState(initial?.city ?? "");
-  // Autocomplete over the street field. Picking a suggestion pins exact
-  // coordinates; typing anything address-related afterwards un-pins them so
-  // the backend geocoder resolves the edited address instead.
-  const [suggestions, setSuggestions] = React.useState<AddressSuggestion[]>([]);
-  const [suggestOpen, setSuggestOpen] = React.useState(false);
-  const [activeSuggestion, setActiveSuggestion] = React.useState(-1);
+  // Picking a street suggestion pins exact coordinates; typing anything
+  // address-related afterwards un-pins them so the backend geocoder
+  // resolves the edited address instead.
   const [pickedCoords, setPickedCoords] = React.useState<{
     latitude: number;
     longitude: number;
@@ -195,58 +194,56 @@ export function PropertyForm({
     [],
   );
 
-  React.useEffect(() => {
-    if (!suggestOpen) return;
-    const q = street.trim();
-    if (q.length < 3) {
-      setSuggestions([]);
-      return;
-    }
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      try {
-        const result = await propertyApi.suggestAddresses(q);
-        if (!cancelled) {
-          setSuggestions(result);
-          setActiveSuggestion(-1);
-        }
-      } catch {
-        // Best-effort helper — typing by hand always remains possible.
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [street, suggestOpen]);
+  // Country suggestions are a client-side match over the ISO list; city and
+  // street go through the global geocoding provider, narrowed by whatever
+  // the host already picked above them.
+  const countrySuggestions = React.useMemo(
+    () => matchCountries(country).map((label) => ({ label })),
+    [country],
+  );
+  const citySuggestions = useAddressSuggestions(
+    city,
+    React.useCallback(
+      (q: string) => propertyApi.suggestAddresses(q, { kind: "city", country }),
+      [country],
+    ),
+  );
+  const streetSuggestions = useAddressSuggestions(
+    street,
+    React.useCallback(
+      (q: string) => propertyApi.suggestAddresses(q, { kind: "street", country, city }),
+      [country, city],
+    ),
+    3,
+  );
 
-  function applySuggestion(s: AddressSuggestion) {
+  // City the street block was auto-filled for. Lets a later city pick tell
+  // "street belongs to another city, clear it" apart from "host typed the
+  // street by hand, keep it". Null once the host edits the street manually.
+  const streetPickCityRef = React.useRef<string | null>(null);
+
+  function pickCity(s: AddressSuggestion) {
+    if (streetPickCityRef.current && streetPickCityRef.current !== s.city) {
+      setStreet("");
+      setHouseNumber("");
+      setDistrict("");
+      streetPickCityRef.current = null;
+    }
+    setCity(s.city);
+    setCountry(s.country);
+    setPickedCoords(null);
+  }
+
+  function pickStreet(s: AddressSuggestion) {
     // Full overwrite, including clears: a leftover house number from a
     // previous street would silently mismatch the pinned coordinates.
-    setStreet(s.street);
+    setStreet(s.street ?? "");
     setHouseNumber(s.houseNumber ?? "");
     setDistrict(s.district ?? "");
     setCity(s.city);
     setCountry(s.country);
     setPickedCoords({ latitude: s.latitude, longitude: s.longitude });
-    setSuggestOpen(false);
-    setSuggestions([]);
-  }
-
-  function onStreetKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!suggestOpen || suggestions.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveSuggestion((i) => (i + 1) % suggestions.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveSuggestion((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
-    } else if (e.key === "Enter" && activeSuggestion >= 0) {
-      e.preventDefault();
-      applySuggestion(suggestions[activeSuggestion]);
-    } else if (e.key === "Escape") {
-      setSuggestOpen(false);
-    }
+    streetPickCityRef.current = s.city;
   }
 
   function toggleAmenity(value: string) {
@@ -328,61 +325,57 @@ export function PropertyForm({
         <Card className="p-6">
           <h2 className="mb-[18px] text-[17px] font-semibold tracking-tight">Location</h2>
           <div className="flex flex-col gap-4">
-            <div className="grid gap-3.5 sm:grid-cols-[1fr_100px_100px]">
+            <Field label="Country" htmlFor="country" error={errors.country}>
+              <AutocompleteInput
+                id="country"
+                placeholder="Ukraine"
+                value={country}
+                invalid={Boolean(errors.country)}
+                suggestions={countrySuggestions}
+                onValueChange={(v) => {
+                  setCountry(v);
+                  setPickedCoords(null);
+                }}
+                onPick={(s) => {
+                  setCountry(s.label);
+                  setPickedCoords(null);
+                }}
+              />
+            </Field>
+            <Field label="City" htmlFor="city" error={errors.city}>
+              <AutocompleteInput
+                id="city"
+                placeholder="Kyiv"
+                value={city}
+                invalid={Boolean(errors.city)}
+                suggestions={citySuggestions}
+                onValueChange={(v) => {
+                  setCity(v);
+                  setPickedCoords(null);
+                }}
+                onPick={pickCity}
+              />
+            </Field>
+            <div className="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_100px_100px]">
               <Field label="Street" htmlFor="street" error={errors.street}>
-                <div className="relative">
-                  <Input
-                    id="street"
-                    placeholder="Lakeshore Dr"
-                    autoComplete="off"
-                    role="combobox"
-                    aria-expanded={suggestOpen && suggestions.length > 0}
-                    aria-controls="street-suggestions"
-                    value={street}
-                    onChange={(e) => {
-                      setStreet(e.target.value);
-                      setPickedCoords(null);
-                      setSuggestOpen(true);
-                    }}
-                    onFocus={() => setSuggestOpen(true)}
-                    onBlur={() => setSuggestOpen(false)}
-                    onKeyDown={onStreetKeyDown}
-                    aria-invalid={Boolean(errors.street)}
-                  />
-                  {suggestOpen && suggestions.length > 0 ? (
-                    <ul
-                      id="street-suggestions"
-                      role="listbox"
-                      className="absolute top-full right-0 left-0 z-30 mt-1 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-md"
-                    >
-                      {suggestions.map((s, i) => (
-                        <li key={s.label} role="option" aria-selected={i === activeSuggestion}>
-                          <button
-                            type="button"
-                            tabIndex={-1}
-                            // mousedown so selection lands before the input's blur
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              applySuggestion(s);
-                            }}
-                            onMouseEnter={() => setActiveSuggestion(i)}
-                            className={cn(
-                              "w-full truncate px-3 py-2 text-left text-sm",
-                              i === activeSuggestion ? "bg-muted" : "hover:bg-muted",
-                            )}
-                          >
-                            {s.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
+                <AutocompleteInput
+                  id="street"
+                  placeholder="Khreshchatyk Street"
+                  value={street}
+                  invalid={Boolean(errors.street)}
+                  suggestions={streetSuggestions}
+                  onValueChange={(v) => {
+                    setStreet(v);
+                    setPickedCoords(null);
+                    streetPickCityRef.current = null;
+                  }}
+                  onPick={pickStreet}
+                />
               </Field>
               <Field label="House no." htmlFor="house">
                 <Input
                   id="house"
-                  placeholder="1240"
+                  placeholder="22"
                   value={houseNumber}
                   onChange={(e) => {
                     setHouseNumber(e.target.value);
@@ -390,10 +383,10 @@ export function PropertyForm({
                   }}
                 />
               </Field>
-              <Field label="Apt (optional)" htmlFor="apt">
+              <Field label="Apt" htmlFor="apt">
                 <Input
                   id="apt"
-                  placeholder="12"
+                  placeholder="Optional"
                   value={apartment}
                   onChange={(e) => setApartment(e.target.value)}
                 />
@@ -405,30 +398,6 @@ export function PropertyForm({
                 placeholder="e.g. Podil"
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
-              />
-            </Field>
-            <Field label="City" htmlFor="city" error={errors.city}>
-              <Input
-                id="city"
-                placeholder="South Lake Tahoe"
-                value={city}
-                onChange={(e) => {
-                  setCity(e.target.value);
-                  setPickedCoords(null);
-                }}
-                aria-invalid={Boolean(errors.city)}
-              />
-            </Field>
-            <Field label="Country" htmlFor="country" error={errors.country}>
-              <Input
-                id="country"
-                placeholder="United States"
-                value={country}
-                onChange={(e) => {
-                  setCountry(e.target.value);
-                  setPickedCoords(null);
-                }}
-                aria-invalid={Boolean(errors.country)}
               />
             </Field>
             <p className="text-[13px] text-muted-foreground">

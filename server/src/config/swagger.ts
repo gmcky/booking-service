@@ -373,7 +373,7 @@ export const swaggerOptions: Options = {
           type: "object",
           properties: {
             label: { type: "string" },
-            street: { type: "string" },
+            street: { type: "string", nullable: true },
             houseNumber: { type: "string", nullable: true },
             district: { type: "string", nullable: true },
             city: { type: "string" },
