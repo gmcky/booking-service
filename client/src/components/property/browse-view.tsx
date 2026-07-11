@@ -219,6 +219,12 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   // a sub-300ms refetch swapping cards in place beats a skeleton blink.
   const listLoading = query.isPending || query.isPlaceholderData;
   const showSkeleton = useDeferredLoading(listLoading) || (query.isPending && !query.data);
+  // The dim is gated too: most map pans resolve fast (and often to the very
+  // same result set) — dimming those reads as a pointless blink.
+  const dimStale = useDeferredLoading(query.isPlaceholderData, 150, 300);
+  // Remount (and fade in) the grid only when the visible result set actually
+  // changes — a pan that lands on the same stays must not animate at all.
+  const resultsKey = query.data?.pages[0]?.data.map((p) => p.id).join(",") ?? "";
   /** Empty while a bbox drives the search — the camera must never re-fit
    *  in response to its own pan. */
   const fitBoundsKey = React.useMemo(
@@ -378,12 +384,15 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           <EmptyState onClear={() => applyFilters({ sort: filters.sort })} />
         ) : (
           <>
-            {/* Stale cards dim while the next map area loads, then fade back
-                up as fresh results swap in — softer than an instant switch. */}
+            {/* Keyed by result identity: new stays fade in, identical results
+                after a pan keep the exact same DOM. Slow loads dim first. */}
             <section
+              key={resultsKey}
               className={cn(
-                "grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6 transition-opacity duration-300 motion-reduce:transition-none",
-                query.isPlaceholderData ? "opacity-50" : "opacity-100",
+                "grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6",
+                "animate-in fade-in duration-300 motion-reduce:animate-none",
+                "transition-opacity motion-reduce:transition-none",
+                dimStale ? "opacity-50" : "opacity-100",
               )}
             >
               {items.map((property) => (
