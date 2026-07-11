@@ -247,6 +247,46 @@ describe("PropertyForm", () => {
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ latitude: null, longitude: null });
   });
 
+  it("country suggests from the ISO list; city pick fills country and scopes the query", async () => {
+    const { propertyApi } = await import("@/lib/api/properties");
+    (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        label: "Kyiv, Ukraine",
+        street: null,
+        houseNumber: null,
+        district: null,
+        city: "Kyiv",
+        country: "Ukraine",
+        latitude: 50.4501,
+        longitude: 30.5234,
+      },
+    ]);
+    renderWithClient(
+      <PropertyForm
+        submitLabel="Publish listing"
+        pendingLabel="Publishing…"
+        pending={false}
+        formError=""
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    // Country: static ISO list, no API involved.
+    await userEvent.type(screen.getByLabelText("Country"), "Ukr");
+    await userEvent.click(await screen.findByText("Ukraine"));
+    expect(screen.getByLabelText("Country")).toHaveValue("Ukraine");
+    expect(propertyApi.suggestAddresses).not.toHaveBeenCalled();
+
+    // City: global provider, scoped to the picked country.
+    await userEvent.type(screen.getByLabelText("City"), "Kyi");
+    await userEvent.click(await screen.findByText("Kyiv, Ukraine"));
+    expect(screen.getByLabelText("City")).toHaveValue("Kyiv");
+    expect(propertyApi.suggestAddresses).toHaveBeenCalledWith("Kyi", {
+      kind: "city",
+      country: "Ukraine",
+    });
+  });
+
   it("uploading a photo shows a preview once the upload resolves", async () => {
     const { propertyApi } = await import("@/lib/api/properties");
     (propertyApi.uploadImages as ReturnType<typeof vi.fn>).mockResolvedValue({

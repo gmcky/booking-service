@@ -176,10 +176,24 @@ export const propertyApi = {
     return unwrap({ data, error, response });
   },
 
-  /** Host-form autocomplete; suggestions carry exact coordinates. */
-  suggestAddresses: async (q: string): Promise<AddressSuggestion[]> => {
+  /** Host-form autocomplete; street suggestions carry exact coordinates.
+   *  country/city narrow the results and are only sent when long enough to
+   *  pass validation. */
+  suggestAddresses: async (
+    q: string,
+    opts: { kind?: "street" | "city"; country?: string; city?: string } = {},
+  ): Promise<AddressSuggestion[]> => {
+    const country = opts.country?.trim();
+    const city = opts.city?.trim();
     const { data, error, response } = await apiClient.GET("/properties/address-suggest", {
-      params: { query: { q } },
+      params: {
+        query: {
+          q,
+          kind: opts.kind,
+          country: country && country.length >= 2 ? country : undefined,
+          city: city && city.length >= 2 ? city : undefined,
+        },
+      },
     });
     return unwrap({ data, error, response });
   },

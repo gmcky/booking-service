@@ -1460,6 +1460,11 @@ export interface paths {
                 query: {
                     q: string;
                     limit?: number;
+                    kind?: "street" | "city";
+                    /** @description Prefer results from this country */
+                    country?: string;
+                    /** @description Prefer results from this city (street kind only) */
+                    city?: string;
                 };
                 header?: never;
                 path?: never;
@@ -2737,7 +2742,7 @@ export interface components {
         };
         AddressSuggestion: {
             label: string;
-            street: string;
+            street: string | null;
             houseNumber: string | null;
             district: string | null;
             city: string;
