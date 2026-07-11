@@ -224,9 +224,6 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     150,
     300,
   );
-  // Remount (and fade in) the grid only when the visible result set actually
-  // changes — a pan that lands on the same stays must not animate at all.
-  const resultsKey = query.data?.pages[0]?.data.map((p) => p.id).join(",") ?? "";
   /** Empty while a bbox drives the search — the camera must never re-fit
    *  in response to its own pan. */
   const fitBoundsKey = React.useMemo(
@@ -389,12 +386,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           <EmptyState onClear={() => applyFilters({ sort: filters.sort })} />
         ) : (
           <>
-            {/* Keyed by result identity: new stays fade in, identical results
-                after a pan keep the exact same DOM. */}
-            <section
-              key={resultsKey}
-              className="animate-in fade-in grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6 duration-300 motion-reduce:animate-none"
-            >
+            {/* No enter animation on purpose: cards are keyed by id, so React
+                swaps only the ones that actually changed and a map pan never
+                flashes the grid. The map spinner is the only loading cue. */}
+            <section className="grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6">
               {items.map((property) => (
                 <PropertyCard
                   key={property.id}
