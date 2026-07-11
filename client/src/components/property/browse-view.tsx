@@ -114,7 +114,12 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
 
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [geoDismissed, setGeoDismissed] = React.useState(false);
-  const [mapMode, setMapMode] = React.useState<"split" | "list">("split");
+  // Collapsed by default; a bbox in the URL means a map session is being
+  // restored (reload, shared link) — hiding the map then would leave the
+  // user filtered to an area they can't see or change.
+  const [mapMode, setMapMode] = React.useState<"split" | "list">(() =>
+    hasBboxFilter(filters) ? "split" : "list",
+  );
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 

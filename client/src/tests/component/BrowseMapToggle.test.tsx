@@ -5,9 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowseView } from "@/components/property/browse-view";
 import { propertyApi } from "@/lib/api/properties";
 
+const nav = vi.hoisted(() => ({ params: new URLSearchParams() }));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => nav.params,
   usePathname: () => "/browse",
 }));
 
@@ -51,6 +53,7 @@ function renderBrowse() {
 
 describe("BrowseView map toggle", () => {
   beforeEach(() => {
+    nav.params = new URLSearchParams();
     vi.mocked(propertyApi.search).mockResolvedValue({
       data: [
         {
@@ -71,15 +74,26 @@ describe("BrowseView map toggle", () => {
     vi.mocked(propertyApi.mapMarkers).mockResolvedValue([]);
   });
 
-  it("defaults to split view (map panel present) and toggles to list-only", async () => {
+  it("defaults to list-only and toggles the map open", async () => {
     renderBrowse();
 
-    const toggle = await screen.findByRole("button", { name: "Show list" });
+    const toggle = await screen.findByRole("button", { name: "Show map" });
     expect(toggle).toBeInTheDocument();
     expect(await screen.findByText("Canal House")).toBeInTheDocument();
 
     await userEvent.click(toggle);
 
-    expect(await screen.findByRole("button", { name: "Show map" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Show list" })).toBeInTheDocument();
+  });
+
+  it("opens in split view when the URL carries a map-area bbox", async () => {
+    // Restored map session (reload / shared link) — collapsing here would
+    // filter by an area the user can't see.
+    nav.params = new URLSearchParams(
+      "minLat=52.1&maxLat=52.6&minLng=4.6&maxLng=5.2",
+    );
+    renderBrowse();
+
+    expect(await screen.findByRole("button", { name: "Show list" })).toBeInTheDocument();
   });
 });
