@@ -112,6 +112,8 @@ export const swaggerOptions: Options = {
             "HISTORIC_BUILDING",
             "VINYL_RECORD_PLAYER",
             "BOOKS",
+            "SMOKE_ALARM",
+            "CARBON_MONOXIDE_ALARM",
           ],
         },
         BookingStatus: {
@@ -327,6 +329,8 @@ export const swaggerOptions: Options = {
             maxGuests: { type: "integer" },
             petsAllowed: { type: "boolean" },
             infantsAllowed: { type: "boolean" },
+            checkInTime: { type: "string", nullable: true, example: "15:00" },
+            checkOutTime: { type: "string", nullable: true, example: "11:00" },
             amenities: {
               type: "array",
               items: { $ref: "#/components/schemas/Amenity" },
@@ -360,6 +364,8 @@ export const swaggerOptions: Options = {
             "maxGuests",
             "petsAllowed",
             "infantsAllowed",
+            "checkInTime",
+            "checkOutTime",
             "amenities",
             "averageRating",
             "reviewCount",

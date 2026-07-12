@@ -286,6 +286,8 @@ propertyRouter.post(
  *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
+ *               checkInTime: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$', example: '15:00' }
+ *               checkOutTime: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$', example: '11:00' }
  *               amenities: { type: array, items: { $ref: '#/components/schemas/Amenity' }, maxItems: 20 }
  *               rawImagePaths: { type: array, items: { type: string }, maxItems: 10 }
  *     responses:
@@ -333,6 +335,8 @@ propertyRouter.post(
  *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               pricePerNight: { type: number }
  *               maxGuests: { type: integer }
+ *               checkInTime: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$', example: '15:00', nullable: true }
+ *               checkOutTime: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$', example: '11:00', nullable: true }
  *               amenities: { type: array, items: { $ref: '#/components/schemas/Amenity' } }
  *               images: { type: array, items: { type: string, format: uri } }
  *     responses:

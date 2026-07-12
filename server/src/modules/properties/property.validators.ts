@@ -33,6 +33,14 @@ export const createPropertySchema = z
     maxGuests: z.number().int().positive(),
     petsAllowed: z.boolean().default(false),
     infantsAllowed: z.boolean().default(true),
+    checkInTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Must be HH:MM (24h)")
+      .optional(),
+    checkOutTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Must be HH:MM (24h)")
+      .optional(),
     amenities: z.array(z.nativeEnum(Amenity)).max(20).default([]),
     // Accept temp upload paths; worker resolves final URLs asynchronously.
     rawImagePaths: z.array(z.string()).max(10).default([]),
@@ -57,6 +65,14 @@ export const updatePropertySchema = z
     maxGuests: z.number().int().positive().optional(),
     petsAllowed: z.boolean().optional(),
     infantsAllowed: z.boolean().optional(),
+    checkInTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Must be HH:MM (24h)")
+      .nullish(),
+    checkOutTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Must be HH:MM (24h)")
+      .nullish(),
     amenities: z.array(z.nativeEnum(Amenity)).max(20).optional(),
     // Expects finalized CDN URLs only.
     images: z.array(z.string().url()).max(10).optional(),
