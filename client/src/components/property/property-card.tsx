@@ -34,7 +34,7 @@ export function PropertyCard({
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cn(
-        "block overflow-hidden rounded-xl border border-border bg-card transition-[box-shadow,border-color] hover:border-ring hover:shadow-sm",
+        "block overflow-hidden rounded-xl border border-border bg-card transition-[box-shadow,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-ring hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         highlighted && "border-ring shadow-sm ring-2 ring-ring",
       )}
     >
