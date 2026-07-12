@@ -18,6 +18,11 @@ globalThis.ResizeObserver ??= ObserverStub as unknown as typeof ResizeObserver;
 
 // jsdom has no matchMedia either (search-pill uses it to pick the popover
 // anchor per layout). Never-matching is fine: tests don't assert positioning.
+// jsdom has no layout engine, so it never implements scroll methods on
+// elements (carousel.tsx calls trackRef.current.scrollBy). Stub it as a
+// no-op — tests only assert on rendered content, never on scroll position.
+window.HTMLElement.prototype.scrollBy ??= function scrollBy() {};
+
 window.matchMedia ??= ((query: string) => ({
   matches: false,
   media: query,

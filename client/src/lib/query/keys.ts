@@ -10,6 +10,8 @@ export const queryKeys = {
     browse: (query: PropertyQuery) => ["properties", "browse", query] as const,
     mapMarkers: (query: PropertyQuery) => ["properties", "map-markers", query] as const,
     detail: (id: string) => ["properties", "detail", id] as const,
+    nearby: (propertyId: string, city: string, country: string) =>
+      ["properties", "nearby", propertyId, city, country] as const,
     mine: ["properties", "mine"] as const,
     locations: ["properties", "locations"] as const,
   },
