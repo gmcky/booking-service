@@ -1,4 +1,5 @@
 import prismaClientPkg, {
+  Amenity,
   Role,
   BookingStatus,
   PaymentStatus,
@@ -32,6 +33,11 @@ const now = Date.now();
 const daysAgo = (n: number) => new Date(now - n * DAY_MS);
 const monthsAgo = (n: number) => new Date(now - n * 30 * DAY_MS);
 const yearsAgo = (n: number) => new Date(now - n * 365 * DAY_MS);
+
+// ~75% of properties get check-in/out times; the rest stay null to exercise
+// the omit-row path on the "Things to know" section.
+const CHECK_IN_TIMES = ["14:00", "15:00", "16:00"];
+const CHECK_OUT_TIMES = ["10:00", "11:00", "12:00"];
 
 type SeededUser = {
   email: string;
@@ -236,7 +242,7 @@ async function main() {
     createdAt: Date;
   }> = [];
 
-  for (const template of allPropertyTemplates) {
+  for (const [propIndex, template] of allPropertyTemplates.entries()) {
     const owner = createdUsers[template.ownerEmail];
     if (!owner) {
       throw new Error(`Owner not found for property "${template.title}": ${template.ownerEmail}`);
@@ -264,7 +270,18 @@ async function main() {
         maxGuests: template.maxGuests,
         petsAllowed: template.petsAllowed ?? false,
         infantsAllowed: template.infantsAllowed ?? true,
-        amenities: template.amenities,
+        checkInTime: propIndex % 4 !== 3 ? CHECK_IN_TIMES[propIndex % 3] : null,
+        checkOutTime: propIndex % 4 !== 3 ? CHECK_OUT_TIMES[propIndex % 3] : null,
+        // Safety amenities layered on deterministically (~86% / ~67%) so the
+        // "Things to know" safety column shows both positive and negative rows.
+        // Set-dedupe in case a template ever lists them by hand.
+        amenities: [
+          ...new Set<Amenity>([
+            ...template.amenities,
+            ...(propIndex % 7 !== 5 ? [Amenity.SMOKE_ALARM] : []),
+            ...(propIndex % 3 !== 2 ? [Amenity.CARBON_MONOXIDE_ALARM] : []),
+          ]),
+        ],
         images: template.images,
         ownerId: owner.id,
         isActive: true,

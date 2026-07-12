@@ -56,6 +56,9 @@ model Property {
   // House rules — filterable, distinct from display amenities.
   petsAllowed    Boolean @default(false)
   infantsAllowed Boolean @default(true)
+  // "HH:MM" 24h wall-clock, display-only — never gates booking validation; no timezone column by design.
+  checkInTime  String?
+  checkOutTime String?
   amenities     Amenity[]
   images        String[]
   ownerId       String
@@ -127,6 +130,8 @@ enum Amenity {
   HISTORIC_BUILDING
   VINYL_RECORD_PLAYER
   BOOKS
+  SMOKE_ALARM
+  CARBON_MONOXIDE_ALARM
 }
 
 model Booking {
