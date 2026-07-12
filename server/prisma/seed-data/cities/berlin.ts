@@ -1,0 +1,65 @@
+import { PropertyType, Amenity } from "@prisma/client";
+import type { SeedPropertyTemplate } from "../types.js";
+import { pickImages } from "../images.js";
+
+export const berlinProperties: SeedPropertyTemplate[] = [
+  {
+    title: "Minimalist Studio in Mitte",
+    description:
+      "A sleek, minimalist studio in the very centre of Berlin, ideal for business travellers. Fast fibre internet, a stand-up desk, and a curated art collection. Five minutes on foot to Museum Island.",
+    type: PropertyType.APARTMENT,
+    city: "Berlin",
+    country: "Germany",
+    district: "Mitte",
+    street: "Rosenthaler Str",
+    houseNumber: "25",
+    latitude: 52.5294,
+    longitude: 13.4014,
+    pricePerNight: 125,
+    maxGuests: 2,
+    infantsAllowed: false,
+    amenities: [Amenity.WIFI, Amenity.STANDING_DESK, Amenity.AIR_CONDITIONING, Amenity.CITY_CENTRE],
+    images: pickImages("minimalistModern", 5, 5),
+    ownerEmail: "owner2@demo.com",
+    createdMonthsAgo: 12,
+  },
+  {
+    title: "Kreuzberg Loft with Courtyard",
+    description:
+      "A spacious loft in Berlin's most creative district. Industrial-chic aesthetics — steel beams, polished concrete floors, floor-to-ceiling bookshelves. Private access to a shared courtyard garden.",
+    type: PropertyType.APARTMENT,
+    city: "Berlin",
+    country: "Germany",
+    district: "Kreuzberg",
+    street: "Oranienstr",
+    houseNumber: "58",
+    latitude: 52.4996,
+    longitude: 13.4212,
+    pricePerNight: 150,
+    maxGuests: 4,
+    petsAllowed: true,
+    amenities: [Amenity.WIFI, Amenity.KITCHEN, Amenity.COURTYARD, Amenity.WASHER, Amenity.BOOKS],
+    images: pickImages("loftIndustrial", 5, 4),
+    ownerEmail: "owner@demo.com",
+    createdMonthsAgo: 33,
+  },
+  {
+    title: "Classic Berlin Altbau near Prenzlauer Berg",
+    description:
+      "A traditional Berlin Altbau (pre-war building) with beautiful stucco ceilings and herringbone parquet. Three rooms, a large eat-in kitchen and a balcony overlooking a tree-lined street.",
+    type: PropertyType.APARTMENT,
+    city: "Berlin",
+    country: "Germany",
+    district: "Prenzlauer Berg",
+    street: "Kastanienallee",
+    houseNumber: "12",
+    latitude: 52.5396,
+    longitude: 13.4088,
+    pricePerNight: 115,
+    maxGuests: 5,
+    amenities: [Amenity.WIFI, Amenity.KITCHEN, Amenity.BALCONY, Amenity.WASHER, Amenity.BIKE_RENTAL_NEARBY],
+    images: pickImages("cityApartment", 5, 6),
+    ownerEmail: "owner2@demo.com",
+    createdMonthsAgo: 8,
+  },
+];

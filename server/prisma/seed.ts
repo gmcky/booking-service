@@ -1,7 +1,5 @@
 import prismaClientPkg, {
   Role,
-  PropertyType,
-  Amenity,
   BookingStatus,
   PaymentStatus,
   PayoutStatus,
@@ -10,6 +8,14 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
+import {
+  allHosts,
+  allGuests,
+  allPropertyTemplates,
+  allReviews,
+  hostReplies,
+  avatarPool,
+} from "./seed-data/index.js";
 
 const { PrismaClient } = prismaClientPkg;
 const prisma = new PrismaClient({
@@ -21,26 +27,34 @@ const prisma = new PrismaClient({
 // seeded content used by other reviewers.
 const PUBLIC_DEMO_PASSWORD = "demo1234";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const now = Date.now();
+const daysAgo = (n: number) => new Date(now - n * DAY_MS);
+const monthsAgo = (n: number) => new Date(now - n * 30 * DAY_MS);
+const yearsAgo = (n: number) => new Date(now - n * 365 * DAY_MS);
+
 type SeededUser = {
   email: string;
   firstName: string;
   lastName: string;
-  phoneNumber: string;
+  phoneNumber?: string;
   role: Role;
-  // Source of truth for the password:
-  //   "public"   — fixed credential exposed in README.
-  //   envVar     — read from process.env[<envVar>]; if unset, a random one is
-  //                generated, logged once, and never persisted in plaintext.
+  bio?: string;
+  avatarUrl?: string;
+  createdAt: Date;
   passwordSource: { kind: "public"; value: string } | { kind: "env"; envVar: string };
 };
 
-const users: SeededUser[] = [
+// Distinct avatars for the 5 human demo accounts, from pool indices that
+// maybeAvatar() never draws for hosts/guests (3,4,8,9,13). demo + admin stay bare.
+const baseUsers: SeededUser[] = [
   {
     email: "demo@booking.dev",
     firstName: "Demo",
     lastName: "Visitor",
     phoneNumber: "+380501110000",
     role: Role.USER,
+    createdAt: monthsAgo(2),
     passwordSource: { kind: "public", value: PUBLIC_DEMO_PASSWORD },
   },
   {
@@ -49,6 +63,8 @@ const users: SeededUser[] = [
     lastName: "Kovalenko",
     phoneNumber: "+380501234567",
     role: Role.USER,
+    avatarUrl: avatarPool[3],
+    createdAt: yearsAgo(6),
     passwordSource: { kind: "env", envVar: "SEED_OWNER1_PASSWORD" },
   },
   {
@@ -57,6 +73,8 @@ const users: SeededUser[] = [
     lastName: "Sirko",
     phoneNumber: "+380509998877",
     role: Role.USER,
+    avatarUrl: avatarPool[4],
+    createdAt: yearsAgo(6),
     passwordSource: { kind: "env", envVar: "SEED_OWNER2_PASSWORD" },
   },
   {
@@ -65,6 +83,7 @@ const users: SeededUser[] = [
     lastName: "Shevchenko",
     phoneNumber: "+380631234567",
     role: Role.ADMIN,
+    createdAt: yearsAgo(5),
     passwordSource: { kind: "env", envVar: "SEED_ADMIN_PASSWORD" },
   },
   {
@@ -73,6 +92,8 @@ const users: SeededUser[] = [
     lastName: "Petrenko",
     phoneNumber: "+380671234567",
     role: Role.USER,
+    avatarUrl: avatarPool[8],
+    createdAt: yearsAgo(3),
     passwordSource: { kind: "env", envVar: "SEED_USER1_PASSWORD" },
   },
   {
@@ -81,6 +102,8 @@ const users: SeededUser[] = [
     lastName: "Melnyk",
     phoneNumber: "+380672345678",
     role: Role.USER,
+    avatarUrl: avatarPool[9],
+    createdAt: yearsAgo(3),
     passwordSource: { kind: "env", envVar: "SEED_USER2_PASSWORD" },
   },
   {
@@ -89,9 +112,36 @@ const users: SeededUser[] = [
     lastName: "Bondarenko",
     phoneNumber: "+380673456789",
     role: Role.USER,
+    avatarUrl: avatarPool[13],
+    createdAt: yearsAgo(3),
     passwordSource: { kind: "env", envVar: "SEED_USER3_PASSWORD" },
   },
 ];
+
+// Hosts + guests become USER accounts. All hosts share one env password, all
+// guests another — the credentials printout collapses each to a single line.
+const hostUsers: SeededUser[] = allHosts.map((h) => ({
+  email: h.email,
+  firstName: h.firstName,
+  lastName: h.lastName,
+  role: Role.USER,
+  bio: h.bio,
+  avatarUrl: h.avatarUrl,
+  createdAt: yearsAgo(h.createdYearsAgo),
+  passwordSource: { kind: "env", envVar: "SEED_HOSTS_PASSWORD" },
+}));
+
+const guestUsers: SeededUser[] = allGuests.map((g) => ({
+  email: g.email,
+  firstName: g.firstName,
+  lastName: g.lastName,
+  role: Role.USER,
+  avatarUrl: g.avatarUrl,
+  createdAt: monthsAgo(g.createdMonthsAgo),
+  passwordSource: { kind: "env", envVar: "SEED_GUESTS_PASSWORD" },
+}));
+
+const users: SeededUser[] = [...baseUsers, ...hostUsers, ...guestUsers];
 
 function resolvePassword(
   source: SeededUser["passwordSource"],
@@ -104,694 +154,40 @@ function resolvePassword(
   if (fromEnv && fromEnv.length > 0) {
     return { value: fromEnv, origin: "env" };
   }
+  // Reuse the fallback across every user sharing this env var (e.g. all hosts).
+  const existing = generated.get(source.envVar);
+  if (existing) {
+    return { value: existing, origin: "generated" };
+  }
   const random = crypto.randomBytes(18).toString("base64url");
   generated.set(source.envVar, random);
   return { value: random, origin: "generated" };
 }
 
-// City-center coordinates for every city used in the templates below. Each
-// property gets a small deterministic jitter (by template index) applied on
-// top so pins don't stack exactly on the city center.
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  Kyiv: { lat: 50.4501, lng: 30.5234 },
-  Lviv: { lat: 49.8397, lng: 24.0297 },
-  Odesa: { lat: 46.4825, lng: 30.7233 },
-  Berlin: { lat: 52.52, lng: 13.405 },
-  Paris: { lat: 48.8566, lng: 2.3522 },
-  Rome: { lat: 41.9028, lng: 12.4964 },
-  Amsterdam: { lat: 52.3676, lng: 4.9041 },
-};
-
-function jitterCoords(city: string, rowIndexInCity: number) {
-  const base = CITY_COORDS[city];
-  if (!base) return { latitude: null, longitude: null };
-
-  return {
-    latitude: base.lat + ((rowIndexInCity % 7) - 3) * 0.006,
-    longitude: base.lng + ((Math.floor(rowIndexInCity / 7) % 7) - 3) * 0.009,
-  };
-}
-
-const propertyTemplates: Array<{
-  title: string;
-  description: string;
-  type: PropertyType;
-  city: string;
-  country: string;
-  district?: string;
-  street: string;
-  houseNumber?: string;
-  apartment?: string;
-  pricePerNight: number;
-  maxGuests: number;
-  petsAllowed?: boolean;
-  infantsAllowed?: boolean;
-  amenities: Amenity[];
-  images: string[];
-}> = [
-  {
-    title: "Modern Studio in Podil",
-    description:
-      "A stylish studio apartment in the heart of Podil — Kyiv's most vibrant neighbourhood. Floor-to-ceiling windows with views of the Dnipro, a fully equipped kitchen and a fast Wi-Fi connection make it perfect for remote work or a relaxing city break.",
-    type: PropertyType.APARTMENT,
-    city: "Kyiv",
-    country: "Ukraine",
-    district: "Podil",
-    street: "Kontraktova Square",
-    houseNumber: "4",
-    pricePerNight: 55,
-    maxGuests: 2,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.AIR_CONDITIONING,
-      Amenity.KITCHEN,
-      Amenity.WASHER,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Spacious 2BR Apartment near Khreshchatyk",
-    description:
-      "A generous two-bedroom apartment just two minutes' walk from Kyiv's main boulevard. Classic Ukrainian interior blended with modern amenities: a projector screen, coffee machine and a soaking tub. Ideal for couples or small families.",
-    type: PropertyType.APARTMENT,
-    city: "Kyiv",
-    country: "Ukraine",
-    district: "Shevchenkivskyi",
-    street: "Shevchenka Blvd",
-    houseNumber: "12",
-    apartment: "7",
-    pricePerNight: 85,
-    maxGuests: 4,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.WASHER,
-      Amenity.PROJECTOR,
-      Amenity.BATHTUB,
-      Amenity.GYM,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Cosy Room in Historic Pechersk",
-    description:
-      "A quiet private room in a shared apartment in Pechersk, a short metro ride from Lavra monastery and the main business district. Great natural light, a comfy bed and a private bathroom.",
-    type: PropertyType.HOTEL_ROOM,
-    city: "Kyiv",
-    country: "Ukraine",
-    district: "Pechersk",
-    street: "Lypska St",
-    houseNumber: "3",
-    pricePerNight: 30,
-    maxGuests: 1,
-    infantsAllowed: false,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.AIR_CONDITIONING,
-      Amenity.PRIVATE_BATHROOM,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Designer Loft on Vozdvizhenka",
-    description:
-      "A stunning loft apartment in one of Kyiv's most photogenic streets. Exposed brick walls, designer furniture, a record player and a rooftop terrace are waiting for you.",
-    type: PropertyType.APARTMENT,
-    city: "Kyiv",
-    country: "Ukraine",
-    district: "Podil",
-    street: "Vozdvyzhenka St",
-    houseNumber: "10",
-    pricePerNight: 120,
-    maxGuests: 3,
-    infantsAllowed: false,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.ROOFTOP_TERRACE,
-      Amenity.VINYL_RECORD_PLAYER,
-      Amenity.COFFEE_MACHINE,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1549187774-b4e9b0445b41?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1461360228754-6e81c478b882?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Private House with Garden, Obolon",
-    description:
-      "A charming private house with a landscaped garden in the quiet Obolon district, on the left bank of the Dnipro. Three bedrooms, a barbecue area and a children's playground on site.",
-    type: PropertyType.HOUSE,
-    city: "Kyiv",
-    country: "Ukraine",
-    district: "Obolon",
-    street: "Obolonska St",
-    houseNumber: "22",
-    pricePerNight: 150,
-    maxGuests: 8,
-    petsAllowed: true,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.PARKING,
-      Amenity.GARDEN,
-      Amenity.BBQ,
-      Amenity.WASHER,
-      Amenity.DISHWASHER,
-      Amenity.KIDS_PLAY_AREA,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=800",
-    ],
-  },
-
-  {
-    title: "Old Town Apartment in Lviv Centre",
-    description:
-      "A beautiful apartment inside a 19th-century building on the most prestigious street in Lviv. Original oak parquet, 3-metre ceilings and windows overlooking the Latin Cathedral. Walking distance to every major landmark.",
-    type: PropertyType.APARTMENT,
-    city: "Lviv",
-    country: "Ukraine",
-    district: "Old Town",
-    street: "Shevska St",
-    houseNumber: "5",
-    pricePerNight: 65,
-    maxGuests: 2,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.HISTORIC_BUILDING,
-      Amenity.CITY_CENTRE,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Cosy Cottage near Lychakiv Cemetery",
-    description:
-      "A romantic two-storey cottage on a quiet street near the famous Lychakiv Cemetery. Wooden beams, a fireplace and a private courtyard with rose bushes. Perfect for a romantic weekend escape.",
-    type: PropertyType.HOUSE,
-    city: "Lviv",
-    country: "Ukraine",
-    district: "Lychakiv",
-    street: "Mechnikova St",
-    houseNumber: "18",
-    pricePerNight: 90,
-    maxGuests: 4,
-    petsAllowed: true,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.FIREPLACE,
-      Amenity.COURTYARD,
-      Amenity.PARKING,
-      Amenity.KITCHEN,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1595877244574-e90ce41ce089?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Modern Apartment near Rynok Square",
-    description:
-      "A freshly renovated apartment 200 m from Rynok Square. The interior blends Lviv's Austro-Hungarian heritage with Scandinavian minimalism. Nespresso machine included, specialty coffee shops at the doorstep.",
-    type: PropertyType.APARTMENT,
-    city: "Lviv",
-    country: "Ukraine",
-    district: "Old Town",
-    street: "Stavropigijska St",
-    houseNumber: "9",
-    pricePerNight: 75,
-    maxGuests: 3,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.COFFEE_MACHINE,
-      Amenity.CITY_CENTRE,
-      Amenity.AIR_CONDITIONING,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800",
-    ],
-  },
-
-  {
-    title: "Sea View Apartment in Arcadia",
-    description:
-      "A bright apartment with panoramic views of the Black Sea, just 50 metres from Arcadia beach. Spend the day on the sand and the evening on your private balcony watching the sunset. Summer-ready: air-conditioned and with beach towels provided.",
-    type: PropertyType.APARTMENT,
-    city: "Odesa",
-    country: "Ukraine",
-    district: "Arcadia",
-    street: "Genuezska St",
-    houseNumber: "24",
-    pricePerNight: 95,
-    maxGuests: 3,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.AIR_CONDITIONING,
-      Amenity.SEA_VIEW,
-      Amenity.BALCONY,
-      Amenity.BEACHFRONT,
-      Amenity.KITCHEN,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1567767292278-a4f21aa2d36e?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Heritage Apartment on Derybasivska",
-    description:
-      "Step back in time in this stunning apartment inside a 19th-century mansion on Odesa's most famous pedestrian street. Antique furniture, high ceilings and ornate moulding — combined with modern Wi-Fi and air conditioning.",
-    type: PropertyType.APARTMENT,
-    city: "Odesa",
-    country: "Ukraine",
-    district: "City Centre",
-    street: "Derybasivska St",
-    houseNumber: "16",
-    pricePerNight: 80,
-    maxGuests: 2,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.AIR_CONDITIONING,
-      Amenity.HISTORIC_BUILDING,
-      Amenity.CITY_CENTRE,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Beach House with Private Pool",
-    description:
-      "A luxurious private beach house with an infinity pool overlooking the sea. Four bedrooms, a fully equipped BBQ terrace and direct beach access via a private staircase. Ideal for groups or family holidays.",
-    type: PropertyType.HOUSE,
-    city: "Odesa",
-    country: "Ukraine",
-    district: "Fontanka",
-    street: "Fontanska Rd",
-    houseNumber: "40",
-    pricePerNight: 280,
-    maxGuests: 10,
-    petsAllowed: true,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.POOL,
-      Amenity.BBQ,
-      Amenity.PARKING,
-      Amenity.BEACHFRONT,
-      Amenity.AIR_CONDITIONING,
-      Amenity.SMART_TV,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800",
-    ],
-  },
-
-  {
-    title: "Minimalist Studio in Mitte",
-    description:
-      "A sleek, minimalist studio in the very centre of Berlin, ideal for business travellers. Fast fibre internet, a stand-up desk, and a curated art collection. Five minutes on foot to Museum Island.",
-    type: PropertyType.APARTMENT,
-    city: "Berlin",
-    country: "Germany",
-    district: "Mitte",
-    street: "Rosenthaler Str",
-    houseNumber: "25",
-    pricePerNight: 110,
-    maxGuests: 2,
-    infantsAllowed: false,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.STANDING_DESK,
-      Amenity.AIR_CONDITIONING,
-      Amenity.CITY_CENTRE,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1493934558415-9d19f0b2b4d2?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Kreuzberg Loft with Courtyard",
-    description:
-      "A spacious loft in Berlin's most creative district. Industrial-chic aesthetics — steel beams, polished concrete floors, floor-to-ceiling bookshelves. Private access to a shared courtyard garden.",
-    type: PropertyType.APARTMENT,
-    city: "Berlin",
-    country: "Germany",
-    district: "Kreuzberg",
-    street: "Oranienstr",
-    houseNumber: "58",
-    pricePerNight: 135,
-    maxGuests: 4,
-    petsAllowed: true,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.COURTYARD,
-      Amenity.WASHER,
-      Amenity.BOOKS,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Classic Berlin Altbau near Prenzlauer Berg",
-    description:
-      "A traditional Berlin Altbau (pre-war building) with beautiful stucco ceilings and herringbone parquet. Three rooms, a large eat-in kitchen and a balcony overlooking a tree-lined street.",
-    type: PropertyType.APARTMENT,
-    city: "Berlin",
-    country: "Germany",
-    district: "Prenzlauer Berg",
-    street: "Kastanienallee",
-    houseNumber: "12",
-    pricePerNight: 100,
-    maxGuests: 5,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.BALCONY,
-      Amenity.WASHER,
-      Amenity.BIKE_RENTAL_NEARBY,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=800",
-    ],
-  },
-
-  {
-    title: "Charming Studio near the Eiffel Tower",
-    description:
-      "Ooh la la! A romantic studio for two in the 7th arrondissement, a short walk from the Eiffel Tower. French antique furniture, a Nespresso machine and a tiny balcony with iron railings — quintessentially Parisian.",
-    type: PropertyType.APARTMENT,
-    city: "Paris",
-    country: "France",
-    district: "7th arrondissement",
-    street: "Rue de Grenelle",
-    houseNumber: "42",
-    pricePerNight: 160,
-    maxGuests: 2,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.COFFEE_MACHINE,
-      Amenity.BALCONY,
-      Amenity.AIR_CONDITIONING,
-      Amenity.CITY_CENTRE,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1489171078254-c3365d6e359f?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Haussmann Apartment in Le Marais",
-    description:
-      "A classic Haussmann building apartment in the heart of Le Marais — Paris's most fashionable neighbourhood. Two bedrooms, parquet floors, exposed stone walls and high ceilings. Steps from Place des Vosges.",
-    type: PropertyType.APARTMENT,
-    city: "Paris",
-    country: "France",
-    district: "Le Marais",
-    street: "Rue de Bretagne",
-    houseNumber: "18",
-    pricePerNight: 210,
-    maxGuests: 4,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.KITCHEN,
-      Amenity.AIR_CONDITIONING,
-      Amenity.DISHWASHER,
-      Amenity.HISTORIC_BUILDING,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800",
-    ],
-  },
-
-  {
-    title: "Trastevere Apartment with Rooftop",
-    description:
-      "Lose yourself in Rome's most charming neighbourhood. This bright apartment features original terracotta tiles, arched doorways and a shared rooftop terrace with views of the basilicas. Fall asleep to the sound of fountains beneath your window.",
-    type: PropertyType.APARTMENT,
-    city: "Rome",
-    country: "Italy",
-    district: "Trastevere",
-    street: "Via della Lungara",
-    houseNumber: "15",
-    pricePerNight: 130,
-    maxGuests: 3,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.ROOFTOP_TERRACE,
-      Amenity.KITCHEN,
-      Amenity.AIR_CONDITIONING,
-      Amenity.CITY_CENTRE,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1531572753322-ad063cecc140?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1615529182904-14819c35db37?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Historic Flat near the Colosseum",
-    description:
-      "Wake up with a view of the Colosseum from this beautifully restored 2-bedroom apartment. Original Roman stone arches in the living area, a full kitchen and a quiet rear-facing terrace for evening aperitivo.",
-    type: PropertyType.APARTMENT,
-    city: "Rome",
-    country: "Italy",
-    district: "Centro Storico",
-    street: "Via Sacra",
-    houseNumber: "8",
-    pricePerNight: 175,
-    maxGuests: 4,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.TERRACE,
-      Amenity.KITCHEN,
-      Amenity.HISTORIC_BUILDING,
-      Amenity.AIR_CONDITIONING,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800",
-    ],
-  },
-
-  {
-    title: "Canal House Apartment, Jordaan",
-    description:
-      "Live like a local in a narrow Dutch canal house in the Jordaan — Amsterdam's most picturesque neighbourhood. Original wooden beams, a steep canal-house staircase and a private terrace overlooking the Prinsengracht canal.",
-    type: PropertyType.APARTMENT,
-    city: "Amsterdam",
-    country: "Netherlands",
-    district: "Jordaan",
-    street: "Prinsengracht",
-    houseNumber: "204",
-    pricePerNight: 195,
-    maxGuests: 2,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.TERRACE,
-      Amenity.CANAL_VIEW,
-      Amenity.KITCHEN,
-      Amenity.BIKE_INCLUDED,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800",
-    ],
-  },
-  {
-    title: "Modern Houseboat on the IJ",
-    description:
-      "An innovative stay — a fully renovated houseboat moored on the IJ river with stunning views of Amsterdam's skyline. Two bedrooms, a sun deck and a kayak available for guests. Unique, unforgettable, quintessentially Amsterdam.",
-    type: PropertyType.HOUSE,
-    city: "Amsterdam",
-    country: "Netherlands",
-    district: "Noord",
-    street: "NDSM Wharf",
-    pricePerNight: 220,
-    maxGuests: 4,
-    amenities: [
-      Amenity.WIFI,
-      Amenity.SUN_DECK,
-      Amenity.KAYAK,
-      Amenity.KITCHEN,
-      Amenity.RIVER_VIEW,
-      Amenity.PARKING,
-    ],
-    images: [
-      "https://images.unsplash.com/photo-1512470876302-972faa2aa9a4?auto=format&fit=crop&w=800",
-      "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=800",
-    ],
-  },
-];
-
-function getStayDates(checkInOffsetDays: number, nights: number) {
-  const dayMs = 24 * 60 * 60 * 1000;
-  const checkIn = new Date(Date.now() + checkInOffsetDays * dayMs);
-  checkIn.setHours(14, 0, 0, 0);
-
-  const checkOut = new Date(checkIn.getTime() + nights * dayMs);
-  checkOut.setHours(12, 0, 0, 0);
-
-  return { checkIn, checkOut, nights };
+function getStayDates(checkIn: Date, nights: number) {
+  const ci = new Date(checkIn);
+  ci.setHours(14, 0, 0, 0);
+  const co = new Date(ci.getTime() + nights * DAY_MS);
+  co.setHours(12, 0, 0, 0);
+  return { checkIn: ci, checkOut: co, nights };
 }
 
 // Keep seed deterministic: stable snapshots across reruns/CI.
 faker.seed(20260406);
 
-// Skewed distribution: realistic demo payload (mostly 4-5, some 3).
-const reviewRatingPool = [5, 5, 5, 4, 4, 4, 3, 3] as const;
-
-const reviewOpeners = [
-  "Really enjoyed this stay.",
-  "Overall, this was a solid booking.",
-  "We had a pleasant stay here.",
-  "This place worked very well for our trip.",
-  "Stayed here recently and had a good experience.",
-  "Came with moderate expectations and was positively surprised.",
-];
-
-const reviewTripContexts = [
-  "for a short city break",
-  "during a work trip",
-  "for a weekend getaway",
-  "while visiting friends nearby",
-  "for a few nights before a conference",
-  "as a base to explore the area",
-];
-
-const reviewPositives = [
-  "the place was spotless on arrival",
-  "check-in instructions were clear and easy to follow",
-  "Wi-Fi was stable for video calls",
-  "the bed was genuinely comfortable",
-  "kitchen had everything needed for simple meals",
-  "host replies were quick and polite",
-  "photos matched reality",
-  "location made it easy to get around",
-  "the apartment felt safe even late at night",
-  "heating and hot water worked perfectly",
-  "noise insulation was better than expected",
-  "common areas were tidy and well maintained",
-];
-
-const reviewNegatives = [
-  "street noise was noticeable after midnight",
-  "soundproofing between rooms could be better",
-  "shower pressure was weaker than expected",
-  "sofa in the living room is starting to wear out",
-  "blackout curtains did not fully block the morning light",
-  "elevator wait time was long during peak hours",
-  "parking nearby was hard to find in the evening",
-  "air conditioning needed extra time to cool the room",
-  "there was a slight smell in the hallway in the evening",
-  "pillows were too soft for my preference",
-];
-
-const reviewClosingsPositive = [
-  "Would happily book this place again.",
-  "I would recommend it to friends.",
-  "Would return on the next trip.",
-  "Good value for money overall.",
-  "Easy recommendation for similar trips.",
-];
-
-const reviewClosingsNeutral = [
-  "Still a decent option if your expectations are realistic.",
-  "With a couple of tweaks this place could be excellent.",
-  "Not perfect, but overall satisfactory for the price.",
-  "Could be improved in small details, but it did the job.",
-];
-
-const reviewDetailSnippets = [
-  () =>
-    `We arrived around ${faker.number.int({ min: 15, max: 23 })}:00 and got in without issues.`,
-  () =>
-    `The walk to public transport took about ${faker.number.int({ min: 4, max: 14 })} minutes.`,
-  () =>
-    `We stayed for ${faker.number.int({ min: 2, max: 7 })} nights and the experience stayed consistent throughout.`,
-  () =>
-    `Room temperature stayed comfortable at around ${faker.number.int({ min: 20, max: 24 })} degrees.`,
-  () =>
-    `I especially appreciated the ${faker.helpers.arrayElement(["clear house manual", "quick support in chat", "self check-in flow", "well-organized kitchen essentials"])}.`,
-];
-
-function buildReviewComment(params: {
-  rating: number;
-  propertyTitle: string;
-  usedComments: Set<string>;
-}): string {
-  const { rating, propertyTitle, usedComments } = params;
-  const positiveCount = rating >= 5 ? 3 : rating === 4 ? 2 : 1;
-
-  // Hard cap avoids pathological loops when combination space gets tight.
-  for (let attempt = 0; attempt < 40; attempt++) {
-    const negativeCount =
-      rating >= 5 ? 0 : rating === 4 ? faker.number.int({ min: 0, max: 1 }) : 1;
-
-    const positives = faker.helpers.arrayElements(reviewPositives, positiveCount);
-    const negatives =
-      negativeCount > 0
-        ? faker.helpers.arrayElements(reviewNegatives, negativeCount)
-        : [];
-
-    const opener = faker.helpers.arrayElement(reviewOpeners);
-    const tripContext = faker.helpers.arrayElement(reviewTripContexts);
-    const detail = faker.helpers.arrayElement(reviewDetailSnippets)();
-    const closing =
-      rating >= 4
-        ? faker.helpers.arrayElement(reviewClosingsPositive)
-        : faker.helpers.arrayElement(reviewClosingsNeutral);
-
-    const positivesText = positives.join("; ");
-    const negativesText =
-      negatives.length > 0 ? ` Minor downside: ${negatives.join("; ")}.` : "";
-
-    const comment = `${opener} Stayed at ${propertyTitle} ${tripContext}. Highlights: ${positivesText}.${negativesText} ${detail} ${closing}`;
-
-    if (!usedComments.has(comment)) {
-      usedComments.add(comment);
-      return comment;
-    }
-  }
-
-  // Collision fallback: guarantees uniqueness without blocking the seed run.
-  const fallback = `${propertyTitle} had a ${rating >= 4 ? "good" : "decent"} overall experience. Ref ${faker.string.alphanumeric({ length: 8, casing: "upper" })}.`;
-  usedComments.add(fallback);
-  return fallback;
-}
-
 async function main() {
   console.log("🌱 Starting seed...");
 
-  const createdUsers: Record<string, { id: string }> = {};
+  const createdUsers: Record<string, { id: string; createdAt: Date }> = {};
   const generatedPasswords = new Map<string, string>();
+  const baseEmails = new Set(baseUsers.map((u) => u.email));
   const resolvedCreds: Array<{
     email: string;
     role: Role;
     password: string;
     origin: "public" | "env" | "generated";
   }> = [];
+  const sharedEnvOrigins = new Map<string, "env" | "generated">();
 
   for (const user of users) {
     const resolved = resolvePassword(user.passwordSource, generatedPasswords);
@@ -806,49 +202,75 @@ async function main() {
         lastName: user.lastName,
         phoneNumber: user.phoneNumber,
         role: user.role,
+        bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt,
       },
     });
-    createdUsers[user.email] = { id: created.id };
-    resolvedCreds.push({
-      email: user.email,
-      role: user.role,
-      password: resolved.value,
-      origin: resolved.origin,
-    });
-    console.log(`  ✅ User: ${user.email} (${user.role}) [pwd from ${resolved.origin}]`);
+    createdUsers[user.email] = { id: created.id, createdAt: user.createdAt };
+
+    if (baseEmails.has(user.email)) {
+      resolvedCreds.push({
+        email: user.email,
+        role: user.role,
+        password: resolved.value,
+        origin: resolved.origin,
+      });
+    } else if (user.passwordSource.kind === "env") {
+      sharedEnvOrigins.set(
+        user.passwordSource.envVar,
+        resolved.origin === "generated" ? "generated" : "env",
+      );
+    }
   }
+  console.log(`  ✅ ${users.length} users upserted (${baseUsers.length} base, ${hostUsers.length} hosts, ${guestUsers.length} guests)`);
 
-  const owner1Id = createdUsers["owner@demo.com"]!.id;
-  const owner2Id = createdUsers["owner2@demo.com"]!.id;
-
-  let created = 0;
   const createdProperties: Array<{
     id: string;
     title: string;
     pricePerNight: number;
     maxGuests: number;
+    ownerId: string;
+    ownerEmail: string;
+    city: string;
+    createdAt: Date;
   }> = [];
-  const cityRowCounters = new Map<string, number>();
 
-  for (const [index, template] of propertyTemplates.entries()) {
-    const assignedOwnerId = index % 2 === 0 ? owner1Id : owner2Id;
-    const rowIndexInCity = cityRowCounters.get(template.city) ?? 0;
-    cityRowCounters.set(template.city, rowIndexInCity + 1);
+  for (const template of allPropertyTemplates) {
+    const owner = createdUsers[template.ownerEmail];
+    if (!owner) {
+      throw new Error(`Owner not found for property "${template.title}": ${template.ownerEmail}`);
+    }
+    // Listing must not predate its owner's account.
+    const minCreated = owner.createdAt.getTime() + DAY_MS;
+    const propCreatedAt = new Date(
+      Math.max(monthsAgo(template.createdMonthsAgo).getTime(), minCreated),
+    );
 
     const createdProperty = await prisma.property.create({
       data: {
-        ...template,
+        title: template.title,
+        description: template.description,
+        type: template.type,
+        city: template.city,
+        country: template.country,
+        district: template.district,
+        street: template.street,
+        houseNumber: template.houseNumber,
+        apartment: template.apartment,
+        latitude: template.latitude,
+        longitude: template.longitude,
         pricePerNight: template.pricePerNight,
-        ownerId: assignedOwnerId,
+        maxGuests: template.maxGuests,
+        petsAllowed: template.petsAllowed ?? false,
+        infantsAllowed: template.infantsAllowed ?? true,
+        amenities: template.amenities,
+        images: template.images,
+        ownerId: owner.id,
         isActive: true,
-        ...jitterCoords(template.city, rowIndexInCity),
+        createdAt: propCreatedAt,
       },
-      select: {
-        id: true,
-        title: true,
-        pricePerNight: true,
-        maxGuests: true,
-      },
+      select: { id: true, title: true, pricePerNight: true, maxGuests: true, city: true },
     });
 
     createdProperties.push({
@@ -856,13 +278,14 @@ async function main() {
       title: createdProperty.title,
       pricePerNight: Number(createdProperty.pricePerNight),
       maxGuests: createdProperty.maxGuests,
+      ownerId: owner.id,
+      ownerEmail: template.ownerEmail,
+      city: createdProperty.city,
+      createdAt: propCreatedAt,
     });
-
-    created++;
-    console.log(
-      `  🏠 ${template.title} — ${template.city} ($${template.pricePerNight}/night)`,
-    );
   }
+  const cityCount = new Set(createdProperties.map((p) => p.city)).size;
+  console.log(`  🏠 ${createdProperties.length} properties across ${cityCount} cities`);
 
   type BookingScenario = {
     code: string;
@@ -950,6 +373,17 @@ async function main() {
     },
   ];
 
+  // Occupied [start,end] ms ranges per property — shared so bulk bookings never
+  // overlap a scenario (or each other) on the same property.
+  const occupied = new Map<string, Array<[number, number]>>();
+  const overlaps = (id: string, s: number, e: number) =>
+    (occupied.get(id) ?? []).some(([os, oe]) => s < oe && os < e);
+  const markOccupied = (id: string, s: number, e: number) => {
+    const list = occupied.get(id) ?? [];
+    list.push([s, e]);
+    occupied.set(id, list);
+  };
+
   const seededScenarioRefs: Array<{
     code: string;
     userEmail: string;
@@ -967,7 +401,8 @@ async function main() {
     }
 
     const property = createdProperties[index % createdProperties.length]!;
-    const stay = getStayDates(scenario.checkInOffsetDays, scenario.nights);
+    const stay = getStayDates(new Date(now + scenario.checkInOffsetDays * DAY_MS), scenario.nights);
+    markOccupied(property.id, stay.checkIn.getTime(), stay.checkOut.getTime());
 
     const guests = Math.min(2 + (index % 2), property.maxGuests);
     const totalPrice = property.pricePerNight * stay.nights;
@@ -982,26 +417,20 @@ async function main() {
       status: scenario.bookingStatus,
       payoutStatus: scenario.payoutStatus ?? "PENDING",
     };
-
     if (scenario.bookingStatus === "COMPLETED") {
       bookingCreateData.actualCheckOutAt = stay.checkOut;
     }
-
     if (scenario.paymentStatus) {
-      const paymentMetadata: Record<string, unknown> = {
-        seededScenario: scenario.code,
-      };
-
+      const paymentMetadata: Record<string, unknown> = { seededScenario: scenario.code };
       if (scenario.paymentStatus === "REFUND_REQUESTED") {
         paymentMetadata.refundRequest = {
-          requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          requestedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
           requestedBy: userId,
           refundPercent: 50,
           refundAmount: totalPrice * 0.5,
           daysUntilCheckIn: Math.max(0, Math.ceil(scenario.checkInOffsetDays)),
         };
       }
-
       bookingCreateData.payment = {
         create: {
           amount: totalPrice,
@@ -1016,18 +445,8 @@ async function main() {
 
     const createdBooking = await prisma.booking.create({
       data: bookingCreateData,
-      select: {
-        id: true,
-        status: true,
-        payment: {
-          select: {
-            id: true,
-            status: true,
-          },
-        },
-      },
+      select: { id: true, status: true, payment: { select: { id: true, status: true } } },
     });
-
     seededScenarioRefs.push({
       code: scenario.code,
       userEmail: scenario.bookerEmail,
@@ -1036,71 +455,222 @@ async function main() {
       paymentId: createdBooking.payment?.id ?? null,
       paymentStatus: createdBooking.payment?.status ?? null,
     });
-
     createdBookings++;
-    console.log(
-      `  📅 Booking #${index + 1} (${scenario.code}) — ${scenario.bookerEmail} — ${scenario.bookingStatus}${scenario.paymentStatus ? ` / ${scenario.paymentStatus}` : " / no payment"} — ${property.title}`,
-    );
   }
+  console.log(`  📅 ${createdBookings} scenario bookings`);
 
-  const completedBookings = await prisma.booking.findMany({
-    where: {
-      status: "COMPLETED",
-    },
-    select: {
-      id: true,
-      userId: true,
-      propertyId: true,
-      property: {
-        select: {
-          title: true,
-        },
-      },
-    },
-    orderBy: {
-      checkOut: "desc",
-    },
+  // ---- Bulk deterministic bookings (guests only book; never demo, never a host) ----
+  const guestPool = guestUsers.map((g) => {
+    const rec = createdUsers[g.email]!;
+    return { id: rec.id, createdAt: rec.createdAt };
   });
 
+  type BulkRec = {
+    id: string;
+    propertyId: string;
+    userId: string;
+    ownerId: string;
+    propertyTitle: string;
+    checkOut: Date;
+    status: BookingStatus;
+  };
+  const bulkBookings: BulkRec[] = [];
+  let bulkTxn = 0;
+
+  function placeStay(propId: string, earliestMs: number, latestMs: number, nights: number) {
+    const spanDays = Math.floor((latestMs - earliestMs) / DAY_MS) - nights;
+    if (spanDays <= 0) return null;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const start = earliestMs + faker.number.int({ min: 0, max: spanDays }) * DAY_MS;
+      const stay = getStayDates(new Date(start), nights);
+      if (!overlaps(propId, stay.checkIn.getTime(), stay.checkOut.getTime())) return stay;
+    }
+    return null;
+  }
+
+  async function createBulk(
+    prop: (typeof createdProperties)[number],
+    stay: { checkIn: Date; checkOut: Date; nights: number },
+    status: BookingStatus,
+    guestRec: { id: string; createdAt: Date },
+  ) {
+    bulkTxn++;
+    const guests = faker.number.int({ min: 1, max: prop.maxGuests });
+    const totalPrice = prop.pricePerNight * stay.nights;
+    const floor = Math.max(guestRec.createdAt.getTime(), prop.createdAt.getTime()) + DAY_MS;
+    let createdAtMs = stay.checkIn.getTime() - faker.number.int({ min: 5, max: 45 }) * DAY_MS;
+    if (createdAtMs < floor) createdAtMs = Math.min(floor, stay.checkIn.getTime() - DAY_MS);
+    const paymentStatus: PaymentStatus = status === "CANCELLED" ? "REFUNDED" : "SUCCESS";
+    const payoutStatus: PayoutStatus =
+      status === "COMPLETED"
+        ? stay.checkOut.getTime() < now - 30 * DAY_MS
+          ? "PAID_OUT"
+          : "READY"
+        : status === "CONFIRMED"
+          ? "PENDING"
+          : "CANCELLED";
+    const data: any = {
+      propertyId: prop.id,
+      userId: guestRec.id,
+      checkIn: stay.checkIn,
+      checkOut: stay.checkOut,
+      totalPrice,
+      guests,
+      status,
+      payoutStatus,
+      createdAt: new Date(createdAtMs),
+      payment: {
+        create: {
+          amount: totalPrice,
+          currency: "USD",
+          status: paymentStatus,
+          provider: "STRIPE",
+          transactionId: `seed_pi_bulk_${bulkTxn}`,
+        },
+      },
+    };
+    if (status === "COMPLETED") data.actualCheckOutAt = stay.checkOut;
+    const b = await prisma.booking.create({ data, select: { id: true } });
+    markOccupied(prop.id, stay.checkIn.getTime(), stay.checkOut.getTime());
+    bulkBookings.push({
+      id: b.id,
+      propertyId: prop.id,
+      userId: guestRec.id,
+      ownerId: prop.ownerId,
+      propertyTitle: prop.title,
+      checkOut: stay.checkOut,
+      status,
+    });
+  }
+
+  for (const [propIndex, prop] of createdProperties.entries()) {
+    // Stays can't start before the listing existed (or 18 months back, whichever is later).
+    const earliestMs = Math.max(prop.createdAt.getTime() + DAY_MS, now - 18 * 30 * DAY_MS);
+
+    const completedCount = faker.helpers.arrayElement([1, 1, 2, 2, 3]);
+    for (let i = 0; i < completedCount; i++) {
+      const nights = faker.number.int({ min: 2, max: 9 });
+      const stay = placeStay(prop.id, earliestMs, now - DAY_MS, nights);
+      if (!stay) continue;
+      const guest = faker.helpers.arrayElement(guestPool);
+      await createBulk(prop, stay, "COMPLETED", guest);
+    }
+
+    if (faker.number.float() < 0.4) {
+      const nights = faker.number.int({ min: 2, max: 7 });
+      const stay = placeStay(prop.id, now + 5 * DAY_MS, now + 60 * DAY_MS + nights * DAY_MS, nights);
+      if (stay) {
+        await createBulk(prop, stay, "CONFIRMED", faker.helpers.arrayElement(guestPool));
+      }
+    }
+
+    // Every ~10th property gets a cancelled stay (past or near future).
+    if (propIndex % 10 === 3) {
+      const nights = faker.number.int({ min: 2, max: 5 });
+      const stay = placeStay(prop.id, Math.max(earliestMs, now - 90 * DAY_MS), now + 30 * DAY_MS, nights);
+      if (stay) {
+        await createBulk(prop, stay, "CANCELLED", faker.helpers.arrayElement(guestPool));
+      }
+    }
+  }
+  const bulkByStatus = bulkBookings.reduce<Record<string, number>>((acc, b) => {
+    acc[b.status] = (acc[b.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(
+    `  📅 ${bulkBookings.length} bulk bookings (${Object.entries(bulkByStatus)
+      .map(([s, n]) => `${n} ${s}`)
+      .join(", ")})`,
+  );
+
+  // ---- Reviews: unique hand-authored texts, one per booking, bucket-matched ----
+  const reviewRatingPool = [5, 5, 5, 4, 4, 4, 3, 3] as const;
+  const buckets: Record<5 | 4 | 3, string[]> = { 5: [], 4: [], 3: [] };
+  for (const r of faker.helpers.shuffle([...allReviews])) buckets[r.bucket].push(r.text);
+  // Falls back to the nearest non-empty bucket; caller stores the text's own
+  // bucket as the rating so text and stars never disagree.
+  function takeReview(wanted: 5 | 4 | 3): { text: string; rating: number } | null {
+    const order: Array<5 | 4 | 3> =
+      wanted === 5 ? [5, 4, 3] : wanted === 4 ? [4, 5, 3] : [3, 4, 5];
+    for (const b of order) {
+      const text = buckets[b].pop();
+      if (text) return { text, rating: b };
+    }
+    return null;
+  }
+
+  const scenarioCompleted = seededScenarioRefs.find(
+    (r) => r.code === "MANUAL_COMPLETED_SUCCESS_REVIEW",
+  );
+  const reviewCandidates: BulkRec[] = bulkBookings.filter((b) => b.status === "COMPLETED");
+
   let seededReviews = 0;
+  let seededReplies = 0;
   const touchedPropertyIds = new Set<string>();
-  const usedReviewComments = new Set<string>();
 
-  for (const [index, booking] of completedBookings.entries()) {
-    const rating = faker.helpers.arrayElement(reviewRatingPool);
-    const comment = buildReviewComment({
-      rating,
-      propertyTitle: booking.property.title,
-      usedComments: usedReviewComments,
-    });
+  async function writeReview(booking: {
+    id: string;
+    userId: string;
+    propertyId: string;
+    ownerId: string;
+    checkOut: Date;
+  }) {
+    const wanted = faker.helpers.arrayElement(reviewRatingPool);
+    const picked = takeReview(wanted);
+    if (!picked) return;
+    const reviewCreatedAt = new Date(
+      Math.min(now, booking.checkOut.getTime() + faker.number.int({ min: 1, max: 3 }) * DAY_MS),
+    );
+    const withReply = faker.number.float() < 0.25;
+    const reply = withReply ? faker.helpers.arrayElement(hostReplies) : null;
 
-    await prisma.review.upsert({
-      where: {
-        bookingId: booking.id,
-      },
-      // bookingId is unique: upsert keeps reruns idempotent.
-      update: {
-        userId: booking.userId,
-        propertyId: booking.propertyId,
-        rating,
-        comment,
-      },
-      create: {
+    await prisma.review.create({
+      data: {
         bookingId: booking.id,
         userId: booking.userId,
         propertyId: booking.propertyId,
-        rating,
-        comment,
+        rating: picked.rating,
+        comment: picked.text,
+        createdAt: reviewCreatedAt,
+        ...(reply
+          ? {
+              hostReplyText: reply.text,
+              hostReplyById: booking.ownerId,
+              hostReplyCreatedAt: new Date(
+                Math.min(
+                  now,
+                  reviewCreatedAt.getTime() + faker.number.int({ min: 1, max: 2 }) * DAY_MS,
+                ),
+              ),
+            }
+          : {}),
       },
     });
-
+    if (reply) seededReplies++;
     touchedPropertyIds.add(booking.propertyId);
     seededReviews++;
-
-    console.log(
-      `  ⭐ Review #${index + 1} for booking ${booking.id} — ${booking.property.title} (${rating}/5)`,
-    );
   }
+
+  // Scenario checkpoint booking is always reviewed (as in the old seed).
+  if (scenarioCompleted) {
+    const scenarioBooking = await prisma.booking.findUniqueOrThrow({
+      where: { id: scenarioCompleted.bookingId },
+      select: {
+        id: true,
+        userId: true,
+        propertyId: true,
+        checkOut: true,
+        property: { select: { ownerId: true } },
+      },
+    });
+    await writeReview({ ...scenarioBooking, ownerId: scenarioBooking.property.ownerId });
+  }
+
+  for (const booking of reviewCandidates) {
+    if (faker.number.float() >= 0.65) continue;
+    await writeReview(booking);
+  }
+  console.log(`  ⭐ ${seededReviews} reviews (${seededReplies} with host reply)`);
 
   for (const propertyId of touchedPropertyIds) {
     const reviewStats = await prisma.review.aggregate({
@@ -1108,7 +678,6 @@ async function main() {
       _avg: { rating: true },
       _count: { id: true },
     });
-
     await prisma.property.update({
       where: { id: propertyId },
       data: {
@@ -1121,13 +690,30 @@ async function main() {
     });
   }
 
-  if (seededReviews === 0) {
-    console.log("  ℹ️ No completed bookings found, so no reviews were created.");
+  // ---- Blocked dates: every 5th property, one future range ----
+  const blockReasons = ["Personal use", "Maintenance", "Family visit"];
+  let blockedRanges = 0;
+  for (const [propIndex, prop] of createdProperties.entries()) {
+    if (propIndex % 5 !== 0) continue;
+    const startMs = now + faker.number.int({ min: 10, max: 50 }) * DAY_MS;
+    const endMs = startMs + faker.number.int({ min: 3, max: 10 }) * DAY_MS;
+    await prisma.blockedDate.create({
+      data: {
+        propertyId: prop.id,
+        startDate: new Date(startMs),
+        endDate: new Date(endMs),
+        reason: blockReasons[propIndex / 5 % blockReasons.length | 0],
+      },
+    });
+    blockedRanges++;
   }
 
   console.log(
-    `\n✅ Seed complete: ${users.length} users, ${created} properties, ${createdBookings} bookings, ${seededReviews} reviews`,
+    `\n✅ Seed complete: ${users.length} users (${hostUsers.length} hosts, ${guestUsers.length} guests), ` +
+      `${createdProperties.length} properties in ${cityCount} cities, ` +
+      `${createdBookings + bulkBookings.length} bookings, ${seededReviews} reviews, ${blockedRanges} blocked ranges`,
   );
+
   console.log("\nManual testing checkpoints:");
   for (const ref of seededScenarioRefs) {
     const paymentInfo = ref.paymentId
@@ -1137,6 +723,7 @@ async function main() {
       `  ${ref.code.padEnd(38)} booking=${ref.bookingId} (${ref.bookingStatus}) | ${paymentInfo} | user=${ref.userEmail}`,
     );
   }
+
   console.log("\nTest credentials:");
   for (const cred of resolvedCreds) {
     if (cred.origin === "public") {
@@ -1146,6 +733,14 @@ async function main() {
     } else {
       console.log(`  ${cred.role.padEnd(5)} ${cred.email}  /  ${cred.password}  (GENERATED — save now)`);
     }
+  }
+  for (const [envVar, count] of [
+    ["SEED_HOSTS_PASSWORD", hostUsers.length],
+    ["SEED_GUESTS_PASSWORD", guestUsers.length],
+  ] as const) {
+    const origin = sharedEnvOrigins.get(envVar);
+    const value = origin === "env" ? "<from env>" : generatedPasswords.get(envVar);
+    console.log(`  ${String(count).padStart(2)} × shared ${envVar}  /  ${value}`);
   }
 
   if (generatedPasswords.size > 0) {

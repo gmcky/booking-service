@@ -1,0 +1,70 @@
+import { PropertyType, Amenity } from "@prisma/client";
+import type { SeedPropertyTemplate } from "../types.js";
+import { pickImages } from "../images.js";
+
+export const lvivProperties: SeedPropertyTemplate[] = [
+  {
+    title: "Old Town Apartment in Lviv Centre",
+    description:
+      "A beautiful apartment inside a 19th-century building on the most prestigious street in Lviv. Original oak parquet, 3-metre ceilings and windows overlooking the Latin Cathedral. Walking distance to every major landmark.",
+    type: PropertyType.APARTMENT,
+    city: "Lviv",
+    country: "Ukraine",
+    district: "Old Town",
+    street: "Shevska St",
+    houseNumber: "5",
+    latitude: 49.8419,
+    longitude: 24.0322,
+    pricePerNight: 45,
+    maxGuests: 2,
+    amenities: [Amenity.WIFI, Amenity.KITCHEN, Amenity.HISTORIC_BUILDING, Amenity.CITY_CENTRE],
+    images: pickImages("historicEuropean", 5, 2),
+    ownerEmail: "owner2@demo.com",
+    createdMonthsAgo: 18,
+  },
+  {
+    title: "Cosy Cottage near Lychakiv Cemetery",
+    description:
+      "A romantic two-storey cottage on a quiet street near the famous Lychakiv Cemetery. Wooden beams, a fireplace and a private courtyard with rose bushes. Perfect for a romantic weekend escape.",
+    type: PropertyType.HOUSE,
+    city: "Lviv",
+    country: "Ukraine",
+    district: "Lychakiv",
+    street: "Mechnikova St",
+    houseNumber: "18",
+    latitude: 49.8329,
+    longitude: 24.0602,
+    pricePerNight: 75,
+    maxGuests: 4,
+    petsAllowed: true,
+    amenities: [Amenity.WIFI, Amenity.FIREPLACE, Amenity.COURTYARD, Amenity.PARKING, Amenity.KITCHEN],
+    images: pickImages("cabinCottage", 5, 3),
+    ownerEmail: "owner@demo.com",
+    createdMonthsAgo: 27,
+  },
+  {
+    title: "Modern Apartment near Rynok Square",
+    description:
+      "A freshly renovated apartment 200 m from Rynok Square. The interior blends Lviv's Austro-Hungarian heritage with Scandinavian minimalism. Nespresso machine included, specialty coffee shops at the doorstep.",
+    type: PropertyType.APARTMENT,
+    city: "Lviv",
+    country: "Ukraine",
+    district: "Old Town",
+    street: "Stavropigijska St",
+    houseNumber: "9",
+    latitude: 49.8408,
+    longitude: 24.0281,
+    pricePerNight: 48,
+    maxGuests: 3,
+    amenities: [
+      Amenity.WIFI,
+      Amenity.KITCHEN,
+      Amenity.COFFEE_MACHINE,
+      Amenity.CITY_CENTRE,
+      Amenity.AIR_CONDITIONING,
+    ],
+    images: pickImages("minimalistModern", 4, 3),
+    ownerEmail: "owner2@demo.com",
+    createdMonthsAgo: 11,
+  },
+];
