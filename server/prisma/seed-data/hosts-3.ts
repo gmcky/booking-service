@@ -105,5 +105,5 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
 
 export const hosts3: SeedHost[] = raw.map((h, i) => ({
   ...h,
-  avatarUrl: maybeAvatar(i, 33),
+  avatarUrl: maybeAvatar(h.firstName, i),
 }));

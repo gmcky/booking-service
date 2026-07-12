@@ -14,7 +14,7 @@ import {
   allPropertyTemplates,
   allReviews,
   hostReplies,
-  avatarPool,
+  demoAvatars,
 } from "./seed-data/index.js";
 
 const { PrismaClient } = prismaClientPkg;
@@ -45,8 +45,8 @@ type SeededUser = {
   passwordSource: { kind: "public"; value: string } | { kind: "env"; envVar: string };
 };
 
-// Distinct avatars for the 5 human demo accounts, from pool indices that
-// maybeAvatar() never draws for hosts/guests (3,4,8,9,13). demo + admin stay bare.
+// Distinct avatars for the 5 human demo accounts, from the reserved pool
+// tails maybeAvatar() never draws for hosts/guests. demo + admin stay bare.
 const baseUsers: SeededUser[] = [
   {
     email: "demo@booking.dev",
@@ -63,7 +63,7 @@ const baseUsers: SeededUser[] = [
     lastName: "Kovalenko",
     phoneNumber: "+380501234567",
     role: Role.USER,
-    avatarUrl: avatarPool[3],
+    avatarUrl: demoAvatars.male[0],
     createdAt: yearsAgo(6),
     passwordSource: { kind: "env", envVar: "SEED_OWNER1_PASSWORD" },
   },
@@ -73,7 +73,7 @@ const baseUsers: SeededUser[] = [
     lastName: "Sirko",
     phoneNumber: "+380509998877",
     role: Role.USER,
-    avatarUrl: avatarPool[4],
+    avatarUrl: demoAvatars.male[1],
     createdAt: yearsAgo(6),
     passwordSource: { kind: "env", envVar: "SEED_OWNER2_PASSWORD" },
   },
@@ -92,7 +92,7 @@ const baseUsers: SeededUser[] = [
     lastName: "Petrenko",
     phoneNumber: "+380671234567",
     role: Role.USER,
-    avatarUrl: avatarPool[8],
+    avatarUrl: demoAvatars.male[2],
     createdAt: yearsAgo(3),
     passwordSource: { kind: "env", envVar: "SEED_USER1_PASSWORD" },
   },
@@ -102,7 +102,7 @@ const baseUsers: SeededUser[] = [
     lastName: "Melnyk",
     phoneNumber: "+380672345678",
     role: Role.USER,
-    avatarUrl: avatarPool[9],
+    avatarUrl: demoAvatars.female[0],
     createdAt: yearsAgo(3),
     passwordSource: { kind: "env", envVar: "SEED_USER2_PASSWORD" },
   },
@@ -112,7 +112,7 @@ const baseUsers: SeededUser[] = [
     lastName: "Bondarenko",
     phoneNumber: "+380673456789",
     role: Role.USER,
-    avatarUrl: avatarPool[13],
+    avatarUrl: demoAvatars.male[3],
     createdAt: yearsAgo(3),
     passwordSource: { kind: "env", envVar: "SEED_USER3_PASSWORD" },
   },
