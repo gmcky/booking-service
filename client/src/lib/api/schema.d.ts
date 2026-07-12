@@ -1289,6 +1289,10 @@ export interface paths {
                         longitude?: number;
                         pricePerNight: number;
                         maxGuests: number;
+                        /** @example 15:00 */
+                        checkInTime?: string;
+                        /** @example 11:00 */
+                        checkOutTime?: string;
                         amenities?: components["schemas"]["Amenity"][];
                         rawImagePaths?: string[];
                     };
@@ -1579,6 +1583,10 @@ export interface paths {
                         longitude?: number;
                         pricePerNight?: number;
                         maxGuests?: number;
+                        /** @example 15:00 */
+                        checkInTime?: string | null;
+                        /** @example 11:00 */
+                        checkOutTime?: string | null;
                         amenities?: components["schemas"]["Amenity"][];
                         images?: string[];
                     };
@@ -2621,7 +2629,7 @@ export interface components {
         /** @enum {string} */
         PropertyType: "HOTEL_ROOM" | "APARTMENT" | "HOUSE" | "MEETING_ROOM";
         /** @enum {string} */
-        Amenity: "WIFI" | "AIR_CONDITIONING" | "HEATING" | "KITCHEN" | "WASHER" | "DRYER" | "DISHWASHER" | "PARKING" | "POOL" | "GYM" | "BALCONY" | "TERRACE" | "ROOFTOP_TERRACE" | "GARDEN" | "BBQ" | "FIREPLACE" | "BATHTUB" | "PRIVATE_BATHROOM" | "TV" | "SMART_TV" | "COFFEE_MACHINE" | "PROJECTOR" | "STANDING_DESK" | "ELEVATOR" | "PET_FRIENDLY" | "WHEELCHAIR_ACCESSIBLE" | "SEA_VIEW" | "CITY_CENTRE" | "BEACHFRONT" | "KIDS_PLAY_AREA" | "BIKE_INCLUDED" | "BIKE_RENTAL_NEARBY" | "COURTYARD" | "CANAL_VIEW" | "RIVER_VIEW" | "SUN_DECK" | "KAYAK" | "HISTORIC_BUILDING" | "VINYL_RECORD_PLAYER" | "BOOKS";
+        Amenity: "WIFI" | "AIR_CONDITIONING" | "HEATING" | "KITCHEN" | "WASHER" | "DRYER" | "DISHWASHER" | "PARKING" | "POOL" | "GYM" | "BALCONY" | "TERRACE" | "ROOFTOP_TERRACE" | "GARDEN" | "BBQ" | "FIREPLACE" | "BATHTUB" | "PRIVATE_BATHROOM" | "TV" | "SMART_TV" | "COFFEE_MACHINE" | "PROJECTOR" | "STANDING_DESK" | "ELEVATOR" | "PET_FRIENDLY" | "WHEELCHAIR_ACCESSIBLE" | "SEA_VIEW" | "CITY_CENTRE" | "BEACHFRONT" | "KIDS_PLAY_AREA" | "BIKE_INCLUDED" | "BIKE_RENTAL_NEARBY" | "COURTYARD" | "CANAL_VIEW" | "RIVER_VIEW" | "SUN_DECK" | "KAYAK" | "HISTORIC_BUILDING" | "VINYL_RECORD_PLAYER" | "BOOKS" | "SMOKE_ALARM" | "CARBON_MONOXIDE_ALARM";
         /** @enum {string} */
         BookingStatus: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
         /** @enum {string} */
@@ -2729,6 +2737,10 @@ export interface components {
             maxGuests: number;
             petsAllowed: boolean;
             infantsAllowed: boolean;
+            /** @example 15:00 */
+            checkInTime: string | null;
+            /** @example 11:00 */
+            checkOutTime: string | null;
             amenities: components["schemas"]["Amenity"][];
             /** @description Decimal serialized as string */
             averageRating: string | null;

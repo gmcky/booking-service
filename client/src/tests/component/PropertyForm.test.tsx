@@ -96,6 +96,8 @@ describe("PropertyForm", () => {
       type: "HOUSE",
       petsAllowed: false,
       infantsAllowed: true,
+      checkInTime: null,
+      checkOutTime: null,
       amenities: [],
       rawImagePaths: [],
     });
@@ -116,6 +118,8 @@ describe("PropertyForm", () => {
       type: "APARTMENT",
       petsAllowed: true,
       infantsAllowed: false,
+      checkInTime: "15:00",
+      checkOutTime: "11:00",
       amenities: ["WIFI"],
       images: ["uploads/properties/a.jpg"],
     };
@@ -137,6 +141,8 @@ describe("PropertyForm", () => {
     expect(screen.getByLabelText("Country")).toHaveValue("United States");
     expect(screen.getByLabelText("Max guests")).toHaveValue(4);
     expect(screen.getByLabelText("Price / night")).toHaveValue(150);
+    expect(screen.getByLabelText("Check-in after")).toHaveValue("15:00");
+    expect(screen.getByLabelText("Checkout before")).toHaveValue("11:00");
 
     expect(
       screen.getByText("Changing photos on an existing listing isn't supported yet."),

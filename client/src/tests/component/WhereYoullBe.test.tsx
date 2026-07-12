@@ -21,6 +21,8 @@ const baseProperty: PropertyDetail = {
   maxGuests: 4,
   petsAllowed: false,
   infantsAllowed: true,
+  checkInTime: null,
+  checkOutTime: null,
   amenities: [],
   averageRating: null,
   reviewCount: 0,

@@ -1,5 +1,6 @@
 import {
   Accessibility,
+  AlarmSmoke,
   Anchor,
   ArrowUpDown,
   Baby,
@@ -27,6 +28,7 @@ import {
   Projector,
   Sailboat,
   ShowerHead,
+  Siren,
   Sun,
   Table2,
   Thermometer,
@@ -83,6 +85,8 @@ export const AMENITY_ICONS: Record<Amenity, LucideIcon> = {
   HISTORIC_BUILDING: Castle,
   VINYL_RECORD_PLAYER: Disc3,
   BOOKS: Book,
+  SMOKE_ALARM: AlarmSmoke,
+  CARBON_MONOXIDE_ALARM: Siren,
 };
 
 export function amenityIcon(value: Amenity): LucideIcon {

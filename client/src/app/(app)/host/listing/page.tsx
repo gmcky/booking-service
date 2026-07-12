@@ -24,6 +24,8 @@ export default function HostListingPage() {
       district,
       latitude,
       longitude,
+      checkInTime,
+      checkOutTime,
       ...values
     }: PropertyFormValues) =>
       propertyApi.create({
@@ -33,6 +35,8 @@ export default function HostListingPage() {
         district: district ?? undefined,
         latitude: latitude ?? undefined,
         longitude: longitude ?? undefined,
+        checkInTime: checkInTime ?? undefined,
+        checkOutTime: checkOutTime ?? undefined,
       }),
     onSuccess: () => {
       toast.success("Listing published");
