@@ -51,7 +51,7 @@ import { reviews5 } from "./reviews-5.js";
 import { reviews6 } from "./reviews-6.js";
 
 export { hostReplies } from "./host-replies.js";
-export { AVATARS as avatarPool } from "./avatars.js";
+export { demoAvatars } from "./avatars.js";
 export type {
   SeedHost,
   SeedGuest,

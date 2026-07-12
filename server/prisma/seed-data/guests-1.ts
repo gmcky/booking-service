@@ -27,5 +27,5 @@ const raw: Omit<SeedGuest, "avatarUrl">[] = [
 
 export const guests1: SeedGuest[] = raw.map((g, i) => ({
   ...g,
-  avatarUrl: maybeAvatar(i, 45),
+  avatarUrl: maybeAvatar(g.firstName, i),
 }));
