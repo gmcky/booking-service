@@ -11,7 +11,9 @@ export function getStripe(): Promise<Stripe | null> {
         "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set. Add it to client/.env.local.",
       );
     }
-    stripePromise = loadStripe(key);
+    // Test-mode keys make Stripe.js inject a floating "Developers" assistant
+    // widget on the payment page — demo visitors would see it too.
+    stripePromise = loadStripe(key, { developerTools: { assistant: { enabled: false } } });
   }
   return stripePromise;
 }
