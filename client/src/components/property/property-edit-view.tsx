@@ -92,6 +92,8 @@ export function PropertyEditView({ id }: { id: string }) {
               type: data.type,
               petsAllowed: data.petsAllowed,
               infantsAllowed: data.infantsAllowed,
+              checkInTime: data.checkInTime,
+              checkOutTime: data.checkOutTime,
               amenities: data.amenities,
               images: data.images,
             }}

@@ -37,6 +37,8 @@ const CURATED_AMENITIES: Amenity[] = [
   "AIR_CONDITIONING",
   "TV",
   "WASHER",
+  "SMOKE_ALARM",
+  "CARBON_MONOXIDE_ALARM",
 ];
 
 const MAX_PHOTOS = 10;
@@ -62,6 +64,9 @@ export interface PropertyFormValues {
   type: PropertyType;
   petsAllowed: boolean;
   infantsAllowed: boolean;
+  /** Empty inputs come out as null so edits can clear the field. */
+  checkInTime: string | null;
+  checkOutTime: string | null;
   amenities: string[];
   rawImagePaths: string[];
 }
@@ -80,6 +85,8 @@ export interface PropertyFormInitial {
   type: PropertyType;
   petsAllowed: boolean;
   infantsAllowed: boolean;
+  checkInTime: string | null;
+  checkOutTime: string | null;
   amenities: Amenity[];
   images: string[];
 }
@@ -129,6 +136,8 @@ export function PropertyForm({
   // Defaults mirror the backend's create schema (petsAllowed: false, infantsAllowed: true).
   const [petsAllowed, setPetsAllowed] = React.useState(initial?.petsAllowed ?? false);
   const [infantsAllowed, setInfantsAllowed] = React.useState(initial?.infantsAllowed ?? true);
+  const [checkInTime, setCheckInTime] = React.useState(initial?.checkInTime ?? "");
+  const [checkOutTime, setCheckOutTime] = React.useState(initial?.checkOutTime ?? "");
   const [amenities, setAmenities] = React.useState<string[]>(initial?.amenities ?? []);
   const [uploaded, setUploaded] = React.useState<UploadedPhoto[]>([]);
   const [photoError, setPhotoError] = React.useState("");
@@ -306,6 +315,8 @@ export function PropertyForm({
       type,
       petsAllowed,
       infantsAllowed,
+      checkInTime: checkInTime.trim() || null,
+      checkOutTime: checkOutTime.trim() || null,
       amenities,
       rawImagePaths: uploaded.map((p) => p.path),
     });
@@ -493,6 +504,24 @@ export function PropertyForm({
               Suitable for infants
               <Switch checked={infantsAllowed} onCheckedChange={setInfantsAllowed} />
             </label>
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              <Field label="Check-in after" htmlFor="checkInTime">
+                <Input
+                  id="checkInTime"
+                  type="time"
+                  value={checkInTime}
+                  onChange={(e) => setCheckInTime(e.target.value)}
+                />
+              </Field>
+              <Field label="Checkout before" htmlFor="checkOutTime">
+                <Input
+                  id="checkOutTime"
+                  type="time"
+                  value={checkOutTime}
+                  onChange={(e) => setCheckOutTime(e.target.value)}
+                />
+              </Field>
+            </div>
           </div>
         </Card>
 

@@ -61,6 +61,8 @@ export const AMENITY_LABELS: Record<Amenity, string> = {
   HISTORIC_BUILDING: "Historic building",
   VINYL_RECORD_PLAYER: "Vinyl record player",
   BOOKS: "Books",
+  SMOKE_ALARM: "Smoke alarm",
+  CARBON_MONOXIDE_ALARM: "Carbon monoxide alarm",
 };
 
 function titleCase(value: string): string {

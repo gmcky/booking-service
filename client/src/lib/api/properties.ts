@@ -83,6 +83,8 @@ export interface CreatePropertyInput {
   maxGuests: number;
   petsAllowed: boolean;
   infantsAllowed: boolean;
+  checkInTime?: string;
+  checkOutTime?: string;
   amenities: string[];
   rawImagePaths?: string[];
 }
@@ -91,11 +93,13 @@ export interface CreatePropertyInput {
  *  Optional address parts take null so hosts can clear them. */
 export type UpdatePropertyInput = Omit<
   Partial<CreatePropertyInput>,
-  "rawImagePaths" | "district" | "houseNumber" | "apartment"
+  "rawImagePaths" | "district" | "houseNumber" | "apartment" | "checkInTime" | "checkOutTime"
 > & {
   district?: string | null;
   houseNumber?: string | null;
   apartment?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
 };
 
 type UploadImagesBody =
