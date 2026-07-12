@@ -30,6 +30,7 @@ import { LocationSection } from "@/components/property/location-section";
 import { WhereYoullBe } from "@/components/property/where-youll-be";
 import { HostSection } from "@/components/property/host-section";
 import { ThingsToKnow } from "@/components/property/things-to-know";
+import { NearbyStays } from "@/components/property/nearby-stays";
 import { useBlockedDates } from "@/components/property/use-blocked-dates";
 import { FavoriteButton } from "@/components/property/favorite-button";
 import { useAuthStore } from "@/lib/auth/store";
@@ -194,6 +195,8 @@ export function PropertyDetailView({ id }: { id: string }) {
             <HostSection ownerId={property.owner.id} />
 
             <ThingsToKnow property={property} checkIn={checkIn} />
+
+            <NearbyStays propertyId={property.id} city={property.city} country={property.country} />
           </div>
 
           <aside className="scroll-mt-32 lg:sticky lg:top-22">
