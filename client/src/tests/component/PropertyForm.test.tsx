@@ -150,6 +150,49 @@ describe("PropertyForm", () => {
     expect(screen.queryByText("Click to add photos")).not.toBeInTheDocument();
   });
 
+  it("clearing both time inputs in edit mode submits null check-in/check-out", async () => {
+    const initial: PropertyFormInitial = {
+      title: "Old Title",
+      description: "An existing description that is long enough.",
+      street: "Main St",
+      houseNumber: "1",
+      apartment: null,
+      district: null,
+      city: "Austin",
+      country: "United States",
+      maxGuests: 4,
+      pricePerNight: "150",
+      type: "APARTMENT",
+      petsAllowed: true,
+      infantsAllowed: false,
+      checkInTime: "15:00",
+      checkOutTime: "11:00",
+      amenities: ["WIFI"],
+      images: ["uploads/properties/a.jpg"],
+    };
+    const onSubmit = vi.fn();
+    renderWithClient(
+      <PropertyForm
+        initial={initial}
+        submitLabel="Save changes"
+        pendingLabel="Saving…"
+        pending={false}
+        formError=""
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await userEvent.clear(screen.getByLabelText("Check-in after"));
+    await userEvent.clear(screen.getByLabelText("Checkout before"));
+    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      checkInTime: null,
+      checkOutTime: null,
+    });
+  });
+
   it("picking a street suggestion shows local names, submits English + coordinates", async () => {
     const { propertyApi } = await import("@/lib/api/properties");
     (propertyApi.suggestAddresses as ReturnType<typeof vi.fn>).mockResolvedValue([
