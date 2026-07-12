@@ -420,6 +420,10 @@ async function main() {
     if (scenario.bookingStatus === "COMPLETED") {
       bookingCreateData.actualCheckOutAt = stay.checkOut;
     }
+    // Past-dated scenarios must not be "booked" after their own check-in.
+    if (scenario.checkInOffsetDays < 0) {
+      bookingCreateData.createdAt = new Date(stay.checkIn.getTime() - 3 * DAY_MS);
+    }
     if (scenario.paymentStatus) {
       const paymentMetadata: Record<string, unknown> = { seededScenario: scenario.code };
       if (scenario.paymentStatus === "REFUND_REQUESTED") {
@@ -499,7 +503,10 @@ async function main() {
     const totalPrice = prop.pricePerNight * stay.nights;
     const floor = Math.max(guestRec.createdAt.getTime(), prop.createdAt.getTime()) + DAY_MS;
     let createdAtMs = stay.checkIn.getTime() - faker.number.int({ min: 5, max: 45 }) * DAY_MS;
-    if (createdAtMs < floor) createdAtMs = Math.min(floor, stay.checkIn.getTime() - DAY_MS);
+    if (createdAtMs < floor) createdAtMs = floor;
+    // Callers constrain the stay window per guest, so floor < checkIn holds;
+    // this cap just keeps "booked" strictly before "checked in".
+    createdAtMs = Math.min(createdAtMs, stay.checkIn.getTime() - 12 * 60 * 60 * 1000);
     const paymentStatus: PaymentStatus = status === "CANCELLED" ? "REFUNDED" : "SUCCESS";
     const payoutStatus: PayoutStatus =
       status === "COMPLETED"
@@ -544,15 +551,17 @@ async function main() {
   }
 
   for (const [propIndex, prop] of createdProperties.entries()) {
-    // Stays can't start before the listing existed (or 18 months back, whichever is later).
-    const earliestMs = Math.max(prop.createdAt.getTime() + DAY_MS, now - 18 * 30 * DAY_MS);
+    // Stays can't start before the listing existed (or 18 months back, whichever
+    // is later) — and, per booking, not before its guest's account either.
+    const propEarliestMs = Math.max(prop.createdAt.getTime() + DAY_MS, now - 18 * 30 * DAY_MS);
 
     const completedCount = faker.helpers.arrayElement([1, 1, 2, 2, 3]);
     for (let i = 0; i < completedCount; i++) {
       const nights = faker.number.int({ min: 2, max: 9 });
+      const guest = faker.helpers.arrayElement(guestPool);
+      const earliestMs = Math.max(propEarliestMs, guest.createdAt.getTime() + 2 * DAY_MS);
       const stay = placeStay(prop.id, earliestMs, now - DAY_MS, nights);
       if (!stay) continue;
-      const guest = faker.helpers.arrayElement(guestPool);
       await createBulk(prop, stay, "COMPLETED", guest);
     }
 
@@ -567,9 +576,11 @@ async function main() {
     // Every ~10th property gets a cancelled stay (past or near future).
     if (propIndex % 10 === 3) {
       const nights = faker.number.int({ min: 2, max: 5 });
-      const stay = placeStay(prop.id, Math.max(earliestMs, now - 90 * DAY_MS), now + 30 * DAY_MS, nights);
+      const guest = faker.helpers.arrayElement(guestPool);
+      const earliestMs = Math.max(propEarliestMs, guest.createdAt.getTime() + 2 * DAY_MS, now - 90 * DAY_MS);
+      const stay = placeStay(prop.id, earliestMs, now + 30 * DAY_MS, nights);
       if (stay) {
-        await createBulk(prop, stay, "CANCELLED", faker.helpers.arrayElement(guestPool));
+        await createBulk(prop, stay, "CANCELLED", guest);
       }
     }
   }
@@ -695,8 +706,20 @@ async function main() {
   let blockedRanges = 0;
   for (const [propIndex, prop] of createdProperties.entries()) {
     if (propIndex % 5 !== 0) continue;
-    const startMs = now + faker.number.int({ min: 10, max: 50 }) * DAY_MS;
-    const endMs = startMs + faker.number.int({ min: 3, max: 10 }) * DAY_MS;
+    // Blocked range must not sit on top of an existing (confirmed) booking.
+    let startMs = 0;
+    let endMs = 0;
+    let placed = false;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      startMs = now + faker.number.int({ min: 10, max: 50 }) * DAY_MS;
+      endMs = startMs + faker.number.int({ min: 3, max: 10 }) * DAY_MS;
+      if (!overlaps(prop.id, startMs, endMs)) {
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) continue;
+    markOccupied(prop.id, startMs, endMs);
     await prisma.blockedDate.create({
       data: {
         propertyId: prop.id,
