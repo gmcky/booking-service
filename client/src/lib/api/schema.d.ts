@@ -2792,6 +2792,7 @@ export interface components {
             user: {
                 firstName: string;
                 lastName: string;
+                avatarUrl?: string | null;
             };
             hostReplyText: string | null;
             hostReplyBy: {
@@ -2927,6 +2928,7 @@ export interface components {
             user: {
                 firstName: string;
                 lastName: string;
+                avatarUrl?: string | null;
             };
             hostReplyBy: {
                 firstName: string;
