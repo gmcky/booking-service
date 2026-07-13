@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Map as MapIcon, Search } from "lucide-react";
@@ -455,27 +456,41 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         )}
         </div>
 
-        {mapMode === "split" ? (
-          <div className="sticky top-22 hidden h-[calc(100vh-7rem)] flex-1 lg:block lg:max-w-[45%]">
-            <BrowseMapPanel
-              markers={markersQuery.data ?? []}
-              markersPending={markersQuery.isPending || markersQuery.isPlaceholderData}
-              searching={searching}
-              hoveredId={hoveredId}
-              onHoverChange={setHoveredId}
-              selectedId={selectedId}
-              onSelectChange={setSelectedId}
-              onBoundsChange={updateBounds}
-              onCollapse={collapseMap}
-              initialBounds={initialMapBounds}
-              fitBoundsKey={fitBoundsKey}
-            />
-          </div>
-        ) : null}
+        {/* Desktop: sticky side panel. Mobile: a full-screen overlay (there's
+            no room for a split view). Opacity-only fade so the animation never
+            sets a transform, which would break the desktop panel's sticky
+            positioning. */}
+        <AnimatePresence>
+          {mapMode === "split" ? (
+            <motion.div
+              key="browse-map"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="fixed inset-x-0 top-16 bottom-0 z-40 bg-background p-4 lg:inset-auto lg:z-auto lg:bg-transparent lg:p-0 lg:sticky lg:top-22 lg:h-[calc(100vh-7rem)] lg:max-w-[45%] lg:flex-1"
+            >
+              <BrowseMapPanel
+                markers={markersQuery.data ?? []}
+                markersPending={markersQuery.isPending || markersQuery.isPlaceholderData}
+                searching={searching}
+                hoveredId={hoveredId}
+                onHoverChange={setHoveredId}
+                selectedId={selectedId}
+                onSelectChange={setSelectedId}
+                onBoundsChange={updateBounds}
+                onCollapse={collapseMap}
+                initialBounds={initialMapBounds}
+                fitBoundsKey={fitBoundsKey}
+              />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-6 z-30 hidden justify-center lg:flex">
+      {/* Above the mobile map overlay (z-40) so it can toggle back to the list. */}
+      <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center">
         <Button
           className="gap-1.5 rounded-full px-4 shadow-lg"
           onClick={() => (mapMode === "split" ? collapseMap() : setMapMode("split"))}
