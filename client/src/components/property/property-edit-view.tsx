@@ -87,6 +87,8 @@ export function PropertyEditView({ id }: { id: string }) {
               district: data.district,
               city: data.city,
               country: data.country,
+              latitude: data.latitude,
+              longitude: data.longitude,
               maxGuests: data.maxGuests,
               pricePerNight: data.pricePerNight,
               type: data.type,

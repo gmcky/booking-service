@@ -43,6 +43,8 @@ export interface BaseMapProps {
    */
   onMoveEnd?: (bounds: MapBounds, isUserGesture: boolean) => void;
   onMapClick?: () => void;
+  /** Like onMapClick but with the clicked geographic point — for pin placement. */
+  onMapPointClick?: (lngLat: { lng: number; lat: number }) => void;
   /** Hands the live map instance up once the style has loaded, for marker layers. */
   onMapReady?: (map: maplibregl.Map) => void;
   navigationControl?: boolean;
@@ -67,6 +69,7 @@ export function BaseMap({
   bounds,
   onMoveEnd,
   onMapClick,
+  onMapPointClick,
   onMapReady,
   navigationControl = true,
   fullscreenControl = false,
@@ -81,9 +84,11 @@ export function BaseMap({
   // parent passes a fresh closure on every render.
   const onMoveEndRef = React.useRef(onMoveEnd);
   const onMapClickRef = React.useRef(onMapClick);
+  const onMapPointClickRef = React.useRef(onMapPointClick);
   const onMapReadyRef = React.useRef(onMapReady);
   onMoveEndRef.current = onMoveEnd;
   onMapClickRef.current = onMapClick;
+  onMapPointClickRef.current = onMapPointClick;
   onMapReadyRef.current = onMapReady;
 
   React.useEffect(() => {
@@ -126,7 +131,10 @@ export function BaseMap({
       moveByUser = false;
       onMoveEndRef.current?.(clampBounds(map.getBounds()), isUserGesture);
     });
-    map.on("click", () => onMapClickRef.current?.());
+    map.on("click", (e) => {
+      onMapClickRef.current?.();
+      onMapPointClickRef.current?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+    });
     map.on("load", () => onMapReadyRef.current?.(map));
 
     return () => {
