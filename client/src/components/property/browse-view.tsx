@@ -21,6 +21,7 @@ import {
 } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
 
 const BrowseMapPanel = dynamic(
@@ -125,6 +126,13 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   const hasBbox = hasBboxFilter(filters);
+  // Below lg the map is a full-screen overlay that slides in from the right;
+  // on desktop it's a sticky panel, which must NOT get a transform (that would
+  // break `position: sticky`), so there we animate opacity only.
+  const isMobile = useMediaQuery("(max-width: 1023px)");
+  const mapMotion = isMobile
+    ? { initial: { x: "100%" }, animate: { x: 0 }, exit: { x: "100%" } }
+    : { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } };
 
   /** Bbox URL update — once the user moves the map, the viewport IS the
    *  location: named-location params are dropped (Airbnb's "map area"). */
@@ -464,10 +472,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
           {mapMode === "split" ? (
             <motion.div
               key="browse-map"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              initial={mapMotion.initial}
+              animate={mapMotion.animate}
+              exit={mapMotion.exit}
+              transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
               className="fixed inset-x-0 top-16 bottom-0 z-40 bg-background p-4 lg:inset-auto lg:z-auto lg:bg-transparent lg:p-0 lg:sticky lg:top-22 lg:h-[calc(100vh-7rem)] lg:max-w-[45%] lg:flex-1"
             >
               <BrowseMapPanel
