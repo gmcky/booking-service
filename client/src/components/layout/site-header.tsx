@@ -15,7 +15,7 @@ export function SiteHeader() {
   const authed = status === "authed";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
+    <header className="sticky top-0 z-20 hidden border-b border-border bg-background/85 backdrop-blur lg:block">
       <div className="mx-auto flex h-16 max-w-[1120px] items-center gap-8 px-6">
         <Link
           href="/"
