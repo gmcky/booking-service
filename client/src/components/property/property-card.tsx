@@ -34,12 +34,12 @@ export function PropertyCard({
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cn(
-        "block overflow-hidden rounded-xl border border-border bg-card transition duration-300 ease-in-out hover:-translate-y-1 hover:border-ring hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+        "group block overflow-hidden rounded-xl border border-border bg-card transition duration-300 ease-in-out hover:-translate-y-1 hover:border-ring hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         highlighted && "border-ring shadow-sm ring-2 ring-ring",
       )}
     >
       <div
-        className="relative flex aspect-[4/3] items-center justify-center"
+        className="relative flex aspect-[4/3] items-center justify-center overflow-hidden"
         style={{ backgroundImage: PHOTO_STRIPES }}
       >
         <FavoriteButton propertyId={property.id} variant="overlay" />
@@ -48,7 +48,7 @@ export function PropertyCard({
           <img
             src={photoUrl(property.images[0])}
             alt={property.title}
-            className="size-full object-cover"
+            className="size-full object-cover transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : (
           <span className="font-mono text-[11px] text-muted-foreground">
