@@ -463,6 +463,7 @@ export const swaggerOptions: Options = {
               properties: {
                 firstName: { type: "string" },
                 lastName: { type: "string" },
+                avatarUrl: { type: "string", nullable: true },
               },
               required: ["firstName", "lastName"],
             },
@@ -780,6 +781,7 @@ export const swaggerOptions: Options = {
               properties: {
                 firstName: { type: "string" },
                 lastName: { type: "string" },
+                avatarUrl: { type: "string", nullable: true },
               },
               required: ["firstName", "lastName"],
             },
