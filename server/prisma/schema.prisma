@@ -261,15 +261,16 @@ model Favorite {
 }
 
 model Payment {
-  id            String          @id @default(uuid())
-  amount        Decimal         @db.Decimal(10, 2)
-  currency      String          @default("USD")
-  status        PaymentStatus   @default(PENDING)
-  provider      PaymentProvider
-  transactionId String? // External payment provider transaction ID
-  metadata      Json? // Additional provider-specific data
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id             String          @id @default(uuid())
+  amount         Decimal         @db.Decimal(10, 2)
+  refundedAmount Decimal?        @db.Decimal(10, 2) // Set on refund finalization; host payout = amount - refundedAmount
+  currency       String          @default("USD")
+  status         PaymentStatus   @default(PENDING)
+  provider       PaymentProvider
+  transactionId  String? // External payment provider transaction ID
+  metadata       Json? // Additional provider-specific data
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   bookingId String  @unique // One payment per booking
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
