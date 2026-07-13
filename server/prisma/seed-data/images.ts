@@ -155,14 +155,20 @@ export const IMAGES = {
     "1571003123894-1f0594d2b5d9",
     "1555400038-63f5ba517a47",
   ].map(u),
+  // Simple, cosy, compact rooms and studios — modest budget-to-mid stays.
+  // Deliberately no luxury suites, big living rooms, or identifiable foreign
+  // exteriors (an earlier pool put a Copenhagen harbour hotel on a Bangkok
+  // backpacker room). Interleaved bedroom / studio / nook so any 4-image
+  // window a listing draws leads with a bedroom or room shot.
   compactRoom: [
-    "1505693416388-ac5ce068fe85",
-    "1600607687920-4e2a09cf159d",
-    "1615873968403-89e068629265",
-    "1618221195710-dd6b41faaea6",
-    "1618221469555-7f3ad97540d6",
-    "1590490359683-658d3d23f972",
-    "1631049307264-da0ec9d70304",
+    "1631049307264-da0ec9d70304", // simple room, grey headboard
+    "1522708323590-d24dbb6b0267", // compact studio with kitchenette
+    "1522771739844-6a9f6d5f14af", // small bedroom, blue accents
+    "1502672260266-1c1ef2d93688", // cosy corner with plants
+    "1600607687644-c7171b42498f", // bright minimal bedroom
+    "1631679706909-1844bbd07221", // bright, compact living space
+    "1586023492125-27b2c045efd7", // reading-chair corner
+    "1533090161767-e6ffed986c88", // minimal desk nook
   ].map(u),
 } as const;
 
