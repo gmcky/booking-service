@@ -541,7 +541,12 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => searchPillRef.current?.openWhere()}
+                    onClick={() => {
+                      // The pill lives behind the fullscreen map — drop back to
+                      // the list first, then open the destination search.
+                      collapseMap();
+                      setTimeout(() => searchPillRef.current?.openWhere(), 0);
+                    }}
                     className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-1.5 text-center shadow-sm"
                   >
                     <div className="truncate text-sm font-semibold">
