@@ -21,6 +21,7 @@ import {
   USER_STATS_CACHE_TTL_SECONDS,
 } from "./user.stats.cache.js";
 import { invalidateUserAuthCache } from "../auth/auth.cache.js";
+import { DEMO_USER_EMAIL } from "../../shared/constants/demo-cleanup.js";
 
 const AVATAR_MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 type UserViewMode = "self" | "public";
@@ -437,6 +438,11 @@ export class UserService {
     });
     if (!user) throw new AppError(404, "User not found");
 
+    // Shared public account: anyone with the password could hijack the login.
+    if (user.email === DEMO_USER_EMAIL) {
+      throw new AppError(403, "The shared demo account cannot be modified");
+    }
+
     if (user.email.toLowerCase() === newEmail.toLowerCase()) {
       throw new AppError(400, "New email must be different from your current email");
     }
@@ -548,6 +554,11 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
+    // Shared public account: anyone with the password could hijack the login.
+    if (user.email === DEMO_USER_EMAIL) {
+      throw new AppError(403, "The shared demo account cannot be modified");
+    }
+
     const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isValidPassword) {
       logger.warn({ userId, event: "password_change_failed" }, "Invalid current password");
@@ -598,6 +609,11 @@ export class UserService {
 
     if (!user || !user.passwordHash) {
       throw new AppError(404, "User not found");
+    }
+
+    // Shared public account: a visitor could break the login for everyone.
+    if (user.email === DEMO_USER_EMAIL) {
+      throw new AppError(403, "The shared demo account cannot be deleted");
     }
 
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);

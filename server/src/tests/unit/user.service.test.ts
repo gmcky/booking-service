@@ -47,6 +47,7 @@ vi.mock("node:fs/promises", () => ({
 
 import { prisma } from "../../shared/lib/prisma.js";
 import { UserService } from "../../modules/users/user.service.js";
+import { DEMO_USER_EMAIL } from "../../shared/constants/demo-cleanup.js";
 
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
 
@@ -102,5 +103,49 @@ describe("UserService.getHostReviews", () => {
       data: [{ id: "review-1" }],
       pagination: { page: 2, limit: 5, total: 1, totalPages: 1 },
     });
+  });
+});
+
+describe("UserService demo account guard", () => {
+  const demoUser = {
+    id: "demo-id",
+    email: DEMO_USER_EMAIL,
+    firstName: "Demo",
+    passwordHash: "$2b$12$hash",
+    avatarUrl: null,
+  };
+
+  beforeEach(() => {
+    mockReset(mockPrisma);
+  });
+
+  it("blocks changePassword for the shared demo account", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue(demoUser as any);
+
+    await expect(
+      UserService.changePassword("demo-id", "demo1234", "NewPassword123!"),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks delete for the shared demo account", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue(demoUser as any);
+
+    await expect(UserService.delete("demo-id", "demo1234")).rejects.toMatchObject({
+      statusCode: 403,
+    });
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("blocks requestEmailChange for the shared demo account", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue(demoUser as any);
+
+    await expect(
+      UserService.requestEmailChange("demo-id", "hijack@example.com"),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mockPrisma.user.findFirst).toHaveBeenCalledTimes(1);
   });
 });
