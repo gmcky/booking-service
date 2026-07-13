@@ -120,21 +120,26 @@ export const IMAGES = {
     "1539020140153-e479b8c22e70",
     "1512632578888-169bbbc64f33",
   ].map(u),
+  // Detached houses, cottages, machiya/hanok, courtyard houses. Deliberately
+  // INTERIOR-only (living rooms, bedrooms, kitchen, bath, dining): the old
+  // pool was forest-cabin exteriors, so an urban "Private House with Garden"
+  // in Kyiv showed a log cabin in the woods — and a gallery of five different
+  // building exteriors never reads as one home. Interiors from varied homes do.
+  // Interleaved living/bedroom/other so any window stays varied.
   cabinCottage: [
-    "1570129477492-45c003edd2be",
-    "1568605114967-8130f3a36994",
-    "1449158743715-0a90ebb6d2d8",
-    "1595877244574-e90ce41ce089",
-    "1584622650111-993a426fbf0a",
-    "1584622781564-1d987f7333c1",
-    "1585544314038-a0d3769d0193",
-    "1587061949409-02df41d5e562",
-    "1587985064135-0366536eab42",
-    "1510798831971-661eb04b3739",
-    "1518780664697-55e3ad937233",
-    "1542718610-a1d656d1884c",
-    "1571055107559-3e67626fa8be",
-    "1601918774946-25832a4be0d6",
+    "1600607687939-ce8a6c25118c", // living room, open kitchen behind
+    "1616594039964-ae9021a400a0", // bedroom, soft grey
+    "1484154218962-a197022b5858", // kitchen with island
+    "1600566753086-00f18fb6b3ea", // living room with staircase
+    "1560185893-a55cbc8c57e8", // bedroom, warm tones
+    "1560448075-bb485b067938", // bathroom
+    "1616486338812-3dadae4b4ace", // spacious sectional living room
+    "1611892440504-42a792e24d32", // bedroom, wood, garden view
+    "1617806118233-18e1de247200", // dining room
+    "1600210491892-03d54c0aaf87", // living room, arched windows, fireplace
+    "1618773928121-c32242e63f39", // bedroom, modern
+    "1598928506311-c55ded91a20c", // bright living room, fireplace
+    "1560448204-e02f11c3d0e2", // bedroom with sitting area
   ].map(u),
   tropical: [
     "1590073844006-33379778ae09",
