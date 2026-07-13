@@ -23,6 +23,50 @@ import { cn } from "@/lib/utils";
 const COMMENT_MIN = 10;
 const COMMENT_MAX = 1000;
 
+const CATEGORY_FIELDS = [
+  ["cleanliness", "Cleanliness"],
+  ["accuracy", "Accuracy"],
+  ["checkIn", "Check-in"],
+  ["communication", "Communication"],
+  ["location", "Location"],
+  ["value", "Value"],
+] as const;
+
+type CategoryKey = (typeof CATEGORY_FIELDS)[number][0];
+
+function StarPicker({
+  value,
+  onChange,
+  label,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  label: string;
+}) {
+  const [hover, setHover] = React.useState(0);
+  return (
+    <div className="flex gap-1" onMouseLeave={() => setHover(0)}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          onMouseEnter={() => setHover(n)}
+          className="p-0.5 text-foreground"
+          aria-label={`${label}: ${n} star${n === 1 ? "" : "s"}`}
+        >
+          <Star
+            className={cn(
+              "size-5",
+              (hover || value) >= n ? "fill-current" : "text-muted-foreground",
+            )}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 type ReviewFormDialogBaseProps = {
   trigger: React.ReactElement;
   children: React.ReactNode;
@@ -38,10 +82,12 @@ export function ReviewFormDialog(props: ReviewFormDialogProps) {
   const propertyId = props.mode === "create" ? props.propertyId : props.review.propertyId;
   const [open, setOpen] = React.useState(false);
   const [rating, setRating] = React.useState(props.mode === "edit" ? props.review.rating : 0);
-  const [hoverRating, setHoverRating] = React.useState(0);
   const [comment, setComment] = React.useState(
     props.mode === "edit" ? (props.review.comment ?? "") : "",
   );
+  // Category values (0 = unset). Per-review payloads don't carry categories, so
+  // edit starts blank; unset values are sent as undefined and left untouched.
+  const [categories, setCategories] = React.useState<Partial<Record<CategoryKey, number>>>({});
   const queryClient = useQueryClient();
 
   const trimmed = comment.trim();
@@ -52,6 +98,7 @@ export function ReviewFormDialog(props: ReviewFormDialogProps) {
   const canSubmit = rating >= 1 && rating <= 5 && !commentError;
 
   function reset() {
+    setCategories({});
     if (props.mode === "edit") {
       setRating(props.review.rating);
       setComment(props.review.comment ?? "");
@@ -63,7 +110,11 @@ export function ReviewFormDialog(props: ReviewFormDialogProps) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const input = { rating, comment: trimmed.length > 0 ? trimmed : undefined };
+      // Only send categories the guest actually set; unset ones stay undefined.
+      const setCats = Object.fromEntries(
+        CATEGORY_FIELDS.map(([key]) => [key, categories[key]]).filter(([, v]) => (v as number) >= 1),
+      );
+      const input = { rating, comment: trimmed.length > 0 ? trimmed : undefined, ...setCats };
       return props.mode === "create"
         ? reviewApi.create({ bookingId: props.bookingId, ...input })
         : reviewApi.update(props.review.id, input);
@@ -107,25 +158,25 @@ export function ReviewFormDialog(props: ReviewFormDialogProps) {
         <div className="flex flex-col gap-3">
           <div>
             <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
-              Rating
+              Overall rating
             </Label>
-            <div className="flex gap-1" onMouseLeave={() => setHoverRating(0)}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setRating(n)}
-                  onMouseEnter={() => setHoverRating(n)}
-                  className="p-0.5 text-foreground"
-                  aria-label={`${n} star${n === 1 ? "" : "s"}`}
-                >
-                  <Star
-                    className={cn(
-                      "size-5",
-                      (hoverRating || rating) >= n ? "fill-current" : "text-muted-foreground",
-                    )}
+            <StarPicker value={rating} onChange={setRating} label="Overall" />
+          </div>
+
+          <div>
+            <Label className="mb-1.5 font-mono text-[10px] tracking-wide uppercase text-muted-foreground">
+              Categories (optional)
+            </Label>
+            <div className="flex flex-col gap-1.5">
+              {CATEGORY_FIELDS.map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-muted-foreground">{label}</span>
+                  <StarPicker
+                    value={categories[key] ?? 0}
+                    onChange={(n) => setCategories((c) => ({ ...c, [key]: n }))}
+                    label={label}
                   />
-                </button>
+                </div>
               ))}
             </div>
           </div>

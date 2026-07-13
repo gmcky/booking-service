@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays } from "date-fns";
-import { ArrowLeft, ChevronDown, MapPin, Star } from "lucide-react";
+import { ArrowLeft, Award, ChevronDown, MapPin, Star } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -271,8 +271,18 @@ function PropertyReviews({
     queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(propertyId) });
   }
 
+  // Honest thresholds: a genuinely strong, well-reviewed listing.
+  const isGuestFavorite = (stats?.averageRating ?? 0) >= 4.9 && (stats?.totalReviews ?? 0) >= 5;
+
   return (
     <div id="reviews" className="scroll-mt-32 py-6 pb-1">
+      {isGuestFavorite ? (
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-[13px] font-medium">
+          <Award className="size-4" />
+          Guest favorite
+        </div>
+      ) : null}
+
       <h2 className="mb-[18px] flex items-center gap-2 text-[19px] font-semibold tracking-tight">
         <Star className="size-[17px] fill-current" />
         {statsRating ? `${statsRating} · ` : ""}
@@ -280,6 +290,7 @@ function PropertyReviews({
       </h2>
 
       {stats ? <RatingBreakdown stats={stats} /> : null}
+      {stats ? <CategoryRatings categories={stats.categories} /> : null}
 
       <div className="mb-5 flex flex-wrap items-center gap-2.5">
         <Select value={sort} onValueChange={(v) => setSort(v as ReviewSort)}>
@@ -349,6 +360,39 @@ function PropertyReviews({
           ) : null}
         </>
       )}
+    </div>
+  );
+}
+
+const REVIEW_CATEGORIES = [
+  ["cleanliness", "Cleanliness"],
+  ["accuracy", "Accuracy"],
+  ["checkIn", "Check-in"],
+  ["communication", "Communication"],
+  ["location", "Location"],
+  ["value", "Value"],
+] as const;
+
+function CategoryRatings({ categories }: { categories: ReviewStats["categories"] }) {
+  const entries = REVIEW_CATEGORIES.filter(([key]) => categories[key] != null);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mb-6 grid grid-cols-1 gap-x-10 gap-y-2.5 sm:grid-cols-2">
+      {entries.map(([key, label]) => {
+        const value = categories[key] as number;
+        return (
+          <div key={key} className="flex items-center gap-3 text-sm">
+            <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-foreground" style={{ width: `${(value / 5) * 100}%` }} />
+            </div>
+            <span className="w-8 shrink-0 text-right font-medium tabular-nums">
+              {value.toFixed(1)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
