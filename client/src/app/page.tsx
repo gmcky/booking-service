@@ -33,7 +33,13 @@ export default function HomePage() {
         </section>
 
         <section className="mx-auto mb-2 max-w-[920px]">
-          <SearchPill />
+          {/* Full expanded pill on desktop; a compact tap-to-open pill on mobile. */}
+          <div className="hidden lg:block">
+            <SearchPill />
+          </div>
+          <div className="lg:hidden">
+            <SearchPill collapsible compact />
+          </div>
         </section>
 
         <section className="flex items-baseline justify-between pt-14">
