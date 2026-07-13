@@ -147,7 +147,9 @@ export function BrowseMapPanel({
         </div>
       ) : null}
 
-      <div className="absolute top-3 left-3 z-10">
+      {/* Desktop collapse control. On mobile the overlay's own top bar (back
+          arrow) handles exiting, so this is hidden there. */}
+      <div className="absolute top-3 left-3 z-10 hidden lg:block">
         <Button
           variant="secondary"
           size="icon"
@@ -160,7 +162,9 @@ export function BrowseMapPanel({
       </div>
 
       {selected ? (
-        <Card className="absolute bottom-3 left-3 z-10 w-64 gap-0 overflow-hidden p-0 shadow-lg">
+        // Mobile: a full-width horizontal card docked at the bottom. Desktop: a
+        // compact vertical card in the corner.
+        <Card className="absolute inset-x-3 bottom-3 z-10 gap-0 overflow-hidden p-0 shadow-lg lg:inset-x-auto lg:left-3 lg:w-64">
           <button
             type="button"
             aria-label="Close"
@@ -169,9 +173,9 @@ export function BrowseMapPanel({
           >
             <X className="size-3.5" />
           </button>
-          <Link href={`/properties/${selected.id}`} className="block">
+          <Link href={`/properties/${selected.id}`} className="flex lg:block">
             <div
-              className="relative flex aspect-[4/3] items-center justify-center"
+              className="relative flex aspect-square w-28 shrink-0 items-center justify-center lg:aspect-[4/3] lg:w-full"
               style={{ backgroundImage: PHOTO_STRIPES }}
             >
               {selected.images[0] ? (
@@ -183,7 +187,7 @@ export function BrowseMapPanel({
                 />
               ) : null}
             </div>
-            <div className="p-3">
+            <div className="min-w-0 flex-1 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-sm font-semibold">{selected.title}</span>
                 {rating ? (
