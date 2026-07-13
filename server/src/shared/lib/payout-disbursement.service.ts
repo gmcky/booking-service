@@ -1,9 +1,22 @@
 import { prisma } from "./prisma.js";
+import type { Prisma } from "@prisma/client";
 import { logger } from "./logger.js";
 import { getMetadataObject } from "../utils/prisma.helpers.js";
 
 const DEFAULT_PAYOUT_BATCH_SIZE = 50;
 const PAYOUT_PROVIDER = "MOCK_HOST_PAYOUT";
+
+// A payout is disbursable for a completed stay, or for a cancelled booking
+// whose refund left a remainder owed to the host (payment REFUNDED with a
+// partial refundedAmount, or still SUCCESS when cancelled inside the
+// no-refund window). payoutStatus READY is only ever set by those two flows.
+const DISBURSABLE_BOOKING_WHERE = {
+  payoutStatus: "READY",
+  OR: [
+    { status: "COMPLETED", payment: { is: { status: "SUCCESS" } } },
+    { status: "CANCELLED", payment: { is: { status: { in: ["SUCCESS", "REFUNDED"] } } } },
+  ],
+} satisfies Prisma.BookingWhereInput;
 
 type PayoutRunStats = {
   attempted: number;
@@ -47,15 +60,7 @@ export async function disburseReadyPayouts(
   };
 
   const readyBookings = await prisma.booking.findMany({
-    where: {
-      status: "COMPLETED",
-      payoutStatus: "READY",
-      payment: {
-        is: {
-          status: "SUCCESS",
-        },
-      },
-    },
+    where: DISBURSABLE_BOOKING_WHERE,
     include: {
       payment: true,
       property: {
@@ -78,6 +83,17 @@ export async function disburseReadyPayouts(
       continue;
     }
 
+    // Host receives what the guest paid minus any refunded share.
+    const payoutAmount = Number(payment.amount) - Number(payment.refundedAmount ?? 0);
+    if (payoutAmount <= 0) {
+      stats.skipped += 1;
+      logger.warn(
+        { bookingId: booking.id, paymentId: payment.id, payoutAmount },
+        "Skipping payout because no remainder is owed to the host",
+      );
+      continue;
+    }
+
     stats.attempted += 1;
 
     try {
@@ -85,7 +101,7 @@ export async function disburseReadyPayouts(
         bookingId: booking.id,
         hostId: booking.property.ownerId,
         paymentId: payment.id,
-        amount: Number(payment.amount),
+        amount: payoutAmount,
         currency: payment.currency,
       });
 
@@ -93,13 +109,7 @@ export async function disburseReadyPayouts(
         const bookingUpdate = await tx.booking.updateMany({
           where: {
             id: booking.id,
-            status: "COMPLETED",
-            payoutStatus: "READY",
-            payment: {
-              is: {
-                status: "SUCCESS",
-              },
-            },
+            ...DISBURSABLE_BOOKING_WHERE,
           },
           data: {
             payoutStatus: "PAID_OUT",
@@ -119,6 +129,7 @@ export async function disburseReadyPayouts(
               payout: {
                 provider: PAYOUT_PROVIDER,
                 providerPayoutId: providerResult.providerPayoutId,
+                amount: payoutAmount,
                 paidOutAt: new Date().toISOString(),
               },
             },

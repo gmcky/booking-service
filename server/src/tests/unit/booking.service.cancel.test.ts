@@ -275,7 +275,7 @@ describe("BookingService.cancel", () => {
     const cancelledBooking = {
       ...booking,
       status: "CANCELLED",
-      payoutStatus: "CANCELLED",
+      payoutStatus: "READY",
     } as any;
 
     mockPrisma.booking.findUnique.mockResolvedValue(booking);
@@ -299,9 +299,11 @@ describe("BookingService.cancel", () => {
     expect(result.cancellation!.refundPercent).toBe(0);
     expect(mockStripe.refunds.create).not.toHaveBeenCalled();
     expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
+    // No refund issued: the host is still owed the full captured amount, so
+    // the payout must stay alive (READY), not be cancelled.
     expect(mockPrisma.booking.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { status: "CANCELLED", payoutStatus: "CANCELLED" },
+        data: { status: "CANCELLED", payoutStatus: "READY" },
       }),
     );
     // Fire-and-forget email chain needs a few microtask ticks to settle.
@@ -313,6 +315,65 @@ describe("BookingService.cancel", () => {
     expect(mockEmailQueue.add).toHaveBeenCalledWith(
       "booking-cancelled-host",
       expect.objectContaining({ hostEmail: "host2@test.com", hostFirstName: "Host2" }),
+    );
+  });
+
+  it("partial (50%) refund keeps payout READY and records refundedAmount", async () => {
+    const now = Date.now();
+
+    // 30h before check-in falls in the 24-48h partial-refund window (50%).
+    const booking = {
+      id: "booking-partial",
+      userId: "guest-3",
+      propertyId: "property-3",
+      checkIn: new Date(now + 30 * 60 * 60 * 1000),
+      checkOut: new Date(now + 54 * 60 * 60 * 1000),
+      totalPrice: new Prisma.Decimal("200.00"),
+      status: "CONFIRMED",
+      payoutStatus: "PENDING",
+      property: { id: "property-3", ownerId: "host-3", title: "Partial Property" },
+      payment: {
+        id: "payment-3",
+        bookingId: "booking-partial",
+        amount: new Prisma.Decimal("200.00"),
+        currency: "USD",
+        status: "SUCCESS",
+        transactionId: "pi_partial_1",
+        metadata: null,
+      },
+    } as any;
+
+    const cancelledBooking = { ...booking, status: "CANCELLED", payoutStatus: "READY" } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+    (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_partial_1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockPrisma.booking.update.mockResolvedValue(cancelledBooking);
+    (mockPrisma.user.findFirst as any)
+      .mockResolvedValueOnce({ email: "guest3@test.com", firstName: "Guest3", lastName: "User3" })
+      .mockResolvedValueOnce({ email: "host3@test.com", firstName: "Host3" });
+    mockEmailQueue.add.mockResolvedValue(undefined as never);
+
+    const result = await BookingService.cancel("booking-partial", "guest-3", "USER");
+
+    expect(result.cancellation!.refundPercent).toBe(50);
+    // Guest is refunded half (100.00 → 10000 cents).
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 10000 }),
+      expect.objectContaining({ idempotencyKey: "booking_cancel_refund_payment-3" }),
+    );
+    // Payment records the refunded share so disbursement can net it out.
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "REFUNDED", refundedAmount: 100 }),
+      }),
+    );
+    // Host is still owed the retained 50%, so the payout stays alive.
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "CANCELLED", payoutStatus: "READY" }),
+      }),
     );
   });
 });

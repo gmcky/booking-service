@@ -159,6 +159,7 @@ export class PaymentRefundService {
             where: { id },
             data: {
               status: "REFUNDED",
+              refundedAmount: refundAmount,
               metadata: {
                 ...processingMetadata,
                 audit: {
@@ -182,7 +183,8 @@ export class PaymentRefundService {
             where: { id: payment.bookingId },
             data: {
               status: "CANCELLED",
-              payoutStatus: "CANCELLED",
+              // Partial refund leaves a remainder owed to the host.
+              payoutStatus: policy.refundPercent < 100 ? "READY" : "CANCELLED",
             },
           });
 
@@ -454,6 +456,7 @@ export class PaymentRefundService {
         },
         data: {
           status: "REFUNDED",
+          refundedAmount: refundAmount,
           metadata: {
             ...freshMetadata,
             audit: {
@@ -478,7 +481,10 @@ export class PaymentRefundService {
         where: { id: payment.bookingId },
         data: {
           status: "CANCELLED",
-          payoutStatus: "CANCELLED",
+          // Partial refund leaves a remainder owed to the host. Compare
+          // amounts, not the rounded percent, so a rounding artifact can't
+          // cancel a real remainder.
+          payoutStatus: refundAmount < paymentAmount ? "READY" : "CANCELLED",
         },
       });
 
