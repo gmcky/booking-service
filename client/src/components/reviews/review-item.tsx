@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ReviewFormDialog } from "@/components/reviews/review-form-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { reviewApi, type Review } from "@/lib/api/reviews";
 import { canEditReview } from "@/lib/utils/reviews";
 import { useAuthStore } from "@/lib/auth/store";
@@ -69,7 +70,12 @@ export function ReviewItem({
   return (
     <div>
       <div className="mb-2 flex items-center gap-2.5">
-        <span className="size-[34px] shrink-0 rounded-full border border-border bg-muted" />
+        <Avatar className="size-[34px] shrink-0 border border-border">
+          {review.user.avatarUrl ? <AvatarImage src={review.user.avatarUrl} alt="" /> : null}
+          <AvatarFallback>
+            {`${review.user.firstName[0] ?? ""}${review.user.lastName[0] ?? ""}`.toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
         <div className="min-w-0">
           <div className="text-sm font-medium">{review.user.firstName}</div>
           <div className="font-mono text-[11px] text-muted-foreground">{date}</div>
