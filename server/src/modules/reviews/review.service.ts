@@ -64,6 +64,7 @@ export class ReviewService {
             select: {
               firstName: true,
               lastName: true,
+              avatarUrl: true,
             },
           },
           hostReplyBy: {
@@ -146,6 +147,7 @@ export class ReviewService {
               select: {
                 firstName: true,
                 lastName: true,
+                avatarUrl: true,
               },
             },
             hostReplyBy: {
@@ -349,6 +351,7 @@ export class ReviewService {
             select: {
               firstName: true,
               lastName: true,
+              avatarUrl: true,
             },
           },
           hostReplyBy: {

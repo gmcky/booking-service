@@ -310,7 +310,7 @@ export class PropertyService {
           take: 5,
           orderBy: { createdAt: "desc" },
           include: {
-            user: { select: { firstName: true, lastName: true } },
+            user: { select: { firstName: true, lastName: true, avatarUrl: true } },
             hostReplyBy: { select: { firstName: true, lastName: true } },
           },
         },
