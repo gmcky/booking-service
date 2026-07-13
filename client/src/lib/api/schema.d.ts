@@ -1848,6 +1848,12 @@ export interface paths {
                         bookingId: string;
                         rating: number;
                         comment?: string;
+                        cleanliness?: number;
+                        accuracy?: number;
+                        checkIn?: number;
+                        communication?: number;
+                        location?: number;
+                        value?: number;
                     };
                 };
             };
@@ -1923,6 +1929,12 @@ export interface paths {
                     "application/json": {
                         rating?: number;
                         comment?: string;
+                        cleanliness?: number;
+                        accuracy?: number;
+                        checkIn?: number;
+                        communication?: number;
+                        location?: number;
+                        value?: number;
                     };
                 };
             };
@@ -2944,6 +2956,14 @@ export interface components {
                 3?: number;
                 4?: number;
                 5?: number;
+            };
+            categories: {
+                cleanliness: number | null;
+                accuracy: number | null;
+                checkIn: number | null;
+                communication: number | null;
+                location: number | null;
+                value: number | null;
             };
             recentTrend: {
                 month: string;
