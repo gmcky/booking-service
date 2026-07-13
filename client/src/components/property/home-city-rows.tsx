@@ -102,7 +102,7 @@ function CityRow({ city, heading }: { city: string; heading?: string }) {
   if (items.length === 0) return null;
 
   return (
-    <section className="pt-14">
+    <section className="pt-14 duration-500 animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
       <Carousel
         heading={
           <div className="flex items-baseline gap-3">
