@@ -7,6 +7,8 @@ import { propertyApi } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { PropertyCard } from "@/components/property/property-card";
 import { Carousel } from "@/components/ui/carousel";
+import type { DetectedLocation } from "@/lib/geo/detect-location";
+import type { LocationCountry } from "@/lib/api/properties";
 
 const MIN_CITY_LISTINGS = 3; // only cities with enough inventory to fill a row
 const TOP_POOL = 8; // rotate the shown rows within the top N eligible cities
@@ -38,7 +40,27 @@ function pickCities(cities: { city: string; count: number }[]): string[] {
   return picked;
 }
 
-export function HomeCityRows() {
+// Resolve a detected city against the real locations tree — the ISO country
+// label may not match host-entered free text, so prefer a same-country match
+// and fall back to a city-only match. Mirrors the search pill's "Nearby".
+function resolveNearbyCity(
+  locations: LocationCountry[],
+  detected: DetectedLocation | undefined,
+): string | undefined {
+  if (!detected?.city) return undefined;
+  const target = detected.city.toLowerCase();
+  let fallback: string | undefined;
+  for (const country of locations) {
+    for (const c of country.cities) {
+      if (c.city.toLowerCase() !== target) continue;
+      if (detected.country && country.country === detected.country) return c.city;
+      fallback ??= c.city;
+    }
+  }
+  return detected.country ? undefined : fallback;
+}
+
+export function HomeCityRows({ detected }: { detected?: DetectedLocation }) {
   const { data } = useQuery({
     queryKey: queryKeys.properties.locations,
     queryFn: () => propertyApi.locations(),
@@ -50,11 +72,17 @@ export function HomeCityRows() {
   const cities = data.flatMap((country) =>
     country.cities.map((c) => ({ city: c.city, count: c.count })),
   );
-  const picked = pickCities(cities);
-  if (picked.length === 0) return null;
+
+  const nearby = resolveNearbyCity(data, detected);
+  // Don't repeat the near-you city in the inventory rows below it.
+  const picked = pickCities(cities).filter((c) => c !== nearby);
+  if (!nearby && picked.length === 0) return null;
 
   return (
     <>
+      {nearby ? (
+        <CityRow key={`nearby-${nearby}`} city={nearby} heading={`Stays near you · ${nearby}`} />
+      ) : null}
       {picked.map((city) => (
         <CityRow key={city} city={city} />
       ))}
@@ -62,7 +90,7 @@ export function HomeCityRows() {
   );
 }
 
-function CityRow({ city }: { city: string }) {
+function CityRow({ city, heading }: { city: string; heading?: string }) {
   const { data } = useQuery({
     queryKey: queryKeys.properties.list({ city, limit: PER_ROW }),
     queryFn: () => propertyApi.search({ city, limit: PER_ROW }),
@@ -78,7 +106,9 @@ function CityRow({ city }: { city: string }) {
       <Carousel
         heading={
           <div className="flex items-baseline gap-3">
-            <h2 className="text-[22px] font-semibold tracking-tight">Stays in {city}</h2>
+            <h2 className="text-[22px] font-semibold tracking-tight">
+              {heading ?? `Stays in ${city}`}
+            </h2>
             <Link
               href={`/browse?city=${encodeURIComponent(city)}`}
               className="inline-flex shrink-0 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
