@@ -7,7 +7,7 @@ export interface UnlinkPropertyImagesJobData {
   paths: string[];
 }
 
-// Empty payload — handler reads PROTECTED_USER_IDS and live DB state.
+// Empty payload — handler reads the protected-email constants and live DB state.
 export type PurgeDemoDataJobData = Record<string, never>;
 
 export type CleanupJobData = UnlinkPropertyImagesJobData | PurgeDemoDataJobData;
