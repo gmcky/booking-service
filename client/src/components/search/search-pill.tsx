@@ -75,6 +75,11 @@ export interface SearchPillProps {
    * while no popover is open.
    */
   collapsible?: boolean;
+  /**
+   * With `collapsible`, the collapsed state is a single "Start your search"
+   * bar (mobile home) rather than the three-segment strip.
+   */
+  compact?: boolean;
 }
 
 function clampAdults(adults: number, children: number, infants: boolean): number {
@@ -133,7 +138,7 @@ function filterLocations(locations: LocationCountry[], query: string): LocationC
 }
 
 export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
-  function SearchPill({ detected, initialFilters, className, collapsible }, ref) {
+  function SearchPill({ detected, initialFilters, className, collapsible, compact }, ref) {
     const router = useRouter();
 
     const rootRef = React.useRef<HTMLDivElement>(null);
@@ -495,6 +500,32 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       if (rules.length > 0) parts.push(rules.join(" · "));
       return parts.length > 0 ? parts.join(" · ") : undefined;
     })();
+
+    if (collapsible && !expanded && compact) {
+      const summary = [whereText, whenText, whoText].filter(Boolean).join(" · ");
+      return (
+        <div ref={rootRef}>
+          <button
+            type="button"
+            onClick={() => expandAndOpen("where")}
+            className={cn(
+              "flex h-14 w-full items-center gap-3 rounded-full border border-border bg-card px-5 shadow-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200",
+              className,
+            )}
+          >
+            <Search className="size-5 shrink-0" />
+            <span
+              className={cn(
+                "truncate text-[15px] font-medium",
+                summary ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {summary || "Start your search"}
+            </span>
+          </button>
+        </div>
+      );
+    }
 
     if (collapsible && !expanded) {
       return (
