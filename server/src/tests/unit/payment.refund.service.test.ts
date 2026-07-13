@@ -556,6 +556,68 @@ describe("PaymentRefundService.approveRefund", () => {
     expect(mockEmailQueue.add).toHaveBeenCalledTimes(2);
   });
 
+  it("partial approved refund keeps payout READY and records refundedAmount", async () => {
+    // amount 300, stored request 150 → 50% refund.
+    const requestedPayment = buildPayment({
+      status: "REFUND_REQUESTED",
+      metadata: { audit: { refundRequest: { refundAmount: 150 } } },
+    });
+    const refundedPayment = buildPayment({ status: "REFUNDED" });
+
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(requestedPayment)
+      .mockResolvedValueOnce({ metadata: requestedPayment.metadata })
+      .mockResolvedValueOnce(refundedPayment);
+    (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_partial_approve" } as any);
+
+    await PaymentRefundService.approveRefund("payment-1", "admin-1");
+
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "REFUNDED", refundedAmount: 150 }),
+      }),
+    );
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "CANCELLED", payoutStatus: "READY" }),
+      }),
+    );
+  });
+
+  it("full approved refund cancels the payout", async () => {
+    // amount 300, stored request 300 → 100% refund.
+    const requestedPayment = buildPayment({
+      status: "REFUND_REQUESTED",
+      metadata: { audit: { refundRequest: { refundAmount: 300 } } },
+    });
+    const refundedPayment = buildPayment({ status: "REFUNDED" });
+
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(requestedPayment)
+      .mockResolvedValueOnce({ metadata: requestedPayment.metadata })
+      .mockResolvedValueOnce(refundedPayment);
+    (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as any);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_full_approve" } as any);
+
+    await PaymentRefundService.approveRefund("payment-1", "admin-1");
+
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "REFUNDED", refundedAmount: 300 }),
+      }),
+    );
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "CANCELLED", payoutStatus: "CANCELLED" }),
+      }),
+    );
+  });
+
   it("does not send duplicate emails when refund was finalized concurrently", async () => {
     const requestedPayment = buildPayment({ status: "REFUND_REQUESTED" });
     const refundedPayment = buildPayment({ status: "REFUNDED" });

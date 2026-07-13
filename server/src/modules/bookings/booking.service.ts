@@ -435,7 +435,9 @@ export class BookingService {
             where: { id },
             data: {
               status: "CANCELLED",
-              payoutStatus: "CANCELLED",
+              // Paid booking cancelled inside the no-refund window: the full
+              // amount is still owed to the host, so the payout stays alive.
+              payoutStatus: booking.payment?.status === "SUCCESS" ? "READY" : "CANCELLED",
             },
             include: { property: true },
           });
@@ -573,6 +575,7 @@ export class BookingService {
           },
           data: {
             status: "REFUNDED",
+            refundedAmount: refundAmount,
             metadata: {
               ...existingMetadata,
               audit: {
@@ -601,7 +604,8 @@ export class BookingService {
           where: { id: booking.id },
           data: {
             status: "CANCELLED",
-            payoutStatus: "CANCELLED",
+            // Partial refund leaves a remainder owed to the host.
+            payoutStatus: refundPercent < 100 ? "READY" : "CANCELLED",
           },
           include: { property: true },
         });
