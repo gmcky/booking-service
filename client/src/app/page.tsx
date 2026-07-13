@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SearchPill } from "@/components/search/search-pill";
 import { PropertyGrid } from "@/components/property/property-grid";
+import { HomeCityRows } from "@/components/property/home-city-rows";
 
 export default function HomePage() {
   return (
@@ -40,6 +41,8 @@ export default function HomePage() {
         <section className="pt-6">
           <PropertyGrid query={{ limit: 8, sort: "newest" }} />
         </section>
+
+        <HomeCityRows />
 
         <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
           <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
