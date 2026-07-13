@@ -102,12 +102,16 @@ function PhotoTile({
 }) {
   return (
     <div
-      className={cn("flex items-center justify-center overflow-hidden", className)}
+      className={cn("group flex items-center justify-center overflow-hidden", className)}
       style={{ backgroundImage: PHOTO_STRIPES }}
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl(src)} alt={title} className="size-full object-cover" />
+        <img
+          src={photoUrl(src)}
+          alt={title}
+          className="size-full object-cover transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        />
       ) : (
         <span className="font-mono text-[11px] text-muted-foreground">no photo</span>
       )}
