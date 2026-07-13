@@ -151,8 +151,8 @@ export const IMAGES = {
     "1600566753086-00f18fb6b3ea",
     "1600566753190-17f0baa2a6c3",
     "1600585154340-be6161a56a0c",
-    "1537996194471-e657df975ab4",
-    "1518548419970-58e3b4079ab2",
+    "1596436889106-be35e843f974", // was Pura Ulun Danu temple (landmark) — now a resort pool
+    "1520250497591-112f2f40a3f4", // was Tanah Lot temple (landmark) — now a pool with mountains
     "1540202404-a2f29016b523",
     "1499793983690-e29da59ef1c2",
     "1540541338287-41700207dee6",
