@@ -82,7 +82,7 @@ export function Carousel({
               type="button"
               variant="outline"
               size="icon-sm"
-              className="rounded-full"
+              className="rounded-full transition-opacity duration-300 disabled:opacity-40"
               aria-label="Previous"
               disabled={!canScrollPrev}
               onClick={() => scrollByPage(-1)}
@@ -93,7 +93,7 @@ export function Carousel({
               type="button"
               variant="outline"
               size="icon-sm"
-              className="rounded-full"
+              className="rounded-full transition-opacity duration-300 disabled:opacity-40"
               aria-label="Next"
               disabled={!canScrollNext}
               onClick={() => scrollByPage(1)}
