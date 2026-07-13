@@ -21,6 +21,7 @@ import {
 } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
 
 const BrowseMapPanel = dynamic(
@@ -125,6 +126,19 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   const hasBbox = hasBboxFilter(filters);
+  const isMobile = useMediaQuery("(max-width: 1023px)");
+  const mapOpen = mapMode === "split";
+
+  // Mobile map is a full-screen overlay — lock the page behind it so a stray
+  // scroll can't reveal the listing grid underneath.
+  React.useEffect(() => {
+    if (!isMobile || !mapOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobile, mapOpen]);
 
   /** Bbox URL update — once the user moves the map, the viewport IS the
    *  location: named-location params are dropped (Airbnb's "map area"). */
@@ -456,10 +470,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         )}
         </div>
 
-        {/* Desktop: sticky side panel. Mobile: a full-screen overlay (no room
-            for a split view). The slide lives on an inner wrapper — a transform
-            on the sticky outer would break its positioning — so the outer only
-            fades while the map itself slides in from the right on both. */}
+        {/* Desktop: sticky side panel that slides in from the right (slide on
+            the inner wrapper — a transform on the sticky outer would break its
+            positioning). Mobile: an edge-to-edge full-screen overlay that just
+            fades in. */}
         <AnimatePresence>
           {mapMode === "split" ? (
             <motion.div
@@ -467,14 +481,14 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.32, ease: "easeOut" }}
-              className="fixed inset-x-0 top-16 bottom-0 z-40 overflow-hidden bg-background p-4 lg:inset-auto lg:z-auto lg:bg-transparent lg:p-0 lg:sticky lg:top-22 lg:h-[calc(100vh-7rem)] lg:max-w-[45%] lg:flex-1"
+              transition={{ duration: 0.28, ease: "easeOut" }}
+              className="fixed inset-0 z-40 overflow-hidden bg-background lg:inset-auto lg:z-auto lg:bg-transparent lg:sticky lg:top-22 lg:h-[calc(100vh-7rem)] lg:max-w-[45%] lg:flex-1"
             >
               <motion.div
                 className="size-full"
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
+                initial={isMobile ? false : { x: "100%" }}
+                animate={isMobile ? { x: 0 } : { x: 0 }}
+                exit={isMobile ? { x: 0 } : { x: "100%" }}
                 transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
               >
                 <BrowseMapPanel
