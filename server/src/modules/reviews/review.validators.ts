@@ -8,15 +8,29 @@ const optionalBooleanStringSchema = z.preprocess((value) => {
   return value;
 }, booleanStringSchema.optional());
 
+const categoryRating = z.number().int().min(1).max(5).optional();
+
+// The six optional per-category ratings, reused by create and update.
+const reviewCategories = {
+  cleanliness: categoryRating,
+  accuracy: categoryRating,
+  checkIn: categoryRating,
+  communication: categoryRating,
+  location: categoryRating,
+  value: categoryRating,
+};
+
 export const createReviewSchema = z.object({
   bookingId: z.string().uuid(),
   rating: z.number().int().min(1).max(5),
   comment: z.string().min(10).max(1000).optional(),
+  ...reviewCategories,
 });
 
 export const updateReviewSchema = z.object({
   rating: z.number().int().min(1).max(5).optional(),
   comment: z.string().min(10).max(1000).optional(),
+  ...reviewCategories,
 });
 
 export const reviewQuerySchema = z.object({

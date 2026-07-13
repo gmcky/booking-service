@@ -826,6 +826,25 @@ export const swaggerOptions: Options = {
                 "5": { type: "integer" },
               },
             },
+            categories: {
+              type: "object",
+              properties: {
+                cleanliness: { type: "number", nullable: true },
+                accuracy: { type: "number", nullable: true },
+                checkIn: { type: "number", nullable: true },
+                communication: { type: "number", nullable: true },
+                location: { type: "number", nullable: true },
+                value: { type: "number", nullable: true },
+              },
+              required: [
+                "cleanliness",
+                "accuracy",
+                "checkIn",
+                "communication",
+                "location",
+                "value",
+              ],
+            },
             recentTrend: {
               type: "array",
               items: {
@@ -839,7 +858,7 @@ export const swaggerOptions: Options = {
               },
             },
           },
-          required: ["averageRating", "totalReviews", "breakdown", "recentTrend"],
+          required: ["averageRating", "totalReviews", "breakdown", "categories", "recentTrend"],
         },
         // --- Favorites ---
         Favorite: {

@@ -636,6 +636,21 @@ async function main() {
   let seededReplies = 0;
   const touchedPropertyIds = new Set<string>();
 
+  // Per-category ratings that hang together with the overall score: jitter
+  // each category by ±1 around the overall, clamped to 1-5. Keeps the six
+  // bars visually consistent with the headline number.
+  function categoryRatings(overall: number) {
+    const one = () => Math.max(1, Math.min(5, overall + faker.number.int({ min: -1, max: 1 })));
+    return {
+      cleanliness: one(),
+      accuracy: one(),
+      checkIn: one(),
+      communication: one(),
+      location: one(),
+      value: one(),
+    };
+  }
+
   async function writeReview(booking: {
     id: string;
     userId: string;
@@ -664,6 +679,7 @@ async function main() {
         userId: booking.userId,
         propertyId: booking.propertyId,
         rating: picked.rating,
+        ...categoryRatings(picked.rating),
         comment: picked.text,
         createdAt: reviewCreatedAt,
         ...(reply

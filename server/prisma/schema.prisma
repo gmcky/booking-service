@@ -194,6 +194,14 @@ model RefreshToken {
 model Review {
   id                 String    @id @default(uuid())
   rating             Int       @db.SmallInt // 1-5 scale (enforced by DB CHECK in migration)
+  // Optional per-category ratings (1-5). Null on legacy rows and when a guest
+  // leaves only an overall rating. DB CHECK constraints enforce the range.
+  cleanliness        Int?      @db.SmallInt
+  accuracy           Int?      @db.SmallInt
+  checkIn            Int?      @db.SmallInt
+  communication      Int?      @db.SmallInt
+  location           Int?      @db.SmallInt
+  value              Int?      @db.SmallInt
   comment            String?   @db.Text
   hostReplyText      String?   @db.Text
   hostReplyCreatedAt DateTime?
