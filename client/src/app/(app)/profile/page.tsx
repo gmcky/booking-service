@@ -33,6 +33,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuthStore } from "@/lib/auth/store";
+import { isDemoUser } from "@/lib/auth/demo";
 import { endpoints } from "@/lib/api/endpoints";
 import { userApi } from "@/lib/api/users";
 import { pollForAvatarUpdate } from "@/lib/utils/avatar-poll";
@@ -315,7 +316,13 @@ function ProfileSection({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
           <Input id="email" type="email" value={email} disabled />
-          <EmailChangeDialog currentEmail={email} />
+          {isDemoUser(email) ? (
+            <p className="text-[13px] text-muted-foreground">
+              The shared demo account can&apos;t change its email.
+            </p>
+          ) : (
+            <EmailChangeDialog currentEmail={email} />
+          )}
         </div>
       </div>
 
@@ -459,6 +466,7 @@ function EmailChangeDialog({ currentEmail }: { currentEmail: string }) {
 function SecuritySection() {
   const router = useRouter();
   const clear = useAuthStore((s) => s.clear);
+  const demo = isDemoUser(useAuthStore((s) => s.user?.email));
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
@@ -489,7 +497,9 @@ function SecuritySection() {
       <Card className="p-6">
         <h2 className="text-[17px] font-semibold tracking-tight">Change password</h2>
         <p className="mb-[22px] text-sm text-muted-foreground">
-          Use at least 12 characters, including upper, lower, a number and a symbol.
+          {demo
+            ? "The shared demo account can't change its password."
+            : "Use at least 12 characters, including upper, lower, a number and a symbol."}
         </p>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -500,6 +510,7 @@ function SecuritySection() {
               placeholder="••••••••"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
+              disabled={demo}
             />
           </div>
           <div className="flex flex-wrap gap-4">
@@ -511,6 +522,7 @@ function SecuritySection() {
                 placeholder="••••••••"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                disabled={demo}
               />
             </div>
             <div className="flex min-w-50 flex-1 flex-col gap-1.5">
@@ -521,6 +533,7 @@ function SecuritySection() {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={demo}
               />
             </div>
           </div>
@@ -529,7 +542,7 @@ function SecuritySection() {
           size="sm"
           className="mt-6"
           onClick={() => pwMutation.mutate()}
-          disabled={pwMutation.isPending || !currentPassword || !newPassword}
+          disabled={demo || pwMutation.isPending || !currentPassword || !newPassword}
         >
           {pwMutation.isPending ? "Updating…" : "Update password"}
         </Button>
@@ -540,9 +553,16 @@ function SecuritySection() {
           <div>
             <h2 className="mb-1 text-base font-semibold">Delete account</h2>
             <p className="max-w-95 text-sm text-muted-foreground text-pretty">
-              Permanently remove your account, bookings, and saved places. This can&apos;t be undone.
+              {demo
+                ? "The shared demo account can't be deleted."
+                : "Permanently remove your account, bookings, and saved places. This can't be undone."}
             </p>
           </div>
+          {demo ? (
+            <Button variant="destructive" size="sm" disabled>
+              Delete account
+            </Button>
+          ) : (
           <AlertDialog
             open={deleteOpen}
             onOpenChange={(open) => {
@@ -592,6 +612,7 @@ function SecuritySection() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          )}
         </div>
       </div>
     </div>
