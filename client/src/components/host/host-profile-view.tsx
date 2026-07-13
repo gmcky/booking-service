@@ -262,7 +262,15 @@ function HostReviewItem({ review, hostFirstName }: { review: HostReview; hostFir
         <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
       ) : null}
 
-      <p className="mt-1 text-xs text-muted-foreground">· {review.property.title}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        ·{" "}
+        <Link
+          href={`/properties/${review.property.id}`}
+          className="underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          {review.property.title}
+        </Link>
+      </p>
 
       {review.hostReplyText ? (
         <div className="mt-3 ml-4 border-l-2 border-border pl-3">
