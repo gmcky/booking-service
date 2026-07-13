@@ -649,8 +649,14 @@ async function main() {
     const reviewCreatedAt = new Date(
       Math.min(now, booking.checkOut.getTime() + faker.number.int({ min: 1, max: 3 }) * DAY_MS),
     );
+    // Reply tone must match the rating: a warm thank-you on a 4-5, a gentle
+    // acknowledgement on a 3. Picking blindly once paired an AC-complaint
+    // reply with a glowing review.
     const withReply = faker.number.float() < 0.25;
-    const reply = withReply ? faker.helpers.arrayElement(hostReplies) : null;
+    const replyTone: "thanks" | "nitpick" = picked.rating >= 4 ? "thanks" : "nitpick";
+    const reply = withReply
+      ? faker.helpers.arrayElement(hostReplies.filter((r) => r.tone === replyTone))
+      : null;
 
     await prisma.review.create({
       data: {
