@@ -332,7 +332,11 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         }
       >
         <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
-        <div className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}>
+        <motion.div
+          layout
+          transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+          className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}
+        >
         <div className="mb-4">
           <SearchPill ref={searchPillRef} detected={detected} initialFilters={filters} collapsible />
         </div>
@@ -468,7 +472,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
             </div>
           </>
         )}
-        </div>
+        </motion.div>
 
         {/* Desktop: sticky side panel that slides in from the right (slide on
             the inner wrapper — a transform on the sticky outer would break its
