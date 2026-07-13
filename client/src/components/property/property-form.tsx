@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, Upload, AlertCircle, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,12 @@ import { amenityLabel } from "@/lib/api/labels";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 import { AutocompleteInput } from "@/components/property/autocomplete-input";
 import { useAddressSuggestions } from "@/lib/hooks/use-address-suggestions";
+
+// maplibre is client-only; keep it out of the server bundle.
+const LocationPinMap = dynamic(
+  () => import("@/components/property/location-pin-map").then((m) => m.LocationPinMap),
+  { ssr: false },
+);
 import { matchCountries } from "@/lib/utils/countries";
 
 const TYPES: { value: PropertyType; label: string }[] = [
@@ -80,6 +87,8 @@ export interface PropertyFormInitial {
   district: string | null;
   city: string;
   country: string;
+  latitude?: number | null;
+  longitude?: number | null;
   maxGuests: number;
   pricePerNight: string;
   type: PropertyType;
@@ -129,6 +138,16 @@ export function PropertyForm({
   // geocoder resolves and anglicizes it.
   const [picked, setPicked] = React.useState<AddressSuggestion | null>(null);
   const [pickPinned, setPickPinned] = React.useState(false);
+  // A host-adjusted pin. On edit, seeded from the saved coordinates; it wins
+  // over the geocoded pin and is cleared when the address changes.
+  const [manualCoords, setManualCoords] = React.useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(
+    initial?.latitude != null && initial?.longitude != null
+      ? { latitude: initial.latitude, longitude: initial.longitude }
+      : null,
+  );
   const [country, setCountry] = React.useState(initial?.country ?? "");
   const [maxGuests, setMaxGuests] = React.useState(initial ? String(initial.maxGuests) : "");
   const [price, setPrice] = React.useState(initial ? String(Number(initial.pricePerNight)) : "");
@@ -237,6 +256,8 @@ export function PropertyForm({
   function dropPick() {
     setPicked(null);
     setPickPinned(false);
+    // Address changed — the saved/manual pin no longer matches; geocoder re-resolves.
+    setManualCoords(null);
   }
 
   /** A street block auto-filled for one city is invalid the moment the
@@ -267,6 +288,8 @@ export function PropertyForm({
     setCountry(s.country);
     setPicked(s);
     setPickPinned(true);
+    // A fresh geocoded pin supersedes any earlier manual adjustment.
+    setManualCoords(null);
     streetPickCityRef.current = s.city;
   }
 
@@ -289,6 +312,14 @@ export function PropertyForm({
     return Object.keys(next).length === 0;
   }
 
+  // Effective pin: a manual adjustment wins, else the geocoded pick's point.
+  const pinLatitude = manualCoords ? manualCoords.latitude : picked && pickPinned ? picked.latitude : null;
+  const pinLongitude = manualCoords
+    ? manualCoords.longitude
+    : picked && pickPinned
+      ? picked.longitude
+      : null;
+
   function onSubmitClick() {
     setLocalError("");
     if (!validate()) {
@@ -308,8 +339,8 @@ export function PropertyForm({
       district: picked ? picked.en.district : district.trim() || null,
       city: picked ? picked.en.city : city.trim(),
       country: picked ? picked.en.country : country.trim(),
-      latitude: picked && pickPinned ? picked.latitude : null,
-      longitude: picked && pickPinned ? picked.longitude : null,
+      latitude: pinLatitude,
+      longitude: pinLongitude,
       maxGuests: Number(maxGuests),
       pricePerNight: Number(price),
       type,
@@ -444,6 +475,19 @@ export function PropertyForm({
               We place your listing on the map from this address — the more
               precise it is, the more accurate the pin.
             </p>
+            {pinLatitude != null && pinLongitude != null ? (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[13px] text-muted-foreground">
+                  Drag the pin or click the map to fine-tune the exact spot.
+                </p>
+                <LocationPinMap
+                  key={picked && pickPinned ? `${picked.latitude},${picked.longitude}` : "base"}
+                  latitude={pinLatitude}
+                  longitude={pinLongitude}
+                  onChange={setManualCoords}
+                />
+              </div>
+            ) : null}
           </div>
         </Card>
 
