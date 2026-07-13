@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Heart, Luggage, House, CircleUser } from "lucide-react";
 import { useAuthStore } from "@/lib/auth/store";
+import { useUiStore } from "@/lib/stores/ui-store";
 import { cn } from "@/lib/utils";
 
 type Item = { href: string; label: string; icon: React.ElementType };
@@ -33,7 +34,11 @@ function isActive(pathname: string, href: string): boolean {
 export function MobileBottomNav() {
   const pathname = usePathname();
   const authed = useAuthStore((s) => s.status === "authed");
+  const mapOverlayOpen = useUiStore((s) => s.mapOverlayOpen);
   const items = authed ? AUTHED : ANON;
+
+  // Hidden while the fullscreen mobile map is up.
+  if (mapOverlayOpen) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">

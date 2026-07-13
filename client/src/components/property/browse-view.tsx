@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Map as MapIcon, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
 import { SearchPill, type DetectedLocation, type SearchPillHandle } from "@/components/search/search-pill";
@@ -22,6 +22,7 @@ import {
 import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { useUiStore } from "@/lib/stores/ui-store";
 import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
 
 const BrowseMapPanel = dynamic(
@@ -130,15 +131,20 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   const mapOpen = mapMode === "split";
 
   // Mobile map is a full-screen overlay — lock the page behind it so a stray
-  // scroll can't reveal the listing grid underneath.
+  // scroll can't reveal the listing grid underneath, and hide the bottom nav
+  // (its global stacking context would otherwise paint over the overlay).
+  const setMapOverlayOpen = useUiStore((s) => s.setMapOverlayOpen);
   React.useEffect(() => {
-    if (!isMobile || !mapOpen) return;
+    const active = isMobile && mapOpen;
+    setMapOverlayOpen(active);
+    if (!active) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+      setMapOverlayOpen(false);
     };
-  }, [isMobile, mapOpen]);
+  }, [isMobile, mapOpen, setMapOverlayOpen]);
 
   /** Bbox URL update — once the user moves the map, the viewport IS the
    *  location: named-location params are dropped (Airbnb's "map area"). */
@@ -319,6 +325,18 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   const locationLabel = effectiveFilters.district
     ? `${effectiveFilters.district}, ${effectiveFilters.city}`
     : (effectiveFilters.city ?? (hasBbox ? "map area" : undefined));
+
+  const fmtDay = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const mapSummary =
+    [
+      filters.checkIn && filters.checkOut
+        ? `${fmtDay(filters.checkIn)} – ${fmtDay(filters.checkOut)}`
+        : null,
+      filters.maxGuests ? `${filters.maxGuests} guest${filters.maxGuests > 1 ? "s" : ""}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || "Any week · Add guests";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -509,14 +527,65 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
                   fitBoundsKey={fitBoundsKey}
                 />
               </motion.div>
+
+              {/* Mobile map chrome: back + search summary + filters, over the map. */}
+              <div className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-background via-background/90 to-transparent px-3 pt-3 pb-6 lg:hidden">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Back to list"
+                    onClick={collapseMap}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-card shadow-sm"
+                  >
+                    <ArrowLeft className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => searchPillRef.current?.openWhere()}
+                    className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-1.5 text-center shadow-sm"
+                  >
+                    <div className="truncate text-sm font-semibold">
+                      {locationLabel ? `Homes in ${locationLabel}` : "Homes in map area"}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">{mapSummary}</div>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Filters"
+                    onClick={() => setFiltersOpen(true)}
+                    className="relative flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-card shadow-sm"
+                  >
+                    <SlidersHorizontal className="size-4" />
+                    {activeFilterCount > 0 ? (
+                      <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                        {activeFilterCount}
+                      </span>
+                    ) : null}
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom result count — hidden while a listing card is open. */}
+              {selectedId ? null : (
+                <div className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center lg:hidden">
+                  <div className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg">
+                    {showSkeleton || searching ? "Searching…" : `${total} ${total === 1 ? "home" : "homes"}`}
+                  </div>
+                </div>
+              )}
             </motion.div>
           ) : null}
         </AnimatePresence>
         </div>
       </main>
 
-      {/* Above the mobile map overlay (z-40) so it can toggle back to the list. */}
-      <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center">
+      {/* Toggle. On mobile the open map has its own back arrow, so this hides
+          while the overlay is up; on desktop it stays as the Show list/map switch. */}
+      <div
+        className={`fixed inset-x-0 bottom-6 z-50 justify-center ${
+          mapOpen && isMobile ? "hidden" : "flex"
+        }`}
+      >
         <Button
           className="gap-1.5 rounded-full px-4 shadow-lg"
           onClick={() => (mapMode === "split" ? collapseMap() : setMapMode("split"))}
