@@ -90,6 +90,12 @@ reviewRouter.use(authenticate);
  *               bookingId: { type: string, format: uuid }
  *               rating: { type: integer, minimum: 1, maximum: 5 }
  *               comment: { type: string, minLength: 10, maxLength: 1000 }
+ *               cleanliness: { type: integer, minimum: 1, maximum: 5 }
+ *               accuracy: { type: integer, minimum: 1, maximum: 5 }
+ *               checkIn: { type: integer, minimum: 1, maximum: 5 }
+ *               communication: { type: integer, minimum: 1, maximum: 5 }
+ *               location: { type: integer, minimum: 1, maximum: 5 }
+ *               value: { type: integer, minimum: 1, maximum: 5 }
  *     responses:
  *       201:
  *         description: Review created
@@ -121,6 +127,12 @@ reviewRouter.post("/", validate(createReviewSchema), asyncHandler(reviewControll
  *             properties:
  *               rating: { type: integer, minimum: 1, maximum: 5 }
  *               comment: { type: string, minLength: 10, maxLength: 1000 }
+ *               cleanliness: { type: integer, minimum: 1, maximum: 5 }
+ *               accuracy: { type: integer, minimum: 1, maximum: 5 }
+ *               checkIn: { type: integer, minimum: 1, maximum: 5 }
+ *               communication: { type: integer, minimum: 1, maximum: 5 }
+ *               location: { type: integer, minimum: 1, maximum: 5 }
+ *               value: { type: integer, minimum: 1, maximum: 5 }
  *     responses:
  *       200:
  *         description: Review updated

@@ -141,6 +141,12 @@ export class ReviewService {
             propertyId: completedBooking.propertyId,
             rating,
             comment: comment ?? null,
+            cleanliness: data.cleanliness ?? null,
+            accuracy: data.accuracy ?? null,
+            checkIn: data.checkIn ?? null,
+            communication: data.communication ?? null,
+            location: data.location ?? null,
+            value: data.value ?? null,
           },
           include: {
             user: {
@@ -222,6 +228,7 @@ export class ReviewService {
               select: {
                 firstName: true,
                 lastName: true,
+                avatarUrl: true,
               },
             },
             hostReplyBy: {
@@ -512,7 +519,15 @@ export class ReviewService {
     const [aggregate, groupedByRating, recentReviews] = await Promise.all([
       prisma.review.aggregate({
         where: { propertyId },
-        _avg: { rating: true },
+        _avg: {
+          rating: true,
+          cleanliness: true,
+          accuracy: true,
+          checkIn: true,
+          communication: true,
+          location: true,
+          value: true,
+        },
         _count: { _all: true },
       }),
       prisma.review.groupBy({
@@ -565,11 +580,20 @@ export class ReviewService {
       totalReviews: entry.count,
     }));
 
+    const round1 = (n: number | null) => (n === null ? null : Number(n.toFixed(1)));
+
     const result = {
-      averageRating:
-        aggregate._avg.rating === null ? null : Number(aggregate._avg.rating.toFixed(1)),
+      averageRating: round1(aggregate._avg.rating),
       totalReviews: aggregate._count._all,
       breakdown,
+      categories: {
+        cleanliness: round1(aggregate._avg.cleanliness),
+        accuracy: round1(aggregate._avg.accuracy),
+        checkIn: round1(aggregate._avg.checkIn),
+        communication: round1(aggregate._avg.communication),
+        location: round1(aggregate._avg.location),
+        value: round1(aggregate._avg.value),
+      },
       recentTrend,
     };
 
