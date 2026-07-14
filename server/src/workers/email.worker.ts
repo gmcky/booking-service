@@ -25,6 +25,10 @@ import type {
   RefundRequestedAdminJob,
   RefundProcessedGuestJob,
   RefundProcessedHostJob,
+  HostCancelRequestedGuestJob,
+  HostCancelRequestedAdminJob,
+  HostCancelApprovedGuestJob,
+  HostCancelRejectedHostJob,
   EmailChangeOtpJob,
   EmailChangedNotificationJob,
   PasswordChangedNotificationJob,
@@ -434,6 +438,143 @@ async function sendRefundProcessedHost(data: RefundProcessedHostJob): Promise<vo
   });
 }
 
+async function sendHostCancelRequestedGuest(data: HostCancelRequestedGuestJob): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Your host requested to cancel — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `The host of "${data.propertyTitle}" has requested to cancel your booking.`,
+      "",
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Host's reason: ${data.reason}`,
+      "",
+      "The request is under review by our team. If it is approved, you will be",
+      "refunded in full. No action is needed from you.",
+      "",
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>The host of <strong>${data.propertyTitle}</strong> has requested to cancel your booking.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Host's reason</td><td>${data.reason}</td></tr>
+      </table>
+      <p>The request is under review by our team. If it is approved, you will be <strong>refunded in full</strong>. No action is needed from you.</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendHostCancelRequestedAdmin(data: HostCancelRequestedAdminJob): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.adminEmail,
+    subject: `Host cancellation request — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.adminFirstName},`,
+      "",
+      "A host has requested to cancel a confirmed booking. Approval issues a full refund to the guest.",
+      "",
+      `Property: ${data.propertyTitle}`,
+      `Host: ${data.hostFullName}`,
+      `Guest: ${data.guestFullName}`,
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Reason: ${data.reason}`,
+      `Request ID: ${data.requestId}`,
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "Review and approve or reject this request in the admin panel.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.adminFirstName},</p>
+      <p>A host has requested to cancel a confirmed booking. Approval issues a <strong>full refund</strong> to the guest.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Property</td><td>${data.propertyTitle}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Host</td><td>${data.hostFullName}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFullName}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Reason</td><td>${data.reason}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Request ID: ${data.requestId}<br/>Booking ID: ${data.bookingId}</p>
+      <p>Review and approve or reject this request in the admin panel.</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendHostCancelApprovedGuest(data: HostCancelApprovedGuestJob): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Booking cancelled, full refund issued — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `Your booking for "${data.propertyTitle}" has been cancelled at the host's request.`,
+      "",
+      `A full refund of ${data.refundedAmount.toFixed(2)} ${data.currency} has been issued to your`,
+      "original payment method. It may take a few business days to appear.",
+      "",
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "We're sorry for the disruption. The dates are free again if you'd like to rebook elsewhere.",
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>Your booking for <strong>${data.propertyTitle}</strong> has been cancelled at the host's request.</p>
+      <p>A <strong>full refund of ${data.refundedAmount.toFixed(2)} ${data.currency}</strong> has been issued to your original payment method. It may take a few business days to appear.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>We're sorry for the disruption.</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendHostCancelRejectedHost(data: HostCancelRejectedHostJob): Promise<void> {
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.hostEmail,
+    subject: `Cancellation request declined — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.hostFirstName},`,
+      "",
+      `Your request to cancel the booking for "${data.propertyTitle}" was declined.`,
+      ...(data.reason ? ["", `Reason: ${data.reason}`] : []),
+      "",
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      "The booking remains active. Contact support if you need help.",
+      "",
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.hostFirstName},</p>
+      <p>Your request to cancel the booking for <strong>${data.propertyTitle}</strong> was declined.</p>
+      ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ""}
+      <p>Dates: ${data.checkIn} — ${data.checkOut}</p>
+      <p>The booking remains active. Contact support if you need help.</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
@@ -583,6 +724,18 @@ async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>):
       break;
     case "refund-processed-host":
       await sendRefundProcessedHost(job.data as RefundProcessedHostJob);
+      break;
+    case "host-cancel-requested-guest":
+      await sendHostCancelRequestedGuest(job.data as HostCancelRequestedGuestJob);
+      break;
+    case "host-cancel-requested-admin":
+      await sendHostCancelRequestedAdmin(job.data as HostCancelRequestedAdminJob);
+      break;
+    case "host-cancel-approved-guest":
+      await sendHostCancelApprovedGuest(job.data as HostCancelApprovedGuestJob);
+      break;
+    case "host-cancel-rejected-host":
+      await sendHostCancelRejectedHost(job.data as HostCancelRejectedHostJob);
       break;
     case "email-change-otp":
       await sendEmailChangeOtp(job.data as EmailChangeOtpJob);

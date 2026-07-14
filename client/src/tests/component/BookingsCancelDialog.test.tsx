@@ -48,6 +48,7 @@ function makeBooking(overrides: Partial<BookingListItem> = {}): BookingListItem 
     totalPrice: "500",
     status: "CONFIRMED" as BookingStatus,
     payoutStatus: "PENDING",
+    cancelledBy: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     actualCheckOutAt: null,

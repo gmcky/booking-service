@@ -20,6 +20,12 @@ import {
   type UnlinkPropertyImagesJobData,
 } from "../shared/queues/cleanup.queue.js";
 import { DEMO_CLEANUP_REPEATABLE_JOB_ID } from "../shared/constants/demo-cleanup.js";
+import { HostCancellationService } from "../modules/bookings/host-cancel.service.js";
+
+// Hourly sweep for host cancellation requests left pending past the configured
+// window. The service reads the (admin-tunable) policy and no-ops when disabled.
+const AUTO_APPROVE_HOST_CANCEL_CRON = "0 * * * *";
+const AUTO_APPROVE_HOST_CANCEL_JOB_ID = "auto-approve-host-cancellations-repeatable";
 
 // ---------------------------------------------------------------------------
 // Path traversal guard
@@ -96,6 +102,11 @@ async function processCleanup(job: Job<CleanupJobData, void, CleanupJobName>): P
     case "purge-demo-data":
       await purgeDemoData();
       break;
+    case "auto-approve-host-cancellations": {
+      const result = await HostCancellationService.autoApproveStale();
+      logger.info(result, "Host cancellation auto-approval sweep complete");
+      break;
+    }
     default: {
       const _exhaustive: never = job.name;
       logger.warn({ name: _exhaustive }, "Unknown cleanup job name — skipping");
@@ -143,6 +154,29 @@ async function syncDemoCleanupSchedule(): Promise<void> {
   );
 }
 
+// Idempotent on startup: ensures exactly one repeatable auto-approve job.
+async function syncHostCancelAutoApproveSchedule(): Promise<void> {
+  const existing = await cleanupQueue.getRepeatableJobs();
+  const stale = existing.filter((j) => j.name === "auto-approve-host-cancellations");
+  for (const job of stale) {
+    await cleanupQueue.removeRepeatableByKey(job.key);
+  }
+
+  await cleanupQueue.add(
+    "auto-approve-host-cancellations",
+    {},
+    {
+      repeat: { pattern: AUTO_APPROVE_HOST_CANCEL_CRON },
+      jobId: AUTO_APPROVE_HOST_CANCEL_JOB_ID,
+    },
+  );
+
+  logger.info(
+    { cron: AUTO_APPROVE_HOST_CANCEL_CRON },
+    "Host cancellation auto-approval schedule registered",
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------------
@@ -160,5 +194,6 @@ worker.on("failed", (job, error) => {
 });
 
 await syncDemoCleanupSchedule();
+await syncHostCancelAutoApproveSchedule();
 
 logger.info("Cleanup worker started");

@@ -41,6 +41,7 @@ function makeBooking(overrides: Partial<BookingDetail> = {}): BookingDetail {
     totalPrice: "500",
     status: "CONFIRMED",
     payoutStatus: "PENDING",
+    cancelledBy: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     actualCheckOutAt: null,
@@ -72,6 +73,7 @@ function makeBooking(overrides: Partial<BookingDetail> = {}): BookingDetail {
     },
     payment: null,
     hostContact: null,
+    pendingHostCancellation: null,
     ...overrides,
   };
 }

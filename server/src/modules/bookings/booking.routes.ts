@@ -9,6 +9,7 @@ import {
   availabilitySchema,
   updateBookingDatesSchema,
   hostBookingsQuerySchema,
+  hostCancelRequestSchema,
 } from "./booking.validators.js";
 
 export const bookingRouter: IRouter = Router();
@@ -150,6 +151,65 @@ bookingRouter.get(
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 bookingRouter.get("/:id", asyncHandler(bookingController.getBookingById));
+
+/**
+ * @openapi
+ * /bookings/{id}/host-view:
+ *   get:
+ *     tags: [Bookings]
+ *     summary: Get booking by id from the host's perspective (owner only)
+ *     description: Guest email/phone are only included once the booking is CONFIRMED or COMPLETED.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Host booking detail
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/HostBookingDetail' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+bookingRouter.get("/:id/host-view", asyncHandler(bookingController.getHostBookingById));
+
+/**
+ * @openapi
+ * /bookings/{id}/host-cancel-request:
+ *   post:
+ *     tags: [Bookings]
+ *     summary: Host requests cancellation of a confirmed booking (admin-approved)
+ *     description: Only the property owner may file this. Approval issues a full refund to the guest.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 10, maxLength: 1000 }
+ *     responses:
+ *       201:
+ *         description: Cancellation request created
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/HostCancellationRequest' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { description: A request is already pending for this booking }
+ */
+bookingRouter.post(
+  "/:id/host-cancel-request",
+  validate(hostCancelRequestSchema),
+  asyncHandler(bookingController.requestHostCancellation),
+);
 
 /**
  * @openapi

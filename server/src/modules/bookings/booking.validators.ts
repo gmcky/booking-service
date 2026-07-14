@@ -65,6 +65,10 @@ export const availabilitySchema = z
     message: "Invalid date range",
   });
 
+export const hostCancelRequestSchema = z.object({
+  reason: z.string().trim().min(10).max(1000),
+});
+
 export const hostBookingsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),

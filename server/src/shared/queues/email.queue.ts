@@ -14,6 +14,10 @@ export type EmailJobName =
   | "refund-requested-admin"
   | "refund-processed-guest"
   | "refund-processed-host"
+  | "host-cancel-requested-guest"
+  | "host-cancel-requested-admin"
+  | "host-cancel-approved-guest"
+  | "host-cancel-rejected-host"
   | "email-change-otp"
   | "email-changed-notification"
   | "password-changed-notification"
@@ -161,6 +165,51 @@ export interface RefundProcessedHostJob {
   currency: string;
 }
 
+export interface HostCancelRequestedGuestJob {
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+  reason: string;
+}
+
+export interface HostCancelRequestedAdminJob {
+  adminEmail: string;
+  adminFirstName: string;
+  requestId: string;
+  bookingId: string;
+  hostFullName: string;
+  guestFullName: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+  reason: string;
+}
+
+export interface HostCancelApprovedGuestJob {
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+  refundedAmount: number;
+  currency: string;
+  autoApproved: boolean;
+}
+
+export interface HostCancelRejectedHostJob {
+  bookingId: string;
+  hostEmail: string;
+  hostFirstName: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+  reason: string | null;
+}
+
 export interface EmailChangeOtpJob {
   /** The new email that the user wants to switch to */
   newEmail: string;
@@ -204,6 +253,10 @@ export type EmailJobData =
   | { name: "refund-requested-admin"; data: RefundRequestedAdminJob }
   | { name: "refund-processed-guest"; data: RefundProcessedGuestJob }
   | { name: "refund-processed-host"; data: RefundProcessedHostJob }
+  | { name: "host-cancel-requested-guest"; data: HostCancelRequestedGuestJob }
+  | { name: "host-cancel-requested-admin"; data: HostCancelRequestedAdminJob }
+  | { name: "host-cancel-approved-guest"; data: HostCancelApprovedGuestJob }
+  | { name: "host-cancel-rejected-host"; data: HostCancelRejectedHostJob }
   | { name: "email-change-otp"; data: EmailChangeOtpJob }
   | { name: "email-changed-notification"; data: EmailChangedNotificationJob }
   | {

@@ -254,6 +254,15 @@ function BookingRow({
           >
             View
           </Button>
+          <Button
+            nativeButton={false}
+            variant="outline"
+            size="sm"
+            className="w-[130px]"
+            render={<Link href={`/host/bookings/${booking.id}`} />}
+          >
+            Manage
+          </Button>
           {booking.status === "PENDING" ? (
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger

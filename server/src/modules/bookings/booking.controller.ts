@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../../shared/types/index.js";
 import { getIdParam } from "../../shared/utils/request.helpers.js";
 import { BookingService } from "./booking.service.js";
+import { HostCancellationService } from "./host-cancel.service.js";
 import { logger } from "../../shared/lib/logger.js";
 import type { HostBookingsQueryInput } from "./booking.types.js";
 
@@ -50,6 +51,33 @@ export async function getBookingById(req: AuthenticatedRequest, res: Response) {
   const userRole = req.user!.role;
   const booking = await BookingService.getById(id, userId, userRole);
   res.json(booking);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route GET /api/v1/bookings/:id/host-view
+ * @access Private
+ * @security Bearer token required. Property owner only.
+ */
+export async function getHostBookingById(req: AuthenticatedRequest, res: Response) {
+  const id = getIdParam(req);
+  const ownerId = req.user!.id;
+  const booking = await BookingService.getHostBookingById(id, ownerId);
+  res.json(booking);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route POST /api/v1/bookings/:id/host-cancel-request
+ * @access Private
+ * @security Bearer token required. Property owner only.
+ */
+export async function requestHostCancellation(req: AuthenticatedRequest, res: Response) {
+  const id = getIdParam(req);
+  const hostUserId = req.user!.id;
+  const { reason } = req.body;
+  const request = await HostCancellationService.requestCancellation(id, hostUserId, reason);
+  res.status(201).json(request);
 }
 
 /**

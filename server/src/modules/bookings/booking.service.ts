@@ -167,6 +167,12 @@ export class BookingService {
             updatedAt: true,
           },
         },
+        hostCancellationRequests: {
+          where: { status: "PENDING" },
+          select: { id: true, reason: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
     });
 
@@ -190,13 +196,81 @@ export class BookingService {
           (booking.status === "COMPLETED" ||
             (booking.status === "CONFIRMED" && insideCancellationCutoff));
 
+    const { hostCancellationRequests, ...bookingRest } = booking;
+
     return {
-      ...booking,
+      ...bookingRest,
       property: {
         ...booking.property,
         owner: ownerPublic,
       },
       hostContact: canSeeHostContact ? { phoneNumber, email } : null,
+      // Surfaced to the guest so the trip page can show a "host requested to
+      // cancel" banner. Contact gating above is unchanged.
+      pendingHostCancellation: hostCancellationRequests?.[0] ?? null,
+    };
+  }
+
+  /**
+   * Host-facing booking detail. Guest contact (email/phone) is gated: revealed
+   * only once the booking is CONFIRMED or COMPLETED — an unpaid PENDING booking
+   * is an intent, not a commitment, and exposing contact invites off-platform
+   * harvesting via throwaway bookings. Mirrors the guest-side host-contact rule.
+   */
+  static async getHostBookingById(id: string, ownerId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: { id: true, title: true, city: true, images: true, ownerId: true },
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            email: true,
+            phoneNumber: true,
+          },
+        },
+        payment: {
+          select: { id: true, amount: true, currency: true, status: true, refundedAmount: true },
+        },
+        hostCancellationRequests: {
+          select: {
+            id: true,
+            status: true,
+            reason: true,
+            createdAt: true,
+            resolvedAt: true,
+            autoApproved: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new AppError(404, "Booking not found");
+    }
+
+    if (booking.property.ownerId !== ownerId) {
+      throw new AppError(403, "Not authorized to view this booking");
+    }
+
+    const canSeeGuestContact = booking.status === "CONFIRMED" || booking.status === "COMPLETED";
+    const { email, phoneNumber, ...guestPublic } = booking.user;
+    const { hostCancellationRequests, user: _user, ...bookingRest } = booking;
+
+    return {
+      ...bookingRest,
+      guest: {
+        ...guestPublic,
+        contact: canSeeGuestContact ? { email, phoneNumber } : null,
+      },
+      cancellationRequest: hostCancellationRequests[0] ?? null,
     };
   }
 
@@ -398,6 +472,16 @@ export class BookingService {
       throw new AppError(403, "Not authorized to cancel this booking");
     }
 
+    // Hosts cannot unilaterally cancel a guest's booking: they file a request
+    // that an admin approves (always a full refund). Guests and admins cancel
+    // directly through this path.
+    if (role === "HOST") {
+      throw new AppError(
+        403,
+        "Hosts must request a cancellation for admin approval, not cancel directly",
+      );
+    }
+
     if (booking.status === "COMPLETED") {
       throw new AppError(400, "Cannot cancel completed booking");
     }
@@ -405,6 +489,8 @@ export class BookingService {
     if (booking.status === "CANCELLED") {
       return { booking, cancellation: null };
     }
+
+    const cancelActor = role === "ADMIN" ? "ADMIN" : "GUEST";
 
     // Snapshot policy to avoid drift if constants change.
     const policy = calculateRefundPolicy(booking.checkIn);
@@ -430,17 +516,33 @@ export class BookingService {
 
     const cancelled =
       refundPercent > 0 && booking.payment?.status === "SUCCESS"
-        ? await this.cancelPaidBookingWithRefund(booking, userId, role, refundPercent, refundAmount)
+        ? await this.cancelPaidBookingWithRefund(
+            booking,
+            userId,
+            role,
+            refundPercent,
+            refundAmount,
+            cancelActor,
+          )
         : await prisma.booking.update({
             where: { id },
             data: {
               status: "CANCELLED",
+              cancelledBy: cancelActor,
               // Paid booking cancelled inside the no-refund window: the full
               // amount is still owed to the host, so the payout stays alive.
               payoutStatus: booking.payment?.status === "SUCCESS" ? "READY" : "CANCELLED",
             },
             include: { property: true },
           });
+
+    // A direct cancellation (guest, or admin via this path) supersedes any open
+    // host-cancellation request — void it so the admin queue doesn't act on a
+    // booking that is already cancelled.
+    await prisma.hostCancellationRequest.updateMany({
+      where: { bookingId: id, status: "PENDING" },
+      data: { status: "VOIDED", resolvedAt: new Date() },
+    });
 
     this.enqueueCancellationEmails(cancelled, booking.userId).catch((err) =>
       logger.error({ err, bookingId: id }, "Failed to enqueue cancellation emails"),
@@ -488,6 +590,7 @@ export class BookingService {
     cancelledByRole: string,
     refundPercent: number,
     refundAmount: number,
+    cancelActor: "GUEST" | "ADMIN",
   ) {
     const payment = booking.payment;
     if (!payment || payment.status !== "SUCCESS") {
@@ -604,6 +707,7 @@ export class BookingService {
           where: { id: booking.id },
           data: {
             status: "CANCELLED",
+            cancelledBy: cancelActor,
             // Partial refund leaves a remainder owed to the host.
             payoutStatus: refundPercent < 100 ? "READY" : "CANCELLED",
           },

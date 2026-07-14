@@ -8,6 +8,7 @@ import { bookingRouter } from "./modules/bookings/booking.routes.js";
 import { paymentRouter } from "./modules/payments/payment.routes.js";
 import { reviewRouter } from "./modules/reviews/review.routes.js";
 import { favoriteRouter } from "./modules/favorites/favorite.routes.js";
+import { adminRouter } from "./modules/admin/admin.routes.js";
 
 /**
  * Main API router factory.
@@ -30,6 +31,7 @@ export function createApiRouter(): Router {
   router.use("/payments", paymentRouter);
   router.use("/reviews", reviewRouter);
   router.use("/favorites", favoriteRouter);
+  router.use("/admin", adminRouter);
 
   router.use((req, res) => {
     res.status(404).json({
@@ -43,6 +45,7 @@ export function createApiRouter(): Router {
         "/payments",
         "/reviews",
         "/favorites",
+        "/admin",
       ].map((r) => `/api/${env.API_VERSION}${r}`),
     });
   });
