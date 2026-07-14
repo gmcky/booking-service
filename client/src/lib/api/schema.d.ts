@@ -4,6 +4,209 @@
  */
 
 export interface paths {
+    "/admin/host-cancellations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List host cancellation requests (oldest first) */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    limit?: number;
+                    status?: "PENDING" | "APPROVED" | "REJECTED" | "VOIDED";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cancellation request list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["HostCancellationRequestItem"][];
+                            pagination: components["schemas"]["Pagination"];
+                        };
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/host-cancellations/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a host cancellation request (cancels booking, full refund) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Request approved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostCancellationRequest"];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/host-cancellations/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a host cancellation request (booking untouched) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Request rejected */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostCancellationRequest"];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read platform settings */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Platform settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlatformSettings"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update platform settings (host-cancel auto-approval policy) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        hostCancelAutoApproveEnabled?: boolean;
+                        hostCancelAutoApproveDays?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlatformSettings"];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+            };
+        };
+        trace?: never;
+    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -514,6 +717,108 @@ export interface paths {
                 404: components["responses"]["NotFound"];
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bookings/{id}/host-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get booking by id from the host's perspective (owner only)
+         * @description Guest email/phone are only included once the booking is CONFIRMED or COMPLETED.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Host booking detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostBookingDetail"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bookings/{id}/host-cancel-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Host requests cancellation of a confirmed booking (admin-approved)
+         * @description Only the property owner may file this. Approval issues a full refund to the guest.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Cancellation request created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostCancellationRequest"];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                /** @description A request is already pending for this booking */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2652,6 +2957,10 @@ export interface components {
         PaymentProvider: "STRIPE";
         /** @enum {string} */
         ReviewReportStatus: "PENDING" | "RESOLVED" | "REJECTED";
+        /** @enum {string} */
+        CancelActor: "GUEST" | "HOST" | "ADMIN";
+        /** @enum {string} */
+        HostCancellationStatus: "PENDING" | "APPROVED" | "REJECTED" | "VOIDED";
         AuthUser: {
             id: string;
             email: string;
@@ -2878,6 +3187,7 @@ export interface components {
             totalPrice: string;
             status: components["schemas"]["BookingStatus"];
             payoutStatus: components["schemas"]["PayoutStatus"];
+            cancelledBy: components["schemas"]["CancelActor"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2921,6 +3231,106 @@ export interface components {
             property: components["schemas"]["BookingPropertyWithOwner"];
             payment: components["schemas"]["Payment"] | null;
             hostContact: components["schemas"]["HostContact"] | null;
+            pendingHostCancellation: {
+                id: string;
+                reason: string;
+                /** Format: date-time */
+                createdAt: string;
+            } | null;
+        };
+        HostCancellationRequest: {
+            id: string;
+            bookingId: string;
+            requestedById: string;
+            reason: string;
+            status: components["schemas"]["HostCancellationStatus"];
+            resolvedById: string | null;
+            autoApproved: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            resolvedAt: string | null;
+        };
+        /** @description Admin queue row: request plus its booking/guest/host context. */
+        HostCancellationRequestItem: components["schemas"]["HostCancellationRequest"] & {
+            booking: {
+                id: string;
+                /** Format: date-time */
+                checkIn: string;
+                /** Format: date-time */
+                checkOut: string;
+                /** @description Decimal serialized as string */
+                totalPrice: string;
+                status: components["schemas"]["BookingStatus"];
+                property: {
+                    id: string;
+                    title: string;
+                    city: string;
+                };
+                user: {
+                    id: string;
+                    firstName: string;
+                    lastName: string;
+                };
+                payment: {
+                    /** @description Decimal serialized as string */
+                    amount: string;
+                    currency: string;
+                    status: components["schemas"]["PaymentStatus"];
+                } | null;
+            };
+            requestedBy: {
+                id: string;
+                firstName: string;
+                lastName: string;
+            };
+        };
+        HostGuestContact: {
+            email: string;
+            phoneNumber: string | null;
+        } | null;
+        HostBookingDetail: components["schemas"]["Booking"] & {
+            property: {
+                id: string;
+                title: string;
+                city: string;
+                images: string[];
+                ownerId: string;
+            };
+            payment: {
+                id: string;
+                /** @description Decimal serialized as string */
+                amount: string;
+                currency: string;
+                status: components["schemas"]["PaymentStatus"];
+                /** @description Decimal serialized as string */
+                refundedAmount: string | null;
+            } | null;
+            guest: {
+                id: string;
+                firstName: string;
+                lastName: string;
+                avatarUrl: string | null;
+                contact: components["schemas"]["HostGuestContact"] | null;
+            };
+            cancellationRequest: {
+                id: string;
+                status: components["schemas"]["HostCancellationStatus"];
+                reason: string;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                resolvedAt: string | null;
+                autoApproved: boolean;
+            } | null;
+        };
+        PlatformSettings: {
+            id: string;
+            hostCancelAutoApproveEnabled: boolean;
+            hostCancelAutoApproveDays: number;
+            updatedById: string | null;
+            /** Format: date-time */
+            updatedAt: string;
         };
         Review: {
             id: string;

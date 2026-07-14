@@ -19,7 +19,13 @@ export const queryKeys = {
     all: ["bookings"] as const,
     detail: (id: string) => ["bookings", "detail", id] as const,
     host: (query: Record<string, unknown>) => ["bookings", "host", query] as const,
+    hostDetail: (id: string) => ["bookings", "host-detail", id] as const,
     blockedDates: (propertyId: string) => ["bookings", "blocked-dates", propertyId] as const,
+  },
+  admin: {
+    hostCancellations: (query: Record<string, unknown>) =>
+      ["admin", "host-cancellations", query] as const,
+    settings: ["admin", "settings"] as const,
   },
   users: {
     me: ["users", "me"] as const,
