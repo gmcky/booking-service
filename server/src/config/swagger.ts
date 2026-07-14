@@ -162,8 +162,9 @@ export const swaggerOptions: Options = {
             firstName: { type: "string" },
             lastName: { type: "string" },
             role: { $ref: "#/components/schemas/Role" },
+            avatarUrl: { type: "string", nullable: true },
           },
-          required: ["id", "email", "firstName", "lastName", "role"],
+          required: ["id", "email", "firstName", "lastName", "role", "avatarUrl"],
         },
         AuthResponse: {
           type: "object",

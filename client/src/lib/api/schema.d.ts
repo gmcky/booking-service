@@ -2967,6 +2967,7 @@ export interface components {
             firstName: string;
             lastName: string;
             role: components["schemas"]["Role"];
+            avatarUrl: string | null;
         };
         AuthResponse: {
             user: components["schemas"]["AuthUser"];
