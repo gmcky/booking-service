@@ -223,7 +223,7 @@ function BookingRow({
             nativeButton={false}
             variant="outline"
             size="sm"
-            className="w-[110px]"
+            className="w-[120px]"
             render={<Link href={`/bookings/${booking.id}`} />}
           >
             Trip details
@@ -254,7 +254,7 @@ function BookingRow({
                     bookingId={booking.id}
                     propertyId={booking.propertyId}
                     propertyTitle={booking.property.title}
-                    trigger={<Button variant="outline" size="sm" className="w-[100px]" />}
+                    trigger={<Button variant="outline" size="sm" className="w-[120px]" />}
                   >
                     Leave a review
                   </ReviewFormDialog>
@@ -267,9 +267,9 @@ function BookingRow({
               ) : null}
               <Button
                 nativeButton={false}
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="w-[100px]"
+                className="w-[120px]"
                 render={<Link href={`/properties/${booking.propertyId}`} />}
               >
                 Book again
