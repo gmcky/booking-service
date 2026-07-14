@@ -160,6 +160,16 @@ function BookingDetailBody({
 
   const owner = booking.property.owner;
 
+  const refund =
+    booking.payment?.refundedAmount != null
+      ? {
+          amount: booking.payment.refundedAmount,
+          percent: Math.round(
+            (Number(booking.payment.refundedAmount) / Number(booking.payment.amount)) * 100,
+          ),
+        }
+      : null;
+
   return (
     <div className="flex flex-1 flex-col">
       <SiteHeader />
@@ -295,6 +305,12 @@ function BookingDetailBody({
               <DetailRow
                 label="Payment status"
                 value={paymentStatusLabel(booking.payment.status)}
+              />
+            ) : null}
+            {refund ? (
+              <DetailRow
+                label="Refunded"
+                value={`${formatPrice(refund.amount)} (${refund.percent}%)`}
               />
             ) : null}
           </dl>

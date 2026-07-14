@@ -158,6 +158,7 @@ export class BookingService {
           select: {
             id: true,
             amount: true,
+            refundedAmount: true,
             currency: true,
             status: true,
             provider: true,
