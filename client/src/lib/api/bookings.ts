@@ -9,6 +9,8 @@ export type BookingListItem = components["schemas"]["BookingListItem"];
 export type BookingWithProperty = components["schemas"]["BookingWithProperty"];
 export type BookingDetail = components["schemas"]["BookingDetail"];
 export type HostBooking = components["schemas"]["HostBooking"];
+export type HostBookingDetail = components["schemas"]["HostBookingDetail"];
+export type HostCancellationRequest = components["schemas"]["HostCancellationRequest"];
 
 export type CancelBookingResult =
   paths["/bookings/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
@@ -107,6 +109,21 @@ export const bookingApi = {
     const { data, error, response } = await apiClient.PATCH("/bookings/{id}/status", {
       params: { path: { id } },
       body: { status },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  hostView: async (id: string): Promise<HostBookingDetail> => {
+    const { data, error, response } = await apiClient.GET("/bookings/{id}/host-view", {
+      params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
+
+  requestHostCancel: async (id: string, reason: string): Promise<HostCancellationRequest> => {
+    const { data, error, response } = await apiClient.POST("/bookings/{id}/host-cancel-request", {
+      params: { path: { id } },
+      body: { reason },
     });
     return unwrap({ data, error, response });
   },

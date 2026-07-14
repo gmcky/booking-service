@@ -1,7 +1,10 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "../lib/redis.js";
 
-export type CleanupJobName = "unlink-property-images" | "purge-demo-data";
+export type CleanupJobName =
+  | "unlink-property-images"
+  | "purge-demo-data"
+  | "auto-approve-host-cancellations";
 
 export interface UnlinkPropertyImagesJobData {
   paths: string[];
@@ -10,7 +13,13 @@ export interface UnlinkPropertyImagesJobData {
 // Empty payload — handler reads the protected-email constants and live DB state.
 export type PurgeDemoDataJobData = Record<string, never>;
 
-export type CleanupJobData = UnlinkPropertyImagesJobData | PurgeDemoDataJobData;
+// Empty payload — handler reads platform settings and live DB state.
+export type AutoApproveHostCancellationsJobData = Record<string, never>;
+
+export type CleanupJobData =
+  | UnlinkPropertyImagesJobData
+  | PurgeDemoDataJobData
+  | AutoApproveHostCancellationsJobData;
 
 export const cleanupQueue = new Queue<CleanupJobData, void, CleanupJobName>("cleanup", {
   connection: redisConnection,

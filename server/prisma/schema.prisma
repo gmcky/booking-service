@@ -30,6 +30,9 @@ model User {
   reviewReports ReviewReport[]
   favorites     Favorite[]
 
+  hostCancelRequests    HostCancellationRequest[] @relation("HostCancelRequester")
+  hostCancelResolutions HostCancellationRequest[] @relation("HostCancelResolver")
+
   @@map("users")
 }
 
@@ -145,6 +148,8 @@ model Booking {
   guests            Int
   status            BookingStatus @default(PENDING)
   payoutStatus      PayoutStatus  @default(PENDING)
+  // Who initiated the cancellation. Null while the booking is not CANCELLED.
+  cancelledBy       CancelActor?
   createdAt         DateTime      @default(now())
   payment      Payment?
   review       Review?
@@ -153,11 +158,19 @@ model Booking {
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id])
 
+  hostCancellationRequests HostCancellationRequest[]
+
   @@index([propertyId, checkIn, checkOut])
   @@index([userId])
   @@index([status])
   @@index([payoutStatus])
   @@map("bookings")
+}
+
+enum CancelActor {
+  GUEST
+  HOST
+  ADMIN
 }
 
 enum BookingStatus {
@@ -324,4 +337,49 @@ model ProcessedStripeEvent {
 
   @@index([createdAt])
   @@map("processed_stripe_events")
+}
+
+// Host-initiated cancellation request. Force-majeure style: a host asks to
+// cancel a confirmed booking, an ADMIN approves/rejects, and the guest always
+// gets a full refund on approval. A partial unique index (see migration)
+// enforces at most one PENDING request per booking.
+model HostCancellationRequest {
+  id            String                 @id @default(uuid())
+  bookingId     String
+  requestedById String
+  reason        String                 @db.Text
+  status        HostCancellationStatus @default(PENDING)
+  // Admin who resolved the request; null when auto-approved by the worker.
+  resolvedById  String?
+  autoApproved  Boolean                @default(false)
+  createdAt     DateTime               @default(now())
+  resolvedAt    DateTime?
+
+  booking     Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  requestedBy User    @relation("HostCancelRequester", fields: [requestedById], references: [id])
+  resolvedBy  User?   @relation("HostCancelResolver", fields: [resolvedById], references: [id])
+
+  @@index([status])
+  @@index([bookingId])
+  @@index([createdAt])
+  @@map("host_cancellation_requests")
+}
+
+enum HostCancellationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  VOIDED
+}
+
+// App-wide configuration, a single row (id = "singleton"). Currently holds the
+// host-cancellation auto-approval policy, editable by admins.
+model PlatformSetting {
+  id                           String   @id
+  hostCancelAutoApproveEnabled Boolean  @default(true)
+  hostCancelAutoApproveDays    Int      @default(7)
+  updatedById                  String?
+  updatedAt                    DateTime @updatedAt
+
+  @@map("platform_settings")
 }
