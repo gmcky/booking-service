@@ -277,8 +277,10 @@ function BookingRow({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirm this reservation?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will confirm the booking at {booking.property.title} for{" "}
-                    {booking.user.firstName} {booking.user.lastName}.
+                    You're accepting {booking.user.firstName} {booking.user.lastName}'s stay at{" "}
+                    {booking.property.title}. The guest's payment is captured and the dates are
+                    locked on your calendar. After confirming, cancelling needs admin approval and
+                    refunds the guest in full — so only confirm if you're sure you can host.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
