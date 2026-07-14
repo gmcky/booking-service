@@ -17,5 +17,6 @@ export interface AuthResponse extends AuthTokens {
     firstName: string;
     lastName: string;
     role: Role;
+    avatarUrl: string | null;
   };
 }

@@ -10,8 +10,8 @@ export interface AuthResult {
 }
 
 /**
- * /auth/login and /auth/register return a user without avatarUrl (fresh
- * sessions never have one yet). Normalize to the store's AuthUser shape.
+ * /auth/login and /auth/register return the full AuthUser (existing users can
+ * already have an avatar). Normalize to the store's AuthUser shape.
  */
 function toAuthUser(user: {
   id: string;
@@ -19,8 +19,9 @@ function toAuthUser(user: {
   firstName: string;
   lastName: string;
   role: "USER" | "ADMIN";
+  avatarUrl: string | null;
 }): AuthUser {
-  return { ...user, avatarUrl: null };
+  return { ...user };
 }
 
 export const endpoints = {
