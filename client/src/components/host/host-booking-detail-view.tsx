@@ -277,7 +277,12 @@ function HostBookingDetailBody({
               />
             ) : null}
             {booking.payment?.refundedAmount ? (
-              <DetailRow label="Refunded" value={formatPrice(booking.payment.refundedAmount)} />
+              <DetailRow
+                label="Refunded"
+                value={`${formatPrice(booking.payment.refundedAmount)} (${Math.round(
+                  (Number(booking.payment.refundedAmount) / Number(booking.payment.amount)) * 100,
+                )}%)`}
+              />
             ) : null}
           </dl>
         </section>

@@ -3144,6 +3144,8 @@ export interface components {
             bookingId: string;
             /** @description Decimal serialized as string */
             amount: string;
+            /** @description Decimal serialized as string; set once a refund is finalized */
+            refundedAmount: string | null;
             currency: string;
             status: components["schemas"]["PaymentStatus"];
             provider: components["schemas"]["PaymentProvider"];
