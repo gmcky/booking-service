@@ -57,10 +57,12 @@ export function PropertyCard({
         )}
       </div>
       <div className="px-4 pt-3.5 pb-4">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[15px] font-semibold">{property.title}</span>
+        <div className="flex min-h-[2lh] items-start justify-between gap-2">
+          <span className="line-clamp-2 text-[15px] font-semibold leading-snug">
+            {property.title}
+          </span>
           {rating ? (
-            <span className="inline-flex items-center gap-1 text-[13px]">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[13px] leading-snug">
               <Star className="size-3.5 fill-current" />
               {rating}
             </span>
