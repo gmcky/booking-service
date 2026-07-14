@@ -298,7 +298,14 @@ export class HostCancellationService {
     }
 
     const payment = booking.payment;
-    const refundable = Boolean(payment && payment.status === "SUCCESS" && payment.transactionId);
+    // REFUND_PROCESSING is included for recovery: a prior attempt may have
+    // issued the Stripe refund but failed to finalize the DB writes. Replaying
+    // (same idempotency key) is safe and finishes the transition to REFUNDED.
+    const refundable = Boolean(
+      payment &&
+      (payment.status === "SUCCESS" || payment.status === "REFUND_PROCESSING") &&
+      payment.transactionId,
+    );
     const refundAmount = payment ? Number(payment.amount) : 0;
 
     let stripeRefund: Awaited<ReturnType<typeof stripe.refunds.create>> | null = null;

@@ -199,6 +199,33 @@ describe("HostCancellationService.approve", () => {
     expect(result).toMatchObject({ status: "APPROVED" });
   });
 
+  it("recovers a payment left in REFUND_PROCESSING by replaying the refund", async () => {
+    mockPrisma.hostCancellationRequest.findUnique.mockResolvedValue(
+      buildRequestForFinalize({ booking: { payment: undefined } }) as never,
+    );
+    // Override the payment with a REFUND_PROCESSING one (a prior finalize failed).
+    const req = buildRequestForFinalize() as any;
+    req.booking.payment.status = "REFUND_PROCESSING";
+    mockPrisma.hostCancellationRequest.findUnique.mockResolvedValue(req as never);
+    mockPrisma.payment.updateMany.mockResolvedValue({ count: 0 } as never); // no SUCCESS row
+    mockPrisma.payment.findUnique.mockResolvedValue({ status: "REFUND_PROCESSING" } as never);
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_1" } as never);
+    mockPrisma.$transaction.mockImplementation((async (cb: any) => cb(mockPrisma)) as never);
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1" } as never);
+    mockPrisma.hostCancellationRequest.update.mockResolvedValue({
+      id: "req-1",
+      status: "APPROVED",
+    } as never);
+
+    await HostCancellationService.approve("req-1", ADMIN_ID);
+
+    // Replays the same idempotency key rather than skipping the refund.
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 30000 }),
+      { idempotencyKey: "host_cancel_refund_payment-1" },
+    );
+  });
+
   it("voids the request instead of double-cancelling when the guest already cancelled", async () => {
     mockPrisma.hostCancellationRequest.findUnique.mockResolvedValue(
       buildRequestForFinalize({ booking: { status: "CANCELLED" } }) as never,
