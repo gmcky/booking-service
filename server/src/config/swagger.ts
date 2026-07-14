@@ -32,6 +32,7 @@ export const swaggerOptions: Options = {
       { name: "Payments", description: "Payments, refunds, Stripe webhook" },
       { name: "Reviews", description: "Property reviews and reports" },
       { name: "Favorites", description: "User wishlist / favorited properties" },
+      { name: "Admin", description: "Admin-only operations (settings, cancellation queue)" },
     ],
     components: {
       securitySchemes: {
@@ -142,6 +143,14 @@ export const swaggerOptions: Options = {
         ReviewReportStatus: {
           type: "string",
           enum: ["PENDING", "RESOLVED", "REJECTED"],
+        },
+        CancelActor: {
+          type: "string",
+          enum: ["GUEST", "HOST", "ADMIN"],
+        },
+        HostCancellationStatus: {
+          type: "string",
+          enum: ["PENDING", "APPROVED", "REJECTED", "VOIDED"],
         },
 
         // --- Auth ---
@@ -635,6 +644,10 @@ export const swaggerOptions: Options = {
             },
             status: { $ref: "#/components/schemas/BookingStatus" },
             payoutStatus: { $ref: "#/components/schemas/PayoutStatus" },
+            cancelledBy: {
+              allOf: [{ $ref: "#/components/schemas/CancelActor" }],
+              nullable: true,
+            },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
             actualCheckOutAt: { type: "string", format: "date-time", nullable: true },
@@ -649,6 +662,7 @@ export const swaggerOptions: Options = {
             "totalPrice",
             "status",
             "payoutStatus",
+            "cancelledBy",
             "createdAt",
             "updatedAt",
             "actualCheckOutAt",
@@ -755,9 +769,206 @@ export const swaggerOptions: Options = {
                   allOf: [{ $ref: "#/components/schemas/HostContact" }],
                   nullable: true,
                 },
+                pendingHostCancellation: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    reason: { type: "string" },
+                    createdAt: { type: "string", format: "date-time" },
+                  },
+                  required: ["id", "reason", "createdAt"],
+                },
               },
-              required: ["property", "payment", "hostContact"],
+              required: ["property", "payment", "hostContact", "pendingHostCancellation"],
             },
+          ],
+        },
+
+        // --- Host cancellations / admin ---
+        HostCancellationRequest: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            bookingId: { type: "string" },
+            requestedById: { type: "string" },
+            reason: { type: "string" },
+            status: { $ref: "#/components/schemas/HostCancellationStatus" },
+            resolvedById: { type: "string", nullable: true },
+            autoApproved: { type: "boolean" },
+            createdAt: { type: "string", format: "date-time" },
+            resolvedAt: { type: "string", format: "date-time", nullable: true },
+          },
+          required: [
+            "id",
+            "bookingId",
+            "requestedById",
+            "reason",
+            "status",
+            "resolvedById",
+            "autoApproved",
+            "createdAt",
+            "resolvedAt",
+          ],
+        },
+        HostCancellationRequestItem: {
+          description: "Admin queue row: request plus its booking/guest/host context.",
+          allOf: [
+            { $ref: "#/components/schemas/HostCancellationRequest" },
+            {
+              type: "object",
+              properties: {
+                booking: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    checkIn: { type: "string", format: "date-time" },
+                    checkOut: { type: "string", format: "date-time" },
+                    totalPrice: { type: "string", description: "Decimal serialized as string" },
+                    status: { $ref: "#/components/schemas/BookingStatus" },
+                    property: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        title: { type: "string" },
+                        city: { type: "string" },
+                      },
+                      required: ["id", "title", "city"],
+                    },
+                    user: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string" },
+                        lastName: { type: "string" },
+                      },
+                      required: ["id", "firstName", "lastName"],
+                    },
+                    payment: {
+                      type: "object",
+                      nullable: true,
+                      properties: {
+                        amount: { type: "string", description: "Decimal serialized as string" },
+                        currency: { type: "string" },
+                        status: { $ref: "#/components/schemas/PaymentStatus" },
+                      },
+                      required: ["amount", "currency", "status"],
+                    },
+                  },
+                  required: [
+                    "id",
+                    "checkIn",
+                    "checkOut",
+                    "totalPrice",
+                    "status",
+                    "property",
+                    "user",
+                    "payment",
+                  ],
+                },
+                requestedBy: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    firstName: { type: "string" },
+                    lastName: { type: "string" },
+                  },
+                  required: ["id", "firstName", "lastName"],
+                },
+              },
+              required: ["booking", "requestedBy"],
+            },
+          ],
+        },
+        HostGuestContact: {
+          type: "object",
+          nullable: true,
+          properties: {
+            email: { type: "string" },
+            phoneNumber: { type: "string", nullable: true },
+          },
+          required: ["email", "phoneNumber"],
+        },
+        HostBookingDetail: {
+          allOf: [
+            { $ref: "#/components/schemas/Booking" },
+            {
+              type: "object",
+              properties: {
+                property: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    title: { type: "string" },
+                    city: { type: "string" },
+                    images: { type: "array", items: { type: "string" } },
+                    ownerId: { type: "string" },
+                  },
+                  required: ["id", "title", "city", "images", "ownerId"],
+                },
+                payment: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    amount: { type: "string", description: "Decimal serialized as string" },
+                    currency: { type: "string" },
+                    status: { $ref: "#/components/schemas/PaymentStatus" },
+                    refundedAmount: {
+                      type: "string",
+                      nullable: true,
+                      description: "Decimal serialized as string",
+                    },
+                  },
+                  required: ["id", "amount", "currency", "status", "refundedAmount"],
+                },
+                guest: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    firstName: { type: "string" },
+                    lastName: { type: "string" },
+                    avatarUrl: { type: "string", nullable: true },
+                    contact: {
+                      allOf: [{ $ref: "#/components/schemas/HostGuestContact" }],
+                      nullable: true,
+                    },
+                  },
+                  required: ["id", "firstName", "lastName", "avatarUrl", "contact"],
+                },
+                cancellationRequest: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    status: { $ref: "#/components/schemas/HostCancellationStatus" },
+                    reason: { type: "string" },
+                    createdAt: { type: "string", format: "date-time" },
+                    resolvedAt: { type: "string", format: "date-time", nullable: true },
+                    autoApproved: { type: "boolean" },
+                  },
+                  required: ["id", "status", "reason", "createdAt", "resolvedAt", "autoApproved"],
+                },
+              },
+              required: ["property", "payment", "guest", "cancellationRequest"],
+            },
+          ],
+        },
+        PlatformSettings: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            hostCancelAutoApproveEnabled: { type: "boolean" },
+            hostCancelAutoApproveDays: { type: "integer" },
+            updatedById: { type: "string", nullable: true },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+          required: [
+            "id",
+            "hostCancelAutoApproveEnabled",
+            "hostCancelAutoApproveDays",
+            "updatedById",
+            "updatedAt",
           ],
         },
 
