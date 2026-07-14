@@ -188,6 +188,15 @@ function BookingDetailBody({
           {formatRange(booking.checkIn, booking.checkOut)}
         </p>
 
+        {booking.pendingHostCancellation ? (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Your host has requested to cancel this booking. If approved, you&apos;ll be
+              refunded in full — no action needed.
+            </p>
+          </div>
+        ) : null}
+
         <Card className="mb-6 p-3.5">
           <Link href={`/properties/${booking.property.id}`} className="flex items-stretch gap-4">
             <div
