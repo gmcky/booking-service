@@ -136,7 +136,7 @@ describe("BookingService.cancel", () => {
     );
     expect(mockPrisma.booking.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { status: "CANCELLED", payoutStatus: "CANCELLED" },
+        data: { status: "CANCELLED", cancelledBy: "GUEST", payoutStatus: "CANCELLED" },
       }),
     );
     // Fire-and-forget email chain needs a few microtask ticks to settle.
@@ -303,7 +303,7 @@ describe("BookingService.cancel", () => {
     // the payout must stay alive (READY), not be cancelled.
     expect(mockPrisma.booking.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { status: "CANCELLED", payoutStatus: "READY" },
+        data: { status: "CANCELLED", cancelledBy: "GUEST", payoutStatus: "READY" },
       }),
     );
     // Fire-and-forget email chain needs a few microtask ticks to settle.
