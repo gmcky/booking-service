@@ -29,6 +29,7 @@ import type {
   HostCancelRequestedAdminJob,
   HostCancelApprovedGuestJob,
   HostCancelRejectedHostJob,
+  HostDeclinedGuestJob,
   EmailChangeOtpJob,
   EmailChangedNotificationJob,
   PasswordChangedNotificationJob,
@@ -575,6 +576,44 @@ async function sendHostCancelRejectedHost(data: HostCancelRejectedHostJob): Prom
   });
 }
 
+async function sendHostDeclinedGuest(data: HostDeclinedGuestJob): Promise<void> {
+  const refundLine =
+    data.refundedAmount > 0
+      ? `A full refund of ${data.refundedAmount.toFixed(2)} ${data.currency} has been issued to your original payment method. It may take a few business days to appear.`
+      : "No payment had been captured, so there is nothing to refund.";
+
+  await transporter.sendMail({
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Reservation declined — ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `The host was unable to accept your reservation request for "${data.propertyTitle}".`,
+      "",
+      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      refundLine,
+      "",
+      "The dates are free again if you'd like to book a different stay.",
+      "",
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "— The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>The host was unable to accept your reservation request for <strong>${data.propertyTitle}</strong>.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+      </table>
+      <p>${refundLine}</p>
+      <p>The dates are free again if you'd like to book a different stay.</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>— The Booking Service team</p>
+    `,
+  });
+}
+
 async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
@@ -736,6 +775,9 @@ async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>):
       break;
     case "host-cancel-rejected-host":
       await sendHostCancelRejectedHost(job.data as HostCancelRejectedHostJob);
+      break;
+    case "host-declined-guest":
+      await sendHostDeclinedGuest(job.data as HostDeclinedGuestJob);
       break;
     case "email-change-otp":
       await sendEmailChangeOtp(job.data as EmailChangeOtpJob);

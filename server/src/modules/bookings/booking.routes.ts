@@ -213,6 +213,31 @@ bookingRouter.post(
 
 /**
  * @openapi
+ * /bookings/{id}/host-decline:
+ *   post:
+ *     tags: [Bookings]
+ *     summary: Host declines a pending reservation (instant, full refund)
+ *     description: >
+ *       Only the property owner may decline, and only while the booking is PENDING.
+ *       No admin approval — nothing was committed. A paid guest is refunded in full.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Reservation declined and cancelled
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Booking' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+bookingRouter.post("/:id/host-decline", asyncHandler(bookingController.declineHostBooking));
+
+/**
+ * @openapi
  * /bookings:
  *   post:
  *     tags: [Bookings]

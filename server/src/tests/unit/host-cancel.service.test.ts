@@ -249,6 +249,85 @@ describe("HostCancellationService.approve", () => {
   });
 });
 
+describe("HostCancellationService.declinePending", () => {
+  function buildPendingBooking(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "booking-1",
+      status: "PENDING",
+      payoutStatus: "PENDING",
+      checkIn: new Date(now + 10 * 86_400_000),
+      checkOut: new Date(now + 15 * 86_400_000),
+      property: { title: "Test Property", ownerId: HOST_ID },
+      user: { email: "ivan@test.com", firstName: "Ivan" },
+      payment: {
+        id: "payment-1",
+        amount: new Prisma.Decimal("300.00"),
+        currency: "USD",
+        status: "SUCCESS",
+        transactionId: "pi_test_123",
+        metadata: null,
+      },
+      ...overrides,
+    };
+  }
+
+  it("403s when the caller is not the owner", async () => {
+    mockPrisma.booking.findUnique.mockResolvedValue(
+      buildPendingBooking({ property: { title: "P", ownerId: "other" } }) as never,
+    );
+    await expect(
+      HostCancellationService.declinePending("booking-1", HOST_ID),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("400s when the booking is not PENDING", async () => {
+    mockPrisma.booking.findUnique.mockResolvedValue(
+      buildPendingBooking({ status: "CONFIRMED" }) as never,
+    );
+    await expect(
+      HostCancellationService.declinePending("booking-1", HOST_ID),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("refunds a paid pending booking in full and cancels it as HOST", async () => {
+    mockPrisma.booking.findUnique.mockResolvedValue(buildPendingBooking() as never);
+    mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 } as never);
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_1" } as never);
+    mockPrisma.$transaction.mockImplementation((async (cb: any) => cb(mockPrisma)) as never);
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1", status: "CANCELLED" } as never);
+
+    await HostCancellationService.declinePending("booking-1", HOST_ID);
+
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 30000 }),
+      { idempotencyKey: "host_decline_refund_payment-1" },
+    );
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "CANCELLED",
+          cancelledBy: "HOST",
+          payoutStatus: "CANCELLED",
+        }),
+      }),
+    );
+    expect(mockEmailQueue.add.mock.calls.map((c) => c[0])).toContain("host-declined-guest");
+  });
+
+  it("cancels an unpaid pending booking without calling Stripe", async () => {
+    mockPrisma.booking.findUnique.mockResolvedValue(
+      buildPendingBooking({ payment: null }) as never,
+    );
+    mockPrisma.$transaction.mockImplementation((async (cb: any) => cb(mockPrisma)) as never);
+    mockPrisma.booking.update.mockResolvedValue({ id: "booking-1", status: "CANCELLED" } as never);
+
+    await HostCancellationService.declinePending("booking-1", HOST_ID);
+
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    expect(mockPrisma.booking.update).toHaveBeenCalled();
+  });
+});
+
 describe("HostCancellationService.reject", () => {
   it("marks the request REJECTED and emails the host", async () => {
     mockPrisma.hostCancellationRequest.findUnique
