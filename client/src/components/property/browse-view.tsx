@@ -23,6 +23,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { useUiStore } from "@/lib/stores/ui-store";
+import { lockBodyScroll } from "@/lib/utils/scroll-lock";
 import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
 
 const BrowseMapPanel = dynamic(
@@ -138,10 +139,9 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     const active = isMobile && mapOpen;
     setMapOverlayOpen(active);
     if (!active) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const release = lockBodyScroll();
     return () => {
-      document.body.style.overflow = prev;
+      release();
       setMapOverlayOpen(false);
     };
   }, [isMobile, mapOpen, setMapOverlayOpen]);
@@ -542,10 +542,12 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
                   <button
                     type="button"
                     onClick={() => {
-                      // The pill lives behind the fullscreen map — drop back to
-                      // the list first, then open the destination search.
+                      // Drop back to the list and open the search flow. The
+                      // mobile search overlay is a body portal above the map,
+                      // so no deferral is needed — and a setTimeout here could
+                      // interleave the two scroll locks on slow devices.
                       collapseMap();
-                      setTimeout(() => searchPillRef.current?.openWhere(), 0);
+                      searchPillRef.current?.openWhere();
                     }}
                     className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-1.5 text-center shadow-sm"
                   >
