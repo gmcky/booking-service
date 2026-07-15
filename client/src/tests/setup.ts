@@ -105,6 +105,12 @@ class MockMarker {
   getElement() {
     return this.#element;
   }
+  on() {
+    return this;
+  }
+  getLngLat() {
+    return { lng: 0, lat: 0 };
+  }
 }
 
 class MockPopup {

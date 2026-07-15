@@ -60,10 +60,10 @@ describe("ReviewFormDialog", () => {
     const submit = await screen.findByRole("button", { name: "Submit review" });
     expect(submit).toBeDisabled();
 
-    await userEvent.click(screen.getByRole("button", { name: "3 stars" }));
+    await userEvent.click(screen.getByRole("button", { name: "Overall: 3 stars" }));
     expect(submit).not.toBeDisabled();
 
-    const threeStarIcon = screen.getByRole("button", { name: "3 stars" }).querySelector("svg");
+    const threeStarIcon = screen.getByRole("button", { name: "Overall: 3 stars" }).querySelector("svg");
     expect(threeStarIcon).toHaveClass("fill-current");
   });
 
@@ -84,7 +84,7 @@ describe("ReviewFormDialog", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Leave a review" }));
-    await userEvent.click(screen.getByRole("button", { name: "3 stars" }));
+    await userEvent.click(screen.getByRole("button", { name: "Overall: 3 stars" }));
     await userEvent.click(screen.getByRole("button", { name: "Submit review" }));
 
     await waitFor(() => {
@@ -112,7 +112,7 @@ describe("ReviewFormDialog", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Leave a review" }));
-    await userEvent.click(screen.getByRole("button", { name: "4 stars" }));
+    await userEvent.click(screen.getByRole("button", { name: "Overall: 4 stars" }));
     await userEvent.type(screen.getByLabelText("Comment (optional)"), "short");
 
     await waitFor(() => {
@@ -139,7 +139,7 @@ describe("ReviewFormDialog", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Leave a review" }));
-    await userEvent.click(screen.getByRole("button", { name: "5 stars" }));
+    await userEvent.click(screen.getByRole("button", { name: "Overall: 5 stars" }));
     await userEvent.type(screen.getByLabelText("Comment (optional)"), "Great stay here");
     await userEvent.click(screen.getByRole("button", { name: "Submit review" }));
 
@@ -164,9 +164,9 @@ describe("ReviewFormDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Edit review" }));
 
     expect(await screen.findByLabelText("Comment (optional)")).toHaveValue("Nice place");
-    const fourthStarIcon = screen.getByRole("button", { name: "4 stars" }).querySelector("svg");
+    const fourthStarIcon = screen.getByRole("button", { name: "Overall: 4 stars" }).querySelector("svg");
     expect(fourthStarIcon).toHaveClass("fill-current");
-    const fifthStarIcon = screen.getByRole("button", { name: "5 stars" }).querySelector("svg");
+    const fifthStarIcon = screen.getByRole("button", { name: "Overall: 5 stars" }).querySelector("svg");
     expect(fifthStarIcon).not.toHaveClass("fill-current");
   });
 });
