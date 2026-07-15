@@ -87,6 +87,14 @@ const emptyStats = {
   totalReviews: 0,
   breakdown: {},
   recentTrend: [],
+  categories: {
+    cleanliness: null,
+    accuracy: null,
+    checkIn: null,
+    communication: null,
+    location: null,
+    value: null,
+  },
 };
 
 const emptyReviewList = {

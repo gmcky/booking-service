@@ -101,7 +101,7 @@ describe("HostProfileView", () => {
     expect(screen.getByText("Hosting since June 2024")).toBeInTheDocument();
 
     expect(await screen.findByText("Wonderful stay!")).toBeInTheDocument();
-    expect(screen.getByText("· Cozy Loft Downtown")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cozy Loft Downtown" })).toBeInTheDocument();
 
     expect(await screen.findByText("Sam's listings")).toBeInTheDocument();
   });
