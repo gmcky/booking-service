@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
@@ -13,7 +14,9 @@ import {
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -144,6 +147,27 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     const rootRef = React.useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = React.useState(!collapsible);
 
+    // Below md every search entry point opens a full-screen stepped flow
+    // (Where → When → Who cards) instead of the desktop morphing popover,
+    // which was never designed for phone widths.
+    const isMobile = useMediaQuery("(max-width: 767px)");
+    const [mobileStep, setMobileStep] = React.useState<SegmentKey | null>(null);
+
+    // Crossing the breakpoint with the overlay open (rotation, resize)
+    // hands off to the desktop popover rather than stranding a hidden overlay.
+    React.useEffect(() => {
+      if (!isMobile) setMobileStep(null);
+    }, [isMobile]);
+
+    React.useEffect(() => {
+      if (!mobileStep) return;
+      const previous = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = previous;
+      };
+    }, [mobileStep]);
+
     // The Where/When/Who panels render inside ONE shared popup box that
     // morphs (position + size) between segments instead of closing and
     // reopening: `openSegment` is what the user asked for, `displayed` is
@@ -170,17 +194,28 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     }, [openSegment, displayed]);
 
     function expandAndOpen(segment: SegmentKey) {
+      if (isMobile) {
+        setMobileStep(segment);
+        return;
+      }
       setExpanded(true);
       setOpenSegment(segment);
     }
 
     function toggleSegment(segment: SegmentKey) {
+      if (isMobile) {
+        setMobileStep(segment);
+        return;
+      }
       setOpenSegment((current) => (current === segment ? null : segment));
     }
 
     // One outside click dismisses the panel; the next one collapses the
     // pill (browse) — mirrors how the popover-based version behaved.
     React.useEffect(() => {
+      // The overlay is portaled outside rootRef — its taps must not count
+      // as "outside the pill".
+      if (mobileStep) return;
       if (!openSegment && !(collapsible && expanded)) return;
       function handlePointerDown(e: PointerEvent) {
         if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
@@ -190,16 +225,18 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       }
       document.addEventListener("pointerdown", handlePointerDown);
       return () => document.removeEventListener("pointerdown", handlePointerDown);
-    }, [collapsible, expanded, openSegment]);
+    }, [collapsible, expanded, openSegment, mobileStep]);
 
     React.useEffect(() => {
-      if (!openSegment) return;
+      if (!openSegment && !mobileStep) return;
       function handleKeyDown(e: KeyboardEvent) {
-        if (e.key === "Escape") setOpenSegment(null);
+        if (e.key !== "Escape") return;
+        if (mobileStep) setMobileStep(null);
+        else setOpenSegment(null);
       }
       document.addEventListener("keydown", handleKeyDown);
       return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [openSegment]);
+    }, [openSegment, mobileStep]);
 
     const activeSegment = openSegment;
 
@@ -300,7 +337,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     // Recomputed each time the When panel opens so a tab left open across
     // midnight can't keep treating yesterday as a selectable "today".
-    const whenOpen = openSegment === "when";
+    const whenOpen = openSegment === "when" || mobileStep === "when";
     const [today, setToday] = React.useState(() => startOfToday());
     React.useEffect(() => {
       if (!whenOpen) return;
@@ -331,7 +368,6 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     // backend takes a single exact range, so a real "any of these months"
     // OR-search isn't possible (same simplification as flexibleWindow).
     const [flexMonthsSelected, setFlexMonthsSelected] = React.useState<Date[]>([]);
-    const flexMonthsScrollRef = React.useRef<HTMLDivElement>(null);
 
     function toggleFlexMonth(month: Date) {
       setFlexMonthsSelected((prev) => {
@@ -358,11 +394,6 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       return Array.from({ length: 12 }, (_, i) => addMonths(start, i));
     }, [today]);
 
-    function scrollFlexMonths(direction: -1 | 1) {
-      // Three cards per click: card width (112) + gap (12).
-      flexMonthsScrollRef.current?.scrollBy({ left: direction * 372, behavior: "smooth" });
-    }
-
     // The URL only ever carries a single aggregate `maxGuests` count (no
     // adults/children/infants breakdown), so a rehydrated total is attributed
     // entirely to adults — the closest lossless reconstruction available.
@@ -379,6 +410,10 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     React.useImperativeHandle(ref, () => ({
       openWhere: () => {
+        if (isMobile) {
+          setMobileStep("where");
+          return;
+        }
         setExpanded(true);
         setOpenSegment("where");
       },
@@ -398,14 +433,19 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     // Committing a destination advances straight to When (Airbnb flow);
     // picking a city that has districts keeps Where open for the drill-down.
+    function advanceToWhen() {
+      if (mobileStep) setMobileStep("when");
+      else setOpenSegment("when");
+    }
+
     function selectCity(country: string, city: string, districtCount: number) {
       setSelection({ country, city, district: undefined });
-      if (districtCount === 0) setOpenSegment("when");
+      if (districtCount === 0) advanceToWhen();
     }
 
     function selectDistrict(country: string, city: string, district: string) {
       setSelection({ country, city, district });
-      setOpenSegment("when");
+      advanceToWhen();
     }
 
     // "Nearby" is only offered when the detected city resolves against the
@@ -432,7 +472,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     function selectNearby() {
       if (!resolvedNearby) return;
       setSelection({ ...resolvedNearby, district: undefined });
-      setOpenSegment("when");
+      advanceToWhen();
     }
 
     const guestsTotal = adults + children;
@@ -479,7 +519,22 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       const qs = params.toString();
       router.push(qs ? `/browse?${qs}` : "/browse");
       setOpenSegment(null);
+      setMobileStep(null);
       if (collapsible) setExpanded(false);
+    }
+
+    function clearAll() {
+      setSelection({});
+      setWhereQuery("");
+      setBase(undefined);
+      setChipDays(0);
+      setWhenTab("dates");
+      setFlexDuration("weekend");
+      setFlexMonthsSelected([]);
+      setAdults(0);
+      setChildren(0);
+      setInfants(false);
+      setPets(false);
     }
 
     const whereText = whereLabel(selection);
@@ -501,10 +556,194 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       return parts.length > 0 ? parts.join(" · ") : undefined;
     })();
 
+    // Full-screen stepped search flow (phones). Portaled so it escapes any
+    // ancestor stacking/transform context; same state as the desktop pill,
+    // just different chrome. The destination input deliberately has no
+    // autofocus — popping the keyboard on open buries the step cards.
+    const mobileOverlay =
+      mobileStep && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[60] flex flex-col bg-muted motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-200 md:hidden">
+              <div className="flex justify-end px-4 pt-4 pb-2">
+                <button
+                  type="button"
+                  aria-label="Close search"
+                  onClick={() => setMobileStep(null)}
+                  className="flex size-9 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+                <div className="flex flex-col gap-3">
+                  {mobileStep === "where" ? (
+                    <div className="rounded-3xl border border-border bg-card p-5 shadow-lg">
+                      <h2 className="text-[22px] font-semibold tracking-tight">Where?</h2>
+                      <Input
+                        value={whereQuery}
+                        onChange={(e) => setWhereQuery(e.target.value)}
+                        placeholder="Search destinations"
+                        aria-label="Search destinations"
+                        className="mt-4 h-12 rounded-xl text-[15px]"
+                      />
+                      {whereQuery.trim() === "" ? (
+                        <div className="mt-4 text-sm font-medium">Suggested destinations</div>
+                      ) : null}
+                      <div className="mt-1 max-h-[42vh] overflow-y-auto">
+                        <DestinationList
+                          mobile
+                          pending={locationsQuery.isPending}
+                          locations={filteredLocations}
+                          selection={selection}
+                          nearby={resolvedNearby}
+                          onNearby={selectNearby}
+                          onCity={selectCity}
+                          onDistrict={selectDistrict}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <MobileStepRow
+                      label="Where"
+                      value={whereText ?? "Anywhere"}
+                      filled={Boolean(whereText)}
+                      onClick={() => setMobileStep("where")}
+                    />
+                  )}
+
+                  {mobileStep === "when" ? (
+                    <div className="rounded-3xl border border-border bg-card p-5 shadow-lg">
+                      <h2 className="text-[22px] font-semibold tracking-tight">When?</h2>
+                      <div className="mt-4 flex justify-center">
+                        <div className="relative grid w-full max-w-60 grid-cols-2 rounded-full bg-muted p-1">
+                          <div
+                            aria-hidden
+                            className={cn(
+                              "absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-background shadow-sm ring-1 ring-foreground/10 transition-transform duration-200 ease-out motion-reduce:transition-none",
+                              whenTab === "flexible" && "translate-x-full",
+                            )}
+                          />
+                          <WhenTabButton
+                            active={whenTab === "dates"}
+                            onClick={() => setWhenTab("dates")}
+                          >
+                            Dates
+                          </WhenTabButton>
+                          <WhenTabButton
+                            active={whenTab === "flexible"}
+                            onClick={() => setWhenTab("flexible")}
+                          >
+                            Flexible
+                          </WhenTabButton>
+                        </div>
+                      </div>
+                      {whenTab === "dates" ? (
+                        <div key="dates" className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
+                          <Calendar
+                            mode="range"
+                            selected={range}
+                            onSelect={onCalendarSelect}
+                            numberOfMonths={1}
+                            defaultMonth={base?.from}
+                            disabled={{ before: today }}
+                            showOutsideDays={false}
+                            className="mt-2 w-full [--cell-size:--spacing(11)]"
+                            classNames={{ root: "w-full", month: "flex w-full flex-col gap-4" }}
+                          />
+                          <div className="mt-2 flex gap-1.5 overflow-x-auto border-t border-border pt-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {FLEX_CHIP_DAYS.map((days) => (
+                              <RangeChip
+                                key={days}
+                                active={chipDays === days}
+                                disabled={!base?.from}
+                                onClick={() => setChipDays(days)}
+                              >
+                                <span className="whitespace-nowrap">
+                                  {days === 0 ? "Exact dates" : `+ ${days} day${days === 1 ? "" : "s"}`}
+                                </span>
+                              </RangeChip>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <FlexiblePanel
+                          key="flexible"
+                          mobile
+                          className="mt-5 w-full"
+                          duration={flexDuration}
+                          onDuration={setFlexDuration}
+                          months={flexMonths}
+                          monthsSelected={flexMonthsSelected}
+                          onToggleMonth={toggleFlexMonth}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <MobileStepRow
+                      label="When"
+                      value={whenText ?? "Anytime"}
+                      filled={Boolean(whenText)}
+                      onClick={() => setMobileStep("when")}
+                    />
+                  )}
+
+                  {mobileStep === "who" ? (
+                    <div className="rounded-3xl border border-border bg-card p-5 shadow-lg">
+                      <h2 className="text-[22px] font-semibold tracking-tight">Who?</h2>
+                      <div className="mt-4 flex flex-col gap-2.5">
+                        <GuestFields
+                          adults={adults}
+                          childCount={children}
+                          infants={infants}
+                          pets={pets}
+                          onAdults={(v) => setAdults(clampAdults(v, children, infants))}
+                          onChildren={(v) => setChildren(clampChildren(v, adults))}
+                          onInfants={setInfants}
+                          onPets={setPets}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <MobileStepRow
+                      label="Who"
+                      value={whoText ?? "Add guests"}
+                      filled={Boolean(whoText)}
+                      onClick={() => setMobileStep("who")}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-sm font-semibold underline underline-offset-4"
+                >
+                  Clear all
+                </button>
+                {mobileStep === "when" ? (
+                  <Button size="lg" className="rounded-xl px-8" onClick={() => setMobileStep("who")}>
+                    Next
+                  </Button>
+                ) : (
+                  <Button size="lg" className="rounded-xl px-7" onClick={onSearch}>
+                    <Search className="mr-1.5" />
+                    Search
+                  </Button>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null;
+
     if (collapsible && !expanded && compact) {
       const summary = [whereText, whenText, whoText].filter(Boolean).join(" · ");
       return (
         <div ref={rootRef}>
+          {mobileOverlay}
           <button
             type="button"
             onClick={() => expandAndOpen("where")}
@@ -530,6 +769,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     if (collapsible && !expanded) {
       return (
         <div ref={rootRef}>
+          {mobileOverlay}
           <div
             key="compact"
             className={cn(
@@ -581,6 +821,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     return (
       <div ref={rootRef} className="relative">
+        {mobileOverlay}
         <div
           key="expanded"
           ref={pillRef}
@@ -738,75 +979,15 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                 />
               </div>
               <div className="max-h-80 overflow-y-auto px-1 pb-1">
-                {resolvedNearby ? (
-                  <button
-                    type="button"
-                    onClick={selectNearby}
-                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-accent"
-                  >
-                    <Navigation className="size-4 shrink-0 text-muted-foreground" />
-                    <span>Nearby · {resolvedNearby.city}</span>
-                  </button>
-                ) : null}
-
-                {locationsQuery.isPending ? (
-                  <p className="px-2.5 py-3 text-center text-sm text-muted-foreground">Loading…</p>
-                ) : filteredLocations.length === 0 ? (
-                  <p className="px-2.5 py-3 text-center text-sm text-muted-foreground">
-                    No destinations found
-                  </p>
-                ) : (
-                  filteredLocations.map((country) => (
-                    <div key={country.country}>
-                      <div className="px-2.5 pt-2.5 pb-1 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
-                        {country.country}
-                      </div>
-                      {country.cities.map((city) => {
-                        const active =
-                          selection.country === country.country && selection.city === city.city;
-                        return (
-                          <div key={city.city}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                selectCity(country.country, city.city, city.districts.length)
-                              }
-                              className={cn(
-                                "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-accent",
-                                active && "bg-accent",
-                              )}
-                            >
-                              <span>
-                                {city.city}, {country.country}
-                              </span>
-                              <span className="text-xs text-muted-foreground">{city.count}</span>
-                            </button>
-                            {active && city.districts.length > 0 ? (
-                              <div className="mb-1 ml-4 flex flex-col gap-0.5 border-l border-border pl-2.5">
-                                {city.districts.map((d) => (
-                                  <button
-                                    key={d.district}
-                                    type="button"
-                                    onClick={() =>
-                                      selectDistrict(country.country, city.city, d.district)
-                                    }
-                                    className={cn(
-                                      "flex items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-[13px] hover:bg-accent",
-                                      selection.district === d.district && "bg-accent",
-                                    )}
-                                  >
-                                    <span>{d.district}</span>
-                                    <span className="text-xs text-muted-foreground">{d.count}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))
-                )}
+                <DestinationList
+                  pending={locationsQuery.isPending}
+                  locations={filteredLocations}
+                  selection={selection}
+                  nearby={resolvedNearby}
+                  onNearby={selectNearby}
+                  onCity={selectCity}
+                  onDistrict={selectDistrict}
+                />
               </div>
                 </div>
               ) : displayed === "when" ? (
@@ -861,104 +1042,29 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                     </div>
                   </div>
                 ) : (
-                  <div
+                  <FlexiblePanel
                     key="flexible"
-                    className="flex w-[640px] max-w-[92vw] flex-col items-center gap-6 px-6 pt-2 pb-7 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
-                  >
-                    <div className="flex flex-col items-center gap-3.5">
-                      <h3 className="text-lg font-semibold tracking-tight">
-                        Stay for {STAY_LABEL[flexDuration]}
-                      </h3>
-                      <div className="flex flex-wrap justify-center gap-2.5">
-                        {(Object.keys(DURATION_LABEL) as FlexibleDuration[]).map((duration) => (
-                          <button
-                            key={duration}
-                            type="button"
-                            onClick={() => setFlexDuration(duration)}
-                            className={cn(
-                              "rounded-full border px-5 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
-                              flexDuration === duration
-                                ? "border-foreground ring-1 ring-inset ring-foreground"
-                                : "border-border hover:border-foreground/50",
-                            )}
-                          >
-                            {DURATION_LABEL[duration]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex w-full flex-col items-center gap-3.5">
-                      <h3 className="text-lg font-semibold tracking-tight">
-                        {flexMonthsSelected.length > 0
-                          ? `Go in ${formatMonthsLabel(flexMonthsSelected, "long")}`
-                          : "Go anytime"}
-                      </h3>
-                      <div className="relative w-full">
-                        <div
-                          ref={flexMonthsScrollRef}
-                          className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                        >
-                          {flexMonths.map((month) => (
-                            <MonthCard
-                              key={month.toISOString()}
-                              month={month}
-                              active={flexMonthsSelected.some((m) => isSameMonth(m, month))}
-                              onClick={() => toggleFlexMonth(month)}
-                            />
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          aria-label="Scroll months left"
-                          onClick={() => scrollFlexMonths(-1)}
-                          className="absolute top-1/2 left-0 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
-                        >
-                          <ChevronLeft className="size-4" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Scroll months right"
-                          onClick={() => scrollFlexMonths(1)}
-                          className="absolute top-1/2 right-0 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
-                        >
-                          <ChevronRight className="size-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    className="w-[640px] max-w-[92vw] px-6 pt-2 pb-7"
+                    duration={flexDuration}
+                    onDuration={setFlexDuration}
+                    months={flexMonths}
+                    monthsSelected={flexMonthsSelected}
+                    onToggleMonth={toggleFlexMonth}
+                  />
                 )}
                 </div>
               ) : (
                 <div className="flex w-72 flex-col gap-2.5 p-2.5">
-              <GuestStepper
-                label="Adults"
-                hint="Ages 13+"
-                value={adults}
-                onChange={(v) => setAdults(clampAdults(v, children, infants))}
-                min={children > 0 || infants ? 1 : 0}
-                max={MAX_GUESTS - children}
-              />
-              <GuestStepper
-                label="Children"
-                hint="2–12"
-                value={children}
-                onChange={(v) => setChildren(clampChildren(v, adults))}
-                max={MAX_GUESTS - adults}
-              />
-              <div className="my-1 h-px bg-border" />
-              <GuestToggle
-                label="Infants"
-                hint="Under 2, suitable stays only"
-                checked={infants}
-                onCheckedChange={setInfants}
-              />
-              <GuestToggle
-                label="Pets"
-                hint="Pet-friendly stays only"
-                checked={pets}
-                onCheckedChange={setPets}
-              />
+                  <GuestFields
+                    adults={adults}
+                    childCount={children}
+                    infants={infants}
+                    pets={pets}
+                    onAdults={(v) => setAdults(clampAdults(v, children, infants))}
+                    onChildren={(v) => setChildren(clampChildren(v, adults))}
+                    onInfants={setInfants}
+                    onPets={setPets}
+                  />
                 </div>
               )}
             </div>
@@ -968,6 +1074,308 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     );
   },
 );
+
+function MobileStepRow({
+  label,
+  value,
+  filled,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  filled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 text-left shadow-sm"
+    >
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={cn("text-sm font-semibold", !filled && "text-muted-foreground")}>
+        {value}
+      </span>
+    </button>
+  );
+}
+
+function DestinationList({
+  mobile,
+  pending,
+  locations,
+  selection,
+  nearby,
+  onNearby,
+  onCity,
+  onDistrict,
+}: {
+  mobile?: boolean;
+  pending: boolean;
+  locations: LocationCountry[];
+  selection: LocationSelection;
+  nearby?: { country: string; city: string };
+  onNearby: () => void;
+  onCity: (country: string, city: string, districtCount: number) => void;
+  onDistrict: (country: string, city: string, district: string) => void;
+}) {
+  return (
+    <>
+      {nearby ? (
+        <button
+          type="button"
+          onClick={onNearby}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md px-2.5 text-left text-sm hover:bg-accent",
+            mobile ? "gap-3 rounded-xl px-1.5 py-2" : "py-1.5",
+          )}
+        >
+          {mobile ? (
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Navigation className="size-5 text-muted-foreground" />
+            </span>
+          ) : (
+            <Navigation className="size-4 shrink-0 text-muted-foreground" />
+          )}
+          {mobile ? (
+            <span className="flex min-w-0 flex-col">
+              <span className="font-medium">Nearby</span>
+              <span className="text-xs text-muted-foreground">
+                Find what&apos;s around you · {nearby.city}
+              </span>
+            </span>
+          ) : (
+            <span>Nearby · {nearby.city}</span>
+          )}
+        </button>
+      ) : null}
+
+      {pending ? (
+        <p className="px-2.5 py-3 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : locations.length === 0 ? (
+        <p className="px-2.5 py-3 text-center text-sm text-muted-foreground">
+          No destinations found
+        </p>
+      ) : (
+        locations.map((country) => (
+          <div key={country.country}>
+            <div
+              className={cn(
+                "px-2.5 pt-2.5 pb-1 font-mono text-[11px] tracking-wide text-muted-foreground uppercase",
+                mobile && "px-1.5",
+              )}
+            >
+              {country.country}
+            </div>
+            {country.cities.map((city) => {
+              const active = selection.country === country.country && selection.city === city.city;
+              return (
+                <div key={city.city}>
+                  <button
+                    type="button"
+                    onClick={() => onCity(country.country, city.city, city.districts.length)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm hover:bg-accent",
+                      mobile ? "rounded-xl px-1.5 py-2" : "py-1.5",
+                      active && "bg-accent",
+                    )}
+                  >
+                    <span className={cn("flex min-w-0 items-center", mobile && "gap-3")}>
+                      {mobile ? (
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <MapPin className="size-5 text-muted-foreground" />
+                        </span>
+                      ) : null}
+                      <span className="truncate">
+                        {city.city}, {country.country}
+                      </span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">{city.count}</span>
+                  </button>
+                  {active && city.districts.length > 0 ? (
+                    <div
+                      className={cn(
+                        "mb-1 ml-4 flex flex-col gap-0.5 border-l border-border pl-2.5",
+                        mobile && "ml-6 gap-1",
+                      )}
+                    >
+                      {city.districts.map((d) => (
+                        <button
+                          key={d.district}
+                          type="button"
+                          onClick={() => onDistrict(country.country, city.city, d.district)}
+                          className={cn(
+                            "flex items-center justify-between gap-2 rounded-md px-2 text-left text-[13px] hover:bg-accent",
+                            mobile ? "py-2" : "py-1",
+                            selection.district === d.district && "bg-accent",
+                          )}
+                        >
+                          <span>{d.district}</span>
+                          <span className="text-xs text-muted-foreground">{d.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ))
+      )}
+    </>
+  );
+}
+
+function FlexiblePanel({
+  mobile,
+  className,
+  duration,
+  onDuration,
+  months,
+  monthsSelected,
+  onToggleMonth,
+}: {
+  mobile?: boolean;
+  className?: string;
+  duration: FlexibleDuration;
+  onDuration: (d: FlexibleDuration) => void;
+  months: Date[];
+  monthsSelected: Date[];
+  onToggleMonth: (m: Date) => void;
+}) {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  function scrollMonths(direction: -1 | 1) {
+    // Three cards per click: card width (112) + gap (12).
+    scrollRef.current?.scrollBy({ left: direction * 372, behavior: "smooth" });
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-6 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200",
+        className,
+      )}
+    >
+      <div className="flex flex-col items-center gap-3.5">
+        <h3 className="text-lg font-semibold tracking-tight">Stay for {STAY_LABEL[duration]}</h3>
+        <div className="flex flex-wrap justify-center gap-2.5">
+          {(Object.keys(DURATION_LABEL) as FlexibleDuration[]).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => onDuration(d)}
+              className={cn(
+                "rounded-full border px-5 py-2 text-sm font-medium transition-[border-color,box-shadow] motion-safe:duration-[180ms] motion-safe:ease-out motion-reduce:transition-none",
+                duration === d
+                  ? "border-foreground ring-1 ring-inset ring-foreground"
+                  : "border-border hover:border-foreground/50",
+              )}
+            >
+              {DURATION_LABEL[d]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex w-full flex-col items-center gap-3.5">
+        <h3 className="text-lg font-semibold tracking-tight">
+          {monthsSelected.length > 0
+            ? `Go in ${formatMonthsLabel(monthsSelected, "long")}`
+            : "Go anytime"}
+        </h3>
+        <div className="relative w-full">
+          <div
+            ref={scrollRef}
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {months.map((month) => (
+              <MonthCard
+                key={month.toISOString()}
+                month={month}
+                active={monthsSelected.some((m) => isSameMonth(m, month))}
+                onClick={() => onToggleMonth(month)}
+              />
+            ))}
+          </div>
+          {!mobile ? (
+            <>
+              <button
+                type="button"
+                aria-label="Scroll months left"
+                onClick={() => scrollMonths(-1)}
+                className="absolute top-1/2 left-0 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Scroll months right"
+                onClick={() => scrollMonths(1)}
+                className="absolute top-1/2 right-0 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GuestFields({
+  adults,
+  childCount,
+  infants,
+  pets,
+  onAdults,
+  onChildren,
+  onInfants,
+  onPets,
+}: {
+  adults: number;
+  childCount: number;
+  infants: boolean;
+  pets: boolean;
+  onAdults: (v: number) => void;
+  onChildren: (v: number) => void;
+  onInfants: (v: boolean) => void;
+  onPets: (v: boolean) => void;
+}) {
+  return (
+    <>
+      <GuestStepper
+        label="Adults"
+        hint="Ages 13+"
+        value={adults}
+        onChange={onAdults}
+        min={childCount > 0 || infants ? 1 : 0}
+        max={MAX_GUESTS - childCount}
+      />
+      <GuestStepper
+        label="Children"
+        hint="2–12"
+        value={childCount}
+        onChange={onChildren}
+        max={MAX_GUESTS - adults}
+      />
+      <div className="my-1 h-px bg-border" />
+      <GuestToggle
+        label="Infants"
+        hint="Under 2, suitable stays only"
+        checked={infants}
+        onCheckedChange={onInfants}
+      />
+      <GuestToggle
+        label="Pets"
+        hint="Pet-friendly stays only"
+        checked={pets}
+        onCheckedChange={onPets}
+      />
+    </>
+  );
+}
 
 function Divider({ faded }: { faded: boolean }) {
   return (
