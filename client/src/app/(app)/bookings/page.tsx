@@ -43,7 +43,7 @@ export default function BookingsPage() {
       const { cancellation } = result;
       if (wasPaid && cancellation && cancellation.refundPercent > 0) {
         toast.success(
-          `Booking cancelled — ${cancellation.refundPercent}% refund (${formatPrice(cancellation.refundAmount)}) is on its way.`,
+          `Booking cancelled. ${cancellation.refundPercent}% refund (${formatPrice(cancellation.refundAmount)}) is on its way.`,
         );
       } else if (wasPaid && cancellation) {
         toast.success("Booking cancelled. No refund applies this close to check-in.");

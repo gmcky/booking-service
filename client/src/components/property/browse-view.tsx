@@ -373,7 +373,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         {detectedMatch && mapMode === "list" ? (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm">
             <span>
-              Showing stays in {detectedMatch.city} — based on your location
+              Showing stays in {detectedMatch.city} · based on your location
             </span>
             <div className="flex items-center gap-4">
               <button

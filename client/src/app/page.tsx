@@ -28,7 +28,7 @@ export default function HomePage() {
             Find a place to stay, anywhere you go.
           </h1>
           <p className="mt-4 text-[17px] text-muted-foreground text-pretty">
-            Hand-picked homes, cabins, and apartments — booked in a few taps.
+            Hand-picked homes, cabins, and apartments. Booked in a few taps.
           </p>
         </section>
 

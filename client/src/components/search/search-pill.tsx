@@ -745,7 +745,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                     className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-accent"
                   >
                     <Navigation className="size-4 shrink-0 text-muted-foreground" />
-                    <span>Nearby — {resolvedNearby.city}</span>
+                    <span>Nearby · {resolvedNearby.city}</span>
                   </button>
                 ) : null}
 
@@ -949,7 +949,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
               <div className="my-1 h-px bg-border" />
               <GuestToggle
                 label="Infants"
-                hint="Under 2 — suitable stays only"
+                hint="Under 2, suitable stays only"
                 checked={infants}
                 onCheckedChange={setInfants}
               />

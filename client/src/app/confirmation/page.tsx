@@ -91,9 +91,9 @@ function ConfirmationInner() {
   const body = confirmed
     ? "We've emailed your itinerary and receipt. The host will reach out before check-in."
     : stalled
-      ? "This is taking longer than usual. Your payment is safe — we'll email you once the booking confirms, or you can check again now."
+      ? "This is taking longer than usual. Your payment is safe. We'll email you once the booking confirms, or you can check again now."
       : processing
-        ? "Your payment is being confirmed. This can take a moment — it's safe to leave this page, we'll email you as soon as it's done."
+        ? "Your payment is being confirmed. This can take a moment. It's safe to leave this page, we'll email you as soon as it's done."
         : "Your payment couldn't be completed and this booking was cancelled. You can try booking again.";
 
   return (
