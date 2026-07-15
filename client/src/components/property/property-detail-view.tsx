@@ -64,8 +64,8 @@ export function PropertyDetailView({ id }: { id: string }) {
     queryKey: queryKeys.properties.detail(id),
     queryFn: () => propertyApi.byId(id),
   });
-  // Stay range shared between the availability calendar and the reserve
-  // card — picking dates in either reprices the booking.
+  // Stay range picked in the reserve card; the availability calendar
+  // renders it read-only.
   const [checkIn, setCheckIn] = React.useState<Date | undefined>();
   const [checkOut, setCheckOut] = React.useState<Date | undefined>();
 
@@ -178,10 +178,6 @@ export function PropertyDetailView({ id }: { id: string }) {
               city={property.city}
               checkIn={checkIn}
               checkOut={checkOut}
-              onRangeChange={(nextIn, nextOut) => {
-                setCheckIn(nextIn);
-                setCheckOut(nextOut);
-              }}
             />
 
             <PropertyReviews propertyId={property.id} propertyOwnerId={property.owner.id} />
@@ -465,8 +461,7 @@ function BookingCard({
     .filter(Boolean)
     .join(" · ");
 
-  // Dates can also change from the availability calendar — any change
-  // invalidates a previously reported conflict.
+  // Any date change invalidates a previously reported conflict.
   React.useEffect(() => {
     setConflict(null);
   }, [checkIn, checkOut]);
@@ -483,6 +478,26 @@ function BookingCard({
     t.setHours(0, 0, 0, 0);
     return t;
   }, []);
+
+  // A stay must not span an existing booking: once a check-in is picked, the
+  // first blocked night after it caps the checkout (picking that day itself
+  // is fine — same-day turnover). Without this cap the two pickers happily
+  // accept a range that jumps over a booked block and the guest only finds
+  // out at the availability re-check.
+  const nextBlockedStart = React.useMemo(() => {
+    if (!checkIn) return undefined;
+    let min: Date | undefined;
+    for (const r of blockedMatchers) {
+      if (r.from > checkIn && (!min || r.from < min)) min = r.from;
+    }
+    return min;
+  }, [checkIn, blockedMatchers]);
+
+  React.useEffect(() => {
+    if (checkOut && nextBlockedStart && checkOut > nextBlockedStart) {
+      onCheckOutChange(undefined);
+    }
+  }, [checkOut, nextBlockedStart, onCheckOutChange]);
 
   const nights = nightsBetween(checkIn, checkOut);
   const subtotal = nights * Number(pricePerNight);
@@ -571,6 +586,7 @@ function BookingCard({
                 className="text-[13px]"
                 disabledDates={[
                   { before: addDays(checkIn ?? today, 1) },
+                  ...(nextBlockedStart ? [{ after: nextBlockedStart }] : []),
                   ...checkoutMatchers,
                 ]}
                 defaultMonth={checkOut ?? checkIn}
