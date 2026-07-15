@@ -239,7 +239,7 @@ function CheckoutInner() {
           <div className="flex flex-col gap-2.5 border-b border-border py-[18px] text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">
-                {property ? formatPrice(property.pricePerNight) : "—"} × {nights}{" "}
+                {property ? formatPrice(property.pricePerNight) : "N/A"} × {nights}{" "}
                 {nights === 1 ? "night" : "nights"}
               </span>
               <span>{formatPrice(subtotal)}</span>
@@ -272,7 +272,7 @@ function CheckoutInner() {
                 )}
               </Button>
               <p className="mt-3 text-center text-xs text-muted-foreground text-pretty">
-                You&apos;ll enter card details on the next step. Test mode — no real charges.
+                You&apos;ll enter card details on the next step. Test mode. No real charges.
               </p>
             </>
           )}
@@ -370,7 +370,7 @@ function PayButton({
         )}
       </Button>
       <p className="mt-3 text-center text-xs text-muted-foreground text-pretty">
-        Processed securely by Stripe in test mode — use card 4242 4242 4242 4242.
+        Processed securely by Stripe in test mode. Use card 4242 4242 4242 4242.
       </p>
     </>
   );

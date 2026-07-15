@@ -79,7 +79,7 @@ export default function AdminHostCancellationsPage() {
   const approveMutation = useMutation({
     mutationFn: (id: string) => adminApi.approveHostCancellation(id),
     onSuccess: () => {
-      toast.success("Cancellation approved — guest refunded in full");
+      toast.success("Cancellation approved. Guest refunded in full");
       invalidate();
     },
     onError: (err) => toast.error((err as Error).message),

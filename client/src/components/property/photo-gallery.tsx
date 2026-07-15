@@ -147,7 +147,7 @@ function FullGallery({ images, title }: { images: string[]; title: string }) {
 
   return (
     <DialogContent className="inset-0 top-0 left-0 flex h-screen max-h-screen w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none p-0 sm:max-w-none">
-      <DialogTitle className="sr-only">{title} — all photos</DialogTitle>
+      <DialogTitle className="sr-only">{title} · all photos</DialogTitle>
       <div className="sticky top-0 z-10 flex items-center justify-center border-b border-border bg-background/95 py-3 text-sm font-medium backdrop-blur">
         {active + 1} / {images.length}
       </div>

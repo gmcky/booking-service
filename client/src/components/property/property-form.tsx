@@ -472,7 +472,7 @@ export function PropertyForm({
               />
             </Field>
             <p className="text-[13px] text-muted-foreground">
-              We place your listing on the map from this address — the more
+              We place your listing on the map from this address. The more
               precise it is, the more accurate the pin.
             </p>
             {pinLatitude != null && pinLongitude != null ? (

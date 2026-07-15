@@ -582,7 +582,7 @@ function BookingCard({
           <p className="text-xs text-muted-foreground">Checking availability…</p>
         ) : blockedError ? (
           <p className="text-xs text-amber-600">
-            Couldn't load availability — we'll double-check when you reserve.
+            Couldn't load availability. We'll double-check when you reserve.
           </p>
         ) : null}
         <div>
@@ -621,7 +621,7 @@ function BookingCard({
               {infantsAllowed ? (
                 <GuestStepper
                   label="Infants"
-                  hint="Under 2 — don't count toward the limit"
+                  hint="Under 2, don't count toward the limit"
                   value={infants}
                   onChange={(v) => setInfants(Math.min(Math.max(0, v), MAX_INFANTS))}
                   max={MAX_INFANTS}

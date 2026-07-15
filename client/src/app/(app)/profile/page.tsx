@@ -189,7 +189,7 @@ function ProfileSection({
           toast.success("Photo updated");
         } else {
           setAuth(accessToken, await endpoints.me());
-          toast.message("Still processing — check back in a moment");
+          toast.message("Still processing, check back in a moment");
         }
       } catch (err) {
         toast.error((err as Error).message);
@@ -629,8 +629,8 @@ function StatsSection() {
     ? [
         { label: "Completed stays", value: String(data.completedBookingsCount) },
         { label: "Nights stayed", value: String(data.completedNights) },
-        { label: "Rating as guest", value: formatRating(data.averageRatingAsGuest) ?? "—" },
-        { label: "Rating as host", value: formatRating(data.averageRatingAsHost) ?? "—" },
+        { label: "Rating as guest", value: formatRating(data.averageRatingAsGuest) ?? "N/A" },
+        { label: "Rating as host", value: formatRating(data.averageRatingAsHost) ?? "N/A" },
         { label: "Listings", value: String(data.listingsCount) },
       ]
     : [];

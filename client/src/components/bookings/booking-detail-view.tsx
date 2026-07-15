@@ -70,7 +70,7 @@ export function BookingDetailView({ id }: { id: string }) {
       const { cancellation } = result;
       if (cancellation && cancellation.refundPercent > 0) {
         toast.success(
-          `Booking cancelled — ${cancellation.refundPercent}% refund (${formatPrice(cancellation.refundAmount)}) is on its way.`,
+          `Booking cancelled. ${cancellation.refundPercent}% refund (${formatPrice(cancellation.refundAmount)}) is on its way.`,
         );
       } else if (cancellation) {
         toast.success("Booking cancelled. No refund applies this close to check-in.");
@@ -202,7 +202,7 @@ function BookingDetailBody({
           <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
             <p className="font-medium text-amber-700 dark:text-amber-400">
               Your host has requested to cancel this booking. If approved, you&apos;ll be
-              refunded in full — no action needed.
+              refunded in full, no action needed.
             </p>
           </div>
         ) : null}
