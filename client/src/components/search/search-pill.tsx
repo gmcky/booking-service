@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { lockBodyScroll } from "@/lib/utils/scroll-lock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -159,14 +160,11 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       if (!isMobile) setMobileStep(null);
     }, [isMobile]);
 
+    const mobileOverlayOpen = mobileStep !== null;
     React.useEffect(() => {
-      if (!mobileStep) return;
-      const previous = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = previous;
-      };
-    }, [mobileStep]);
+      if (!mobileOverlayOpen) return;
+      return lockBodyScroll();
+    }, [mobileOverlayOpen]);
 
     // The Where/When/Who panels render inside ONE shared popup box that
     // morphs (position + size) between segments instead of closing and
