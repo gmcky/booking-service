@@ -82,6 +82,19 @@ export async function requestHostCancellation(req: AuthenticatedRequest, res: Re
 
 /**
  * @server\src\api.routes.ts
+ * @route POST /api/v1/bookings/:id/host-decline
+ * @access Private
+ * @security Bearer token required. Property owner only.
+ */
+export async function declineHostBooking(req: AuthenticatedRequest, res: Response) {
+  const id = getIdParam(req);
+  const hostUserId = req.user!.id;
+  const booking = await HostCancellationService.declinePending(id, hostUserId);
+  res.json(booking);
+}
+
+/**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/bookings
  * @access Private
  * @security Bearer token required.

@@ -14,6 +14,7 @@ import {
   getStripePayloadObject,
   toInputJsonObject,
 } from "../payments/payment.helpers.js";
+import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
 import { setTimeout as sleep } from "timers/promises";
 import { Prisma } from "@prisma/client";
 import type { HostCancellationStatus } from "@prisma/client";
@@ -107,6 +108,192 @@ export class HostCancellationService {
     );
 
     return request;
+  }
+
+  /**
+   * Host declines a still-PENDING reservation. Instant — no admin approval,
+   * because nothing was committed yet (the host never confirmed). The booking
+   * is cancelled and, if the guest already paid, refunded in full to their
+   * card. Same money machinery as approval, minus the request record.
+   */
+  static async declinePending(bookingId: string, hostUserId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        property: { select: { title: true, ownerId: true } },
+        user: { select: { email: true, firstName: true } },
+        payment: {
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            status: true,
+            transactionId: true,
+            metadata: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new AppError(404, "Booking not found");
+    }
+    if (booking.property.ownerId !== hostUserId) {
+      throw new AppError(403, "Only the host of this booking can decline it");
+    }
+    if (booking.status !== "PENDING") {
+      throw new AppError(400, "Only pending reservations can be declined");
+    }
+    if (booking.payoutStatus === "PAID_OUT") {
+      throw new AppError(400, "Cannot decline: host payout has already been disbursed");
+    }
+
+    const payment = booking.payment;
+    const refundable = Boolean(
+      payment &&
+      (payment.status === "SUCCESS" || payment.status === "REFUND_PROCESSING") &&
+      payment.transactionId,
+    );
+    const refundAmount = payment ? Number(payment.amount) : 0;
+
+    let stripeRefund: Awaited<ReturnType<typeof stripe.refunds.create>> | null = null;
+
+    if (refundable && payment) {
+      const moved = await prisma.payment.updateMany({
+        where: { id: payment.id, status: "SUCCESS" },
+        data: { status: "REFUND_PROCESSING" },
+      });
+
+      let callStripe = moved.count > 0;
+      if (!callStripe) {
+        const latest = await prisma.payment.findUnique({
+          where: { id: payment.id },
+          select: { status: true },
+        });
+        if (!latest) throw new AppError(404, "Payment not found");
+        if (latest.status === "REFUNDED") callStripe = false;
+        else if (latest.status === "REFUND_PROCESSING") callStripe = true;
+        else throw new AppError(400, "Payment is not eligible for refund");
+      }
+
+      if (callStripe) {
+        try {
+          stripeRefund = await stripe.refunds.create(
+            {
+              payment_intent: payment.transactionId!,
+              amount: Math.round(refundAmount * 100),
+              metadata: {
+                paymentId: payment.id,
+                bookingId: booking.id,
+                hostDeclined: "true",
+              },
+            },
+            { idempotencyKey: `host_decline_refund_${payment.id}` },
+          );
+        } catch (error) {
+          logger.error(
+            { error, bookingId: booking.id, paymentId: payment.id },
+            "Failed to create Stripe refund during host decline",
+          );
+          throw new AppError(502, "Payment provider error during decline");
+        }
+      }
+    }
+
+    const existingMetadata = payment ? getMetadataObject(payment.metadata) : {};
+    const existingAudit = getAuditObject(existingMetadata);
+    const existingStripePayload = getStripePayloadObject(existingMetadata);
+    const declinedAt = new Date();
+
+    const finalizeTx = () =>
+      prisma.$transaction(async (tx) => {
+        if (refundable && payment) {
+          await tx.payment.updateMany({
+            where: { id: payment.id, status: { in: ["SUCCESS", "REFUND_PROCESSING"] } },
+            data: {
+              status: "REFUNDED",
+              refundedAmount: refundAmount,
+              metadata: {
+                ...existingMetadata,
+                audit: {
+                  ...existingAudit,
+                  hostDeclineRefund: {
+                    refundedAt: declinedAt.toISOString(),
+                    declinedBy: hostUserId,
+                    refundAmount,
+                    refundPercent: 100,
+                  },
+                },
+                stripePayload: {
+                  ...existingStripePayload,
+                  ...(stripeRefund ? { hostDeclineRefund: toInputJsonObject(stripeRefund) } : {}),
+                },
+              },
+            },
+          });
+        }
+
+        return tx.booking.update({
+          where: { id: booking.id },
+          data: { status: "CANCELLED", cancelledBy: "HOST", payoutStatus: "CANCELLED" },
+        });
+      });
+
+    const MAX_ATTEMPTS = 3;
+    let finalized: Awaited<ReturnType<typeof finalizeTx>> | null = null;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        finalized = await finalizeTx();
+        break;
+      } catch (err) {
+        lastError = err;
+        logger.warn(
+          { err, bookingId: booking.id, attempt },
+          "Host decline DB finalization failed — retrying",
+        );
+        if (attempt < MAX_ATTEMPTS) await sleep(200 * attempt);
+      }
+    }
+
+    if (!finalized) {
+      void sendOpsAlert({
+        title: "Host decline DB finalization failed after retries",
+        message:
+          "Stripe refund may have been issued but the booking could not be cancelled. Manual recovery required.",
+        context: {
+          bookingId: booking.id,
+          paymentId: payment?.id ?? null,
+          stripeRefundId: stripeRefund?.id ?? null,
+          idempotencyKey: payment ? `host_decline_refund_${payment.id}` : null,
+          error: String(lastError),
+        },
+      });
+      logger.error(
+        { lastError, bookingId: booking.id },
+        "Host decline DB finalization failed after all retries",
+      );
+      throw new AppError(
+        500,
+        "The reservation could not be declined. Our team has been alerted — please retry shortly.",
+      );
+    }
+
+    await emailQueue.add("host-declined-guest", {
+      bookingId: booking.id,
+      guestEmail: booking.user.email,
+      guestFirstName: booking.user.firstName,
+      propertyTitle: booking.property.title,
+      checkIn: formatDate(booking.checkIn),
+      checkOut: formatDate(booking.checkOut),
+      refundedAmount: refundAmount,
+      currency: payment?.currency ?? "USD",
+    });
+
+    // Dates are free again.
+    await cacheInvalidateNamespace("properties:search");
+
+    return finalized;
   }
 
   /** Admin queue, oldest first (manual review order). */
