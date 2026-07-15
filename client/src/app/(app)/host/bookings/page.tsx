@@ -69,6 +69,16 @@ export default function HostBookingsPage() {
     onError: (err) => toast.error((err as Error).message),
   });
 
+  const declineMutation = useMutation({
+    mutationFn: (id: string) => bookingApi.declinePending(id),
+    onSuccess: () => {
+      toast.success("Reservation declined. The guest was refunded in full");
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const anyBusy = statusMutation.isPending || declineMutation.isPending;
   const bookings = data?.data ?? [];
   const count = data?.pagination.total ?? bookings.length;
 
@@ -139,8 +149,12 @@ export default function HostBookingsPage() {
                 booking={b}
                 onConfirm={() => statusMutation.mutate({ id: b.id, status: "CONFIRMED" })}
                 onComplete={() => statusMutation.mutate({ id: b.id, status: "COMPLETED" })}
-                busy={statusMutation.isPending && statusMutation.variables?.id === b.id}
-                disabled={statusMutation.isPending}
+                onDecline={() => declineMutation.mutate(b.id)}
+                busy={
+                  (statusMutation.isPending && statusMutation.variables?.id === b.id) ||
+                  (declineMutation.isPending && declineMutation.variables === b.id)
+                }
+                disabled={anyBusy}
               />
             ))}
           </div>
@@ -176,12 +190,14 @@ function BookingRow({
   booking,
   onConfirm,
   onComplete,
+  onDecline,
   busy,
   disabled,
 }: {
   booking: HostBooking;
   onConfirm: () => void;
   onComplete: () => void;
+  onDecline: () => void;
   busy: boolean;
   // busy drives the spinner on the acting row; disabled gates every row while
   // any status PATCH is in flight — the mutation instance is shared, so
@@ -190,6 +206,7 @@ function BookingRow({
 }) {
   const badge = statusBadge(booking);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [declineOpen, setDeclineOpen] = React.useState(false);
   const canComplete = booking.status === "CONFIRMED" && new Date(booking.checkOut) <= new Date();
 
   return (
@@ -264,40 +281,74 @@ function BookingRow({
             Manage
           </Button>
           {booking.status === "PENDING" ? (
-            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <AlertDialogTrigger
-                render={
-                  <Button variant="default" size="sm" className="w-[130px]" disabled={disabled} />
-                }
-              >
-                {busy ? <Loader2 className="animate-spin" /> : <Check />}
-                Confirm
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirm this reservation?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    You're accepting {booking.user.firstName} {booking.user.lastName}'s stay at{" "}
-                    {booking.property.title}. The guest's payment is captured and the dates are
-                    locked on your calendar. After confirming, cancelling needs admin approval and
-                    refunds the guest in full — so only confirm if you're sure you can host.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Not yet</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      // AlertDialogAction is a plain Button (no Close): close
-                      // explicitly so a pending mutation can't be double-fired.
-                      setConfirmOpen(false);
-                      onConfirm();
-                    }}
-                  >
-                    Confirm reservation
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <>
+              <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <AlertDialogTrigger
+                  render={
+                    <Button variant="default" size="sm" className="w-[130px]" disabled={disabled} />
+                  }
+                >
+                  {busy ? <Loader2 className="animate-spin" /> : <Check />}
+                  Confirm
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm this reservation?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      You're accepting {booking.user.firstName} {booking.user.lastName}'s stay at{" "}
+                      {booking.property.title}. The guest's payment is captured and the dates are
+                      locked on your calendar. After confirming, cancelling needs admin approval and
+                      refunds the guest in full. Only confirm if you're sure you can host.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Not yet</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        // AlertDialogAction is a plain Button (no Close): close
+                        // explicitly so a pending mutation can't be double-fired.
+                        setConfirmOpen(false);
+                        onConfirm();
+                      }}
+                    >
+                      Confirm reservation
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog open={declineOpen} onOpenChange={setDeclineOpen}>
+                <AlertDialogTrigger
+                  render={
+                    <Button variant="outline" size="sm" className="w-[130px]" disabled={disabled} />
+                  }
+                >
+                  Decline
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Decline this reservation?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This declines {booking.user.firstName} {booking.user.lastName}'s request for{" "}
+                      {booking.property.title} and refunds the guest in full. The dates stay open
+                      for other guests. This can't be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Not yet</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => {
+                        setDeclineOpen(false);
+                        onDecline();
+                      }}
+                    >
+                      Decline reservation
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           ) : canComplete ? (
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger
