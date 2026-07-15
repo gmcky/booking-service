@@ -12,22 +12,21 @@ export interface AvailabilitySectionProps {
   city: string;
   checkIn?: Date;
   checkOut?: Date;
-  onRangeChange: (checkIn?: Date, checkOut?: Date) => void;
 }
 
 /**
- * Interactive two-month calendar: blocked dates greyed, free dates
- * selectable as a stay range. The range is owned by the detail view and
- * shared with the reserve card, so picking here reprices the booking.
- * Reuses the same blocked-dates query/matchers as the booking card via
- * `useBlockedDates` — TanStack Query dedupes the fetch.
+ * Read-only two-month calendar: blocked dates greyed, the stay picked in
+ * the reserve card highlighted. Deliberately not clickable — the reserve
+ * card owns date picking; a second interactive calendar mid-page invited
+ * mis-taps while scrolling on phones. Reuses the same blocked-dates
+ * query/matchers as the booking card via `useBlockedDates` — TanStack
+ * Query dedupes the fetch.
  */
 export function AvailabilitySection({
   propertyId,
   city,
   checkIn,
   checkOut,
-  onRangeChange,
 }: AvailabilitySectionProps) {
   const { blockedMatchers } = useBlockedDates(propertyId);
   const today = startOfToday();
@@ -36,38 +35,19 @@ export function AvailabilitySection({
     ? { from: checkIn, to: checkOut }
     : undefined;
 
-  function handleSelect(next?: DateRange) {
-    const from = next?.from;
-    // A single click produces from === to; treat it as "check-in picked,
-    // checkout still open" rather than a zero-night stay.
-    const to = next?.to && from && next.to.getTime() !== from.getTime() ? next.to : undefined;
-    onRangeChange(from, to);
-  }
-
   const nights = nightsBetween(checkIn, checkOut);
 
   return (
     <div id="availability" className="scroll-mt-32 border-b border-border py-6">
-      <div className="mb-[18px] flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-[19px] font-semibold tracking-tight">
-            {nights > 0 ? `${nights} ${nights === 1 ? "night" : "nights"} in ${city}` : "Availability"}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {checkIn
-              ? `${format(checkIn, "MMM d, yyyy")} – ${checkOut ? format(checkOut, "MMM d, yyyy") : "select checkout"}`
-              : "Select your check-in date"}
-          </p>
-        </div>
-        {checkIn ? (
-          <button
-            type="button"
-            onClick={() => onRangeChange(undefined, undefined)}
-            className="text-sm font-medium text-foreground underline underline-offset-2"
-          >
-            Clear dates
-          </button>
-        ) : null}
+      <div className="mb-[18px]">
+        <h2 className="text-[19px] font-semibold tracking-tight">
+          {nights > 0 ? `${nights} ${nights === 1 ? "night" : "nights"} in ${city}` : "Availability"}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {checkIn
+            ? `${format(checkIn, "MMM d, yyyy")} – ${checkOut ? format(checkOut, "MMM d, yyyy") : "select checkout in the booking form"}`
+            : "Unavailable dates are greyed out"}
+        </p>
       </div>
       {/* Container query: cells shrink with the column instead of forcing a
           horizontal scrollbar. Below md the months stack, so a cell is 1/7 of
@@ -76,12 +56,10 @@ export function AvailabilitySection({
         <Calendar
           mode="range"
           selected={selected}
-          onSelect={handleSelect}
-          excludeDisabled
           numberOfMonths={2}
           showOutsideDays={false}
           disabled={[{ before: today }, ...blockedMatchers]}
-          className="mx-auto p-0 [--cell-size:clamp(2.25rem,calc(100cqw/7),3.25rem)] md:[--cell-size:clamp(1.75rem,calc((100cqw-2.5rem)/14),2.5rem)]"
+          className="mx-auto p-0 [--cell-size:clamp(2.25rem,calc(100cqw/7),3.25rem)] md:[--cell-size:clamp(1.75rem,calc((100cqw-2.5rem)/14),2.5rem)] [&_tbody]:pointer-events-none"
           classNames={{
             months: "relative flex flex-col gap-8 md:flex-row md:gap-10",
             month_caption:
