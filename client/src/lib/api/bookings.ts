@@ -127,4 +127,11 @@ export const bookingApi = {
     });
     return unwrap({ data, error, response });
   },
+
+  declinePending: async (id: string): Promise<components["schemas"]["Booking"]> => {
+    const { data, error, response } = await apiClient.POST("/bookings/{id}/host-decline", {
+      params: { path: { id } },
+    });
+    return unwrap({ data, error, response });
+  },
 };

@@ -81,6 +81,16 @@ export function HostBookingDetailView({ id }: { id: string }) {
     onError: (err) => toast.error((err as Error).message),
   });
 
+  const declineMutation = useMutation({
+    mutationFn: () => bookingApi.declinePending(id),
+    onSuccess: () => {
+      toast.success("Reservation declined. The guest was refunded in full");
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.hostDetail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
   if (isError) {
     return (
       <div className="flex flex-1 flex-col">
@@ -126,6 +136,8 @@ export function HostBookingDetailView({ id }: { id: string }) {
       booking={booking}
       onRequestCancel={(reason) => requestCancelMutation.mutate(reason)}
       requesting={requestCancelMutation.isPending}
+      onDecline={() => declineMutation.mutate()}
+      declining={declineMutation.isPending}
     />
   );
 }
@@ -134,14 +146,19 @@ function HostBookingDetailBody({
   booking,
   onRequestCancel,
   requesting,
+  onDecline,
+  declining,
 }: {
   booking: HostBookingDetail;
   onRequestCancel: (reason: string) => void;
   requesting: boolean;
+  onDecline: () => void;
+  declining: boolean;
 }) {
   const badge = statusBadge(booking.status);
   const cancellationRequest = booking.cancellationRequest;
   const isPendingRequest = cancellationRequest?.status === "PENDING";
+  const canDecline = booking.status === "PENDING";
   const canRequestCancel =
     booking.status === "CONFIRMED" &&
     new Date(booking.checkIn) > new Date() &&
@@ -246,7 +263,7 @@ function HostBookingDetailBody({
           )}
 
           <Button variant="outline" size="sm" className="mt-4" disabled>
-            Message guest — coming soon
+            Message guest · coming soon
           </Button>
         </section>
 
@@ -293,7 +310,7 @@ function HostBookingDetailBody({
           {isPendingRequest ? (
             <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
               <p className="font-medium text-amber-700 dark:text-amber-400">
-                Cancellation request under review — the guest will be refunded in full if
+                Cancellation request under review. The guest will be refunded in full if
                 approved.
               </p>
               <p className="mt-1.5 text-muted-foreground">{cancellationRequest?.reason}</p>
@@ -308,7 +325,19 @@ function HostBookingDetailBody({
             </p>
           ) : null}
 
-          {canRequestCancel ? (
+          {canDecline ? (
+            <>
+              <p className="mb-3 text-sm text-muted-foreground">
+                This reservation is still pending your confirmation. You can decline it now. The
+                guest is refunded in full and the dates stay open for other guests.
+              </p>
+              <DeclineDialog
+                onConfirm={onDecline}
+                declining={declining}
+                guestName={`${booking.guest.firstName} ${booking.guest.lastName}`}
+              />
+            </>
+          ) : canRequestCancel ? (
             <RequestCancelDialog onConfirm={onRequestCancel} requesting={requesting} />
           ) : !isPendingRequest && cancellationRequest?.status !== "APPROVED" ? (
             <p className="text-sm text-muted-foreground">
@@ -375,6 +404,51 @@ function RequestCancelDialog({
             }}
           >
             Submit request
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function DeclineDialog({
+  onConfirm,
+  declining,
+  guestName,
+}: {
+  onConfirm: () => void;
+  declining: boolean;
+  guestName: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger
+        render={
+          <Button variant="destructive" size="sm" className="w-[200px]" disabled={declining} />
+        }
+      >
+        Decline reservation
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Decline this reservation?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This declines {guestName}'s request and refunds the guest in full. The dates stay open
+            for other guests. This can't be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Never mind</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={() => {
+              setOpen(false);
+              onConfirm();
+            }}
+          >
+            Decline reservation
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
