@@ -70,7 +70,8 @@ export function AvailabilitySection({
         ) : null}
       </div>
       {/* Container query: cells shrink with the column instead of forcing a
-          horizontal scrollbar (14 cells + the 2.5rem month gap must fit). */}
+          horizontal scrollbar. Below md the months stack, so a cell is 1/7 of
+          the container; side by side it's 1/14 plus the 2.5rem month gap. */}
       <div className="overflow-x-auto pb-1 [container-type:inline-size]">
         <Calendar
           mode="range"
@@ -80,14 +81,9 @@ export function AvailabilitySection({
           numberOfMonths={2}
           showOutsideDays={false}
           disabled={[{ before: today }, ...blockedMatchers]}
-          className="p-0"
-          style={
-            {
-              "--cell-size": "clamp(1.75rem, calc((100cqw - 2.5rem) / 14), 2.5rem)",
-            } as React.CSSProperties
-          }
+          className="mx-auto p-0 [--cell-size:clamp(2.25rem,calc(100cqw/7),3.25rem)] md:[--cell-size:clamp(1.75rem,calc((100cqw-2.5rem)/14),2.5rem)]"
           classNames={{
-            months: "relative flex flex-col gap-6 md:flex-row md:gap-10",
+            months: "relative flex flex-col gap-8 md:flex-row md:gap-10",
             month_caption:
               "flex h-(--cell-size) w-full items-center justify-center px-(--cell-size) whitespace-nowrap",
             caption_label: "text-[15px] font-medium select-none",
