@@ -3,7 +3,13 @@ import { authenticate } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as authController from "./auth.controller.js";
-import { loginSchema, registerSchema, verifyEmailSchema } from "./auth.validators.js";
+import {
+  loginSchema,
+  registerSchema,
+  verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./auth.validators.js";
 
 export const authRouter: IRouter = Router();
 
@@ -189,4 +195,76 @@ authRouter.post(
   "/resend-verification",
   authenticate,
   asyncHandler(authController.resendVerification),
+);
+
+/**
+ * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Request a password reset link
+ *     description: |
+ *       Always responds 204, whether or not the email belongs to an
+ *       account — this endpoint never discloses account existence.
+ *       Rate-limited to 3 requests per hour per email; requests beyond
+ *       that limit are silently dropped (still 204, no email sent).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       204:
+ *         description: Request accepted (email sent if the account exists and is under the rate limit)
+ *       400:
+ *         description: Validation error (malformed email)
+ */
+authRouter.post(
+  "/forgot-password",
+  validate(forgotPasswordSchema),
+  asyncHandler(authController.forgotPassword),
+);
+
+/**
+ * @openapi
+ * /auth/reset-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reset password via link token
+ *     description: |
+ *       Consumes the link token emailed by `/auth/forgot-password`
+ *       (`{token}` query param appended to `CLIENT_URL/reset-password`).
+ *       The token is single-use and expires 1 hour after issuance. On
+ *       success, every refresh token for the account is revoked (all
+ *       sessions are logged out) and, if the email had not been verified
+ *       yet, it is marked verified — a successful reset proves mailbox
+ *       ownership.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, newPassword]
+ *             properties:
+ *               token: { type: string }
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *                 maxLength: 128
+ *                 description: Must pass zxcvbn strength check (score ≥ 3), same rule as registration.
+ *     responses:
+ *       204:
+ *         description: Password reset; all sessions revoked
+ *       400:
+ *         description: Token is invalid, expired, already used, or the new password is too weak (deliberately generic for the token failure modes to avoid leaking which one occurred)
+ */
+authRouter.post(
+  "/reset-password",
+  validate(resetPasswordSchema),
+  asyncHandler(authController.resetPassword),
 );

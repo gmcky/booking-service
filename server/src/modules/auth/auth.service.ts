@@ -18,6 +18,10 @@ const EMAIL_VERIFY_INVALID_MESSAGE =
   "This verification link is invalid or has expired. Request a new one from your profile.";
 const RESEND_VERIFICATION_MAX_ATTEMPTS = 3;
 const RESEND_VERIFICATION_WINDOW_SECONDS = 60 * 60;
+const PWD_RESET_TTL_SECONDS = 60 * 60;
+const PWD_RESET_INVALID_MESSAGE = "This reset link is invalid or has expired. Request a new one.";
+const FORGOT_PASSWORD_MAX_ATTEMPTS = 3;
+const FORGOT_PASSWORD_WINDOW_SECONDS = 60 * 60;
 
 // Pre-encode once; avoids per-request TextEncoder churn.
 const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
@@ -768,5 +772,131 @@ export class AuthService {
     }
 
     await this.sendVerificationEmail(user);
+  }
+
+  private static pwdResetKey(userId: string): string {
+    return `pwd_reset:${userId}`;
+  }
+
+  private static pwdResetRequestKey(email: string): string {
+    return `pwd_reset_req:${email}`;
+  }
+
+  /**
+   * Issues a fresh link token, stashes its hash in Redis (hashed-at-rest,
+   * mirrors sendVerificationEmail). A repeat call rotates the token — the
+   * SET overwrite invalidates any link still in flight.
+   */
+  private static async sendPasswordResetEmail(
+    user: Pick<User, "id" | "email" | "firstName">,
+  ): Promise<void> {
+    const secret = crypto.randomBytes(32).toString("base64url");
+    const token = `${user.id}.${secret}`;
+    const secretHash = crypto.createHash("sha256").update(secret).digest("hex");
+
+    await cacheClient.set(this.pwdResetKey(user.id), secretHash, "EX", PWD_RESET_TTL_SECONDS);
+
+    await emailQueue.add("password-reset", {
+      to: user.email,
+      firstName: user.firstName,
+      resetUrl: `${env.CLIENT_URL}/reset-password?token=${token}`,
+    });
+
+    logger.info({ userId: user.id }, "Password reset email queued");
+  }
+
+  /**
+   * Fixed-window rate limit (3/hour) per email. Always resolves without
+   * throwing — this is the account-enumeration-proof entry point, so an
+   * unknown email and a rate-limited email both look identical to the
+   * caller (silent success, no email sent).
+   */
+  static async forgotPassword(email: string): Promise<void> {
+    const key = this.pwdResetRequestKey(email);
+    const attempts = await cacheClient.incr(key);
+    if (attempts === 1) {
+      await cacheClient.expire(key, FORGOT_PASSWORD_WINDOW_SECONDS);
+    }
+    if (attempts > FORGOT_PASSWORD_MAX_ATTEMPTS) {
+      logger.warn({ email, attempts }, "Forgot-password rate limit exceeded");
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { email, isDeleted: false },
+      select: { id: true, email: true, firstName: true },
+    });
+
+    if (!user) {
+      logger.info({ email }, "Forgot-password requested for unknown email");
+      return;
+    }
+
+    await this.sendPasswordResetEmail(user);
+  }
+
+  /**
+   * Consumes a reset link token. Errors are deliberately generic
+   * (expired/missing/mismatch/unknown-user all read the same) to avoid
+   * leaking which failure mode occurred.
+   */
+  static async resetPassword(token: string, newPassword: string): Promise<void> {
+    const separatorIndex = token.indexOf(".");
+    if (separatorIndex <= 0 || separatorIndex === token.length - 1) {
+      throw new AppError(400, PWD_RESET_INVALID_MESSAGE);
+    }
+
+    const userId = token.slice(0, separatorIndex);
+    const secret = token.slice(separatorIndex + 1);
+
+    const storedHash = await cacheClient.get(this.pwdResetKey(userId));
+    if (!storedHash) {
+      throw new AppError(400, PWD_RESET_INVALID_MESSAGE);
+    }
+
+    const candidateHash = crypto.createHash("sha256").update(secret).digest("hex");
+    const storedBuf = Buffer.from(storedHash, "hex");
+    const candidateBuf = Buffer.from(candidateHash, "hex");
+
+    const isMatch =
+      storedBuf.length === candidateBuf.length && crypto.timingSafeEqual(storedBuf, candidateBuf);
+
+    if (!isMatch) {
+      throw new AppError(400, PWD_RESET_INVALID_MESSAGE);
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: userId, isDeleted: false },
+      select: { id: true, email: true, firstName: true, emailVerifiedAt: true },
+    });
+    if (!user) {
+      throw new AppError(400, PWD_RESET_INVALID_MESSAGE);
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash,
+          // A successful reset proves mailbox ownership — piggyback the
+          // verification if the account hadn't confirmed its email yet.
+          ...(user.emailVerifiedAt === null ? { emailVerifiedAt: new Date() } : {}),
+        },
+      }),
+      prisma.refreshToken.deleteMany({ where: { userId } }),
+    ]);
+
+    await cacheClient.del(this.pwdResetKey(userId));
+    await this.clearLockout(user.email);
+
+    await emailQueue.add("password-changed-notification", {
+      email: user.email,
+      firstName: user.firstName,
+      changedAtIso: new Date().toISOString(),
+    });
+
+    logger.info({ userId }, "Password reset successfully");
   }
 }
