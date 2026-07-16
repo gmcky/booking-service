@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { authenticate, authorize } from "../../shared/middlewares/auth.js";
+import { authenticate, authorize, requireVerifiedEmail } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as reviewController from "./review.controller.js";
@@ -107,7 +107,12 @@ reviewRouter.use(authenticate);
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-reviewRouter.post("/", validate(createReviewSchema), asyncHandler(reviewController.createReview));
+reviewRouter.post(
+  "/",
+  requireVerifiedEmail,
+  validate(createReviewSchema),
+  asyncHandler(reviewController.createReview),
+);
 
 /**
  * @openapi

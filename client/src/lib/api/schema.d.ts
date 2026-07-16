@@ -427,6 +427,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify email address via link token
+         * @description Consumes the link token emailed to the user on registration
+         *     (`{token}` query param appended to `CLIENT_URL/verify-email`).
+         *     The token is single-use and expires 24 hours after issuance.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Email verified */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Token is invalid, expired, or already used */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/resend-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend the email verification link
+         * @description Rotates and re-sends the verification token. Rate-limited to 3
+         *     requests per hour per user. A no-op (still 204, no email sent) if
+         *     the account is already verified.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Verification email re-sent (or account already verified) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                401: components["responses"]["Unauthorized"];
+                /** @description Too many resend requests this hour */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bookings/check-availability": {
         parameters: {
             query?: never;
@@ -582,6 +681,13 @@ export interface paths {
                 };
                 400: components["responses"]["ValidationError"];
                 401: components["responses"]["Unauthorized"];
+                /** @description Email not verified (code: EMAIL_NOT_VERIFIED) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
                 /** @description Date range conflict */
                 409: {
                     headers: {
@@ -1660,6 +1766,13 @@ export interface paths {
                 };
                 400: components["responses"]["ValidationError"];
                 401: components["responses"]["Unauthorized"];
+                /** @description Email not verified (code: EMAIL_NOT_VERIFIED) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -3013,6 +3126,7 @@ export interface components {
             lastName: string;
             role: components["schemas"]["Role"];
             avatarUrl: string | null;
+            emailVerified: boolean;
         };
         AuthResponse: {
             user: components["schemas"]["AuthUser"];
@@ -3028,6 +3142,7 @@ export interface components {
             role: components["schemas"]["Role"];
             /** Format: date-time */
             createdAt: string;
+            emailVerified: boolean;
         };
         UserProfile: {
             id: string;

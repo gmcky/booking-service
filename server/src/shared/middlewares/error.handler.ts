@@ -11,6 +11,7 @@ export class AppError extends Error {
     public statusCode: number,
     message: string,
     public isOperational = true,
+    public code?: string,
   ) {
     super(message);
     Object.setPrototypeOf(this, AppError.prototype);
@@ -45,8 +46,13 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   }
 
   if (err instanceof AppError) {
-    logger.warn({ statusCode: err.statusCode, message: err.message }, "Operational error");
-    return res.status(err.statusCode).json({ error: err.message });
+    logger.warn(
+      { statusCode: err.statusCode, message: err.message, code: err.code },
+      "Operational error",
+    );
+    return res
+      .status(err.statusCode)
+      .json({ error: err.message, ...(err.code && { code: err.code }) });
   }
 
   Sentry.captureException(err);

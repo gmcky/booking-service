@@ -11,6 +11,23 @@ export interface UnwrapArgs<T> {
   response: Response;
 }
 
+/**
+ * Thrown by unwrap/unwrapVoid on any failed request. `.message` behaves
+ * exactly like a plain Error (existing `err.message` / `err instanceof Error`
+ * catch sites are unaffected); `.code` additionally surfaces the backend's
+ * `AppError.code` when present (e.g. "EMAIL_NOT_VERIFIED") so callers that
+ * care can branch on it without string-matching the message.
+ */
+export class ApiError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+  }
+}
+
 function extractMessage(error: unknown): string | undefined {
   if (error && typeof error === "object" && "details" in error) {
     const details = (error as { details?: unknown }).details;
@@ -28,12 +45,23 @@ function extractMessage(error: unknown): string | undefined {
   return undefined;
 }
 
+function extractCode(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "code" in error) {
+    const value = (error as { code?: unknown }).code;
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
+}
+
 export function unwrap<T>({ data, error, response }: UnwrapArgs<T>): T {
   if (error !== undefined) {
-    throw new Error(extractMessage(error) ?? `Request failed (${response.status})`);
+    throw new ApiError(
+      extractMessage(error) ?? `Request failed (${response.status})`,
+      extractCode(error),
+    );
   }
   if (data === undefined) {
-    throw new Error(`Request failed (${response.status})`);
+    throw new ApiError(`Request failed (${response.status})`);
   }
   return data;
 }
@@ -41,6 +69,9 @@ export function unwrap<T>({ data, error, response }: UnwrapArgs<T>): T {
 /** For endpoints with no response body (204, or 200 with no content) on success. */
 export function unwrapVoid(args: { error?: unknown; response: Response }): void {
   if (args.error !== undefined || !args.response.ok) {
-    throw new Error(extractMessage(args.error) ?? `Request failed (${args.response.status})`);
+    throw new ApiError(
+      extractMessage(args.error) ?? `Request failed (${args.response.status})`,
+      extractCode(args.error),
+    );
   }
 }

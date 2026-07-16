@@ -17,6 +17,7 @@ model User {
   isDeleted     Boolean        @default(false)
   isSuspended   Boolean        @default(false)
   deletedAt     DateTime?
+  emailVerifiedAt DateTime?
   firstName     String
   lastName      String
   role          Role           @default(USER)

@@ -28,6 +28,7 @@ const mockUser: AuthUser = {
   email: "test@example.com",
   role: "USER",
   avatarUrl: null,
+  emailVerified: true,
 };
 
 function jsonResponse(body: unknown, status: number): Response {

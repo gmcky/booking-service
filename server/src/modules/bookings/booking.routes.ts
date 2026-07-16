@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { authenticate } from "../../shared/middlewares/auth.js";
+import { authenticate, requireVerifiedEmail } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as bookingController from "./booking.controller.js";
@@ -264,10 +264,12 @@ bookingRouter.post("/:id/host-decline", asyncHandler(bookingController.declineHo
  *               $ref: '#/components/schemas/BookingWithProperty'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: 'Email not verified (code: EMAIL_NOT_VERIFIED)' }
  *       409: { description: Date range conflict }
  */
 bookingRouter.post(
   "/",
+  requireVerifiedEmail,
   validate(createBookingSchema),
   asyncHandler(bookingController.createBooking),
 );
