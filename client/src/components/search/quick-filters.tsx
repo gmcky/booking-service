@@ -90,7 +90,10 @@ export function QuickFilters({ filters, activeFilterCount, onApply, onOpenFilter
       <div className="relative min-w-0 flex-1">
         <div
           ref={scrollerRef}
-          className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // py-1/-my-1 give the scroll container vertical headroom: chips are
+          // 42.5px tall (fractional), and at non-integer zoom/DPI the
+          // container can round down and shave the bottom border off.
+          className="flex gap-2 overflow-x-auto py-1 -my-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {QUICK_CHIPS.map((chip) => {
             const active = isChipActive(chip, filters);
