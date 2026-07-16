@@ -5,6 +5,7 @@ import {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  googleAuthSchema,
 } from "./auth.validators.js";
 import type { Role } from "@prisma/client";
 
@@ -13,6 +14,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
 
 export interface AuthTokens {
   accessToken: string;

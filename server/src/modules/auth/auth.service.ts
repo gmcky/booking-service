@@ -3,11 +3,17 @@ import { AppError } from "../../shared/middlewares/error.handler.js";
 import { logger } from "../../shared/lib/logger.js";
 import { cacheClient } from "../../shared/lib/cache.js";
 import { parseExpiry } from "../../shared/utils/time.js";
-import type { RegisterInput, LoginInput, AuthResponse, AuthTokens } from "./auth.types.js";
+import type {
+  RegisterInput,
+  LoginInput,
+  AuthResponse,
+  AuthTokens,
+  GoogleAuthInput,
+} from "./auth.types.js";
 import { getCachedAuthUser, setCachedAuthUser } from "./auth.cache.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import bcrypt from "bcrypt";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, createRemoteJWKSet } from "jose";
 import { env } from "../../config/env.js";
 import type { User } from "@prisma/client";
 import crypto from "crypto";
@@ -32,6 +38,11 @@ const REFRESH_SECRET = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 // genuine wrong-password attempt — otherwise the missing bcrypt call makes
 // unknown emails answer measurably faster, enabling user enumeration.
 const DUMMY_PASSWORD_HASH = "$2b$12$D1WSx5rWJnI9DP7/o6ZsWuvQxA86RqoD73x3ZSVCfV3TfLmoZAhzW";
+
+// jose caches this internally (keyed by URL) — one JWKS fetch, reused and
+// refreshed automatically across requests.
+const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
+const GOOGLE_CREDENTIAL_INVALID_MESSAGE = "Invalid Google credential";
 
 export class AuthService {
   /**
@@ -194,6 +205,20 @@ export class AuthService {
       throw new AppError(401, "Invalid credentials");
     }
 
+    // Google-only accounts carry an unusable dummy hash — comparing against
+    // it would always fail anyway, so skip bcrypt and hint at the fix
+    // directly. This deliberately discloses the account's auth method (a
+    // documented enumeration trade-off); it does not affect the
+    // isDeleted/isSuspended ordering below, which only ever runs for
+    // password-capable accounts.
+    if (user.hasPassword === false) {
+      logger.warn(
+        { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Login failed: account uses Google sign-in only",
+      );
+      throw new AppError(401, "This account uses Google sign-in. Use the Google button to log in.");
+    }
+
     const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
     if (!isValidPassword) {
       logger.warn(
@@ -216,6 +241,193 @@ export class AuthService {
 
     await this.clearLockout(email);
 
+    const result = await this.issueSession(user, meta);
+
+    logger.info(
+      { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+      "User logged in",
+    );
+
+    return result;
+  }
+
+  /**
+   * Verifies a Google Identity Services ID token and signs the user in,
+   * auto-linking or creating an account as needed. Issues the same
+   * access+refresh pair as password login.
+   */
+  static async googleAuth(
+    data: GoogleAuthInput,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<AuthResponse> {
+    let payload;
+    try {
+      const verification = await jwtVerify(data.credential, googleJwks, {
+        issuer: ["https://accounts.google.com", "accounts.google.com"],
+        audience: env.GOOGLE_CLIENT_ID,
+        algorithms: ["RS256"],
+      });
+      payload = verification.payload;
+    } catch (error) {
+      logger.warn(
+        {
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+          error: (error as Error).message,
+        },
+        "Google sign-in rejected: credential verification failed",
+      );
+      throw new AppError(401, GOOGLE_CREDENTIAL_INVALID_MESSAGE);
+    }
+
+    if (payload.email_verified !== true) {
+      logger.warn(
+        { ip: meta?.ip, userAgent: meta?.userAgent, sub: payload.sub },
+        "Google sign-in rejected: email not verified with Google",
+      );
+      throw new AppError(401, GOOGLE_CREDENTIAL_INVALID_MESSAGE);
+    }
+
+    const googleId = payload.sub;
+    const rawEmail = typeof payload.email === "string" ? payload.email : undefined;
+    if (!googleId || !rawEmail) {
+      logger.warn(
+        { ip: meta?.ip, userAgent: meta?.userAgent },
+        "Google sign-in rejected: credential missing sub or email",
+      );
+      throw new AppError(401, GOOGLE_CREDENTIAL_INVALID_MESSAGE);
+    }
+    const email = rawEmail.toLowerCase();
+
+    // Looked up without the isDeleted filter on purpose: googleId is a
+    // unique column that a soft-deleted account can still be holding, and
+    // creating a fresh user would otherwise collide with it. A hit here —
+    // deleted or not — means we must not fall through to account creation.
+    let user = await prisma.user.findUnique({ where: { googleId } });
+
+    if (user?.isDeleted) {
+      logger.warn(
+        { userId: user.id, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Google sign-in rejected: account is deleted",
+      );
+      throw new AppError(401, GOOGLE_CREDENTIAL_INVALID_MESSAGE);
+    }
+
+    if (!user) {
+      // isDeleted:false mirrors login's user lookup — a soft-deleted
+      // account's email is anonymized on delete, so it can never match
+      // here and can never be resurrected/linked by this path.
+      const existingByEmail = await prisma.user.findFirst({
+        where: { email, isDeleted: false },
+      });
+
+      if (existingByEmail) {
+        if (existingByEmail.emailVerifiedAt === null) {
+          // Pre-hijack guard: an UNVERIFIED password account never proved it
+          // owns this mailbox — anyone could have registered it with the
+          // Google user's address and a password they know. Google's proof
+          // wins: take the account over for the mailbox owner by scrubbing
+          // the password (unusable hash, hasPassword=false), marking the
+          // email verified, and revoking every existing session.
+          const scrubHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
+          const [updated] = await prisma.$transaction([
+            prisma.user.update({
+              where: { id: existingByEmail.id },
+              data: {
+                googleId,
+                emailVerifiedAt: new Date(),
+                passwordHash: scrubHash,
+                hasPassword: false,
+              },
+            }),
+            prisma.refreshToken.deleteMany({ where: { userId: existingByEmail.id } }),
+          ]);
+          user = updated;
+          logger.warn(
+            { userId: user.id, email },
+            "Google account linked to UNVERIFIED user: password scrubbed, sessions revoked",
+          );
+        } else {
+          user = await prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: { googleId },
+          });
+          logger.info({ userId: user.id, email }, "Google account linked to existing user");
+        }
+      }
+    }
+
+    if (!user) {
+      const dummyPassword = crypto.randomBytes(32).toString("hex");
+      const passwordHash = await bcrypt.hash(dummyPassword, 12);
+      const givenName =
+        typeof payload.given_name === "string" && payload.given_name
+          ? payload.given_name
+          : email.split("@")[0] || "User";
+      const familyName = typeof payload.family_name === "string" ? payload.family_name : "";
+      const avatarUrl = typeof payload.picture === "string" ? payload.picture : null;
+
+      try {
+        user = await prisma.user.create({
+          data: {
+            email,
+            googleId,
+            passwordHash,
+            hasPassword: false,
+            firstName: givenName,
+            lastName: familyName,
+            avatarUrl,
+            emailVerifiedAt: new Date(),
+            role: "USER",
+          },
+        });
+      } catch (error) {
+        // Two concurrent first sign-ins can race past the lookups and both
+        // attempt the create; the loser lands here. Re-read instead of 500.
+        if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+          user = await prisma.user.findUnique({ where: { googleId } });
+          if (!user || user.isDeleted) {
+            throw new AppError(401, GOOGLE_CREDENTIAL_INVALID_MESSAGE);
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      logger.info({ userId: user.id, email }, "User signed in via Google (account created)");
+    }
+
+    // Same suspension handling as password login.
+    if (user.isSuspended) {
+      logger.warn(
+        { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+        "Google sign-in blocked: account is suspended",
+      );
+      throw new AppError(403, "Account is suspended");
+    }
+
+    const result = await this.issueSession(user, meta);
+
+    logger.info(
+      { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
+      "User logged in via Google",
+    );
+
+    return result;
+  }
+
+  /**
+   * Shared session-issuance tail for login and Google sign-in: signs a
+   * fresh access+refresh pair, persists the refresh session, prunes
+   * expired/excess sessions, and shapes the AuthResponse.
+   */
+  private static async issueSession(
+    user: Pick<
+      User,
+      "id" | "email" | "firstName" | "lastName" | "role" | "avatarUrl" | "emailVerifiedAt"
+    >,
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<AuthResponse> {
     const jti = crypto.randomUUID();
     const refreshExpiresIn = parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
     const expiresAt = new Date(Date.now() + refreshExpiresIn);
@@ -258,11 +470,6 @@ export class AuthService {
         });
       }
     });
-
-    logger.info(
-      { userId: user.id, email, ip: meta?.ip, userAgent: meta?.userAgent },
-      "User logged in",
-    );
 
     return {
       user: {
@@ -880,6 +1087,10 @@ export class AuthService {
         where: { id: userId },
         data: {
           passwordHash,
+          // Google-only accounts (hasPassword=false) regain the password
+          // grant here — reset is mailbox-proof gated, so this is the safe
+          // "set a password" path for them.
+          hasPassword: true,
           // A successful reset proves mailbox ownership — piggyback the
           // verification if the account hadn't confirmed its email yet.
           ...(user.emailVerifiedAt === null ? { emailVerifiedAt: new Date() } : {}),

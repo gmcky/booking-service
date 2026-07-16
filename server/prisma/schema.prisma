@@ -14,6 +14,8 @@ model User {
   bio           String?        @db.VarChar(500)
   avatarUrl     String?
   passwordHash  String?
+  googleId      String?        @unique
+  hasPassword   Boolean        @default(true)
   isDeleted     Boolean        @default(false)
   isSuspended   Boolean        @default(false)
   deletedAt     DateTime?

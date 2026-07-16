@@ -9,6 +9,7 @@ import {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  googleAuthSchema,
 } from "./auth.validators.js";
 
 export const authRouter: IRouter = Router();
@@ -105,6 +106,47 @@ authRouter.post("/register", validate(registerSchema), asyncHandler(authControll
  *         description: Invalid credentials
  */
 authRouter.post("/login", validate(loginSchema), asyncHandler(authController.login));
+
+/**
+ * @openapi
+ * /auth/google:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Sign in (or sign up) with a Google ID token
+ *     description: |
+ *       Verifies the Google Identity Services ID token (`credential`) against
+ *       Google's published JWKS (issuer + audience + signature + expiry).
+ *       Resolution order: match by `googleId`, then fall back to a
+ *       case-insensitive email match (which auto-links the Google account to
+ *       that user), then create a new account. New accounts get
+ *       `hasPassword: false` — the password grant is disabled until the
+ *       account sets one — and `emailVerifiedAt` is set immediately, since
+ *       Google already confirmed the address. Soft-deleted accounts are
+ *       never linked or resurrected by this path.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [credential]
+ *             properties:
+ *               credential:
+ *                 type: string
+ *                 description: The ID token returned by Google Identity Services.
+ *     responses:
+ *       200:
+ *         description: Signed in (existing or newly created account)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       401:
+ *         description: Invalid, expired, or unverified Google credential
+ *       403:
+ *         description: Account is suspended
+ */
+authRouter.post("/google", validate(googleAuthSchema), asyncHandler(authController.googleAuth));
 
 /**
  * @openapi

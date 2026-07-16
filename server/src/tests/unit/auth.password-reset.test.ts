@@ -79,7 +79,11 @@ vi.mock("jose", () => {
       return "mock-jwt-token";
     }
   }
-  return { SignJWT: MockSignJWT, jwtVerify: vi.fn() };
+  return {
+    SignJWT: MockSignJWT,
+    jwtVerify: vi.fn(),
+    createRemoteJWKSet: vi.fn(() => "mock-jwks"),
+  };
 });
 
 vi.mock("../../modules/auth/auth.cache.js", () => ({
@@ -190,7 +194,7 @@ describe("AuthService — password reset", () => {
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-1" },
-        data: { passwordHash: "hashed-new-password" },
+        data: { passwordHash: "hashed-new-password", hasPassword: true },
       });
       expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user-1" },
@@ -213,7 +217,11 @@ describe("AuthService — password reset", () => {
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-1" },
-        data: { passwordHash: "hashed-new-password", emailVerifiedAt: expect.any(Date) },
+        data: {
+          passwordHash: "hashed-new-password",
+          hasPassword: true,
+          emailVerifiedAt: expect.any(Date),
+        },
       });
     });
 
@@ -229,7 +237,7 @@ describe("AuthService — password reset", () => {
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-1" },
-        data: { passwordHash: "hashed-new-password" },
+        data: { passwordHash: "hashed-new-password", hasPassword: true },
       });
     });
 

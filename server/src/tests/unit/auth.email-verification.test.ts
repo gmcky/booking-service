@@ -79,7 +79,11 @@ vi.mock("jose", () => {
       return "mock-jwt-token";
     }
   }
-  return { SignJWT: MockSignJWT, jwtVerify: vi.fn() };
+  return {
+    SignJWT: MockSignJWT,
+    jwtVerify: vi.fn(),
+    createRemoteJWKSet: vi.fn(() => "mock-jwks"),
+  };
 });
 
 vi.mock("../../modules/auth/auth.cache.js", () => ({
