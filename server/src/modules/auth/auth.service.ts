@@ -5,12 +5,19 @@ import { cacheClient } from "../../shared/lib/cache.js";
 import { parseExpiry } from "../../shared/utils/time.js";
 import type { RegisterInput, LoginInput, AuthResponse, AuthTokens } from "./auth.types.js";
 import { getCachedAuthUser, setCachedAuthUser } from "./auth.cache.js";
+import { emailQueue } from "../../shared/queues/email.queue.js";
 import bcrypt from "bcrypt";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "../../config/env.js";
 import type { User } from "@prisma/client";
 import crypto from "crypto";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+
+const EMAIL_VERIFY_TTL_SECONDS = 24 * 60 * 60;
+const EMAIL_VERIFY_INVALID_MESSAGE =
+  "This verification link is invalid or has expired. Request a new one from your profile.";
+const RESEND_VERIFICATION_MAX_ATTEMPTS = 3;
+const RESEND_VERIFICATION_WINDOW_SECONDS = 60 * 60;
 
 // Pre-encode once; avoids per-request TextEncoder churn.
 const ACCESS_SECRET = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
@@ -109,6 +116,14 @@ export class AuthService {
         "User registered successfully",
       );
 
+      // Fail-soft: the account is already committed; a Redis/queue blip must
+      // not turn registration into a 500. The user can resend from the banner.
+      try {
+        await this.sendVerificationEmail(user);
+      } catch (error) {
+        logger.error({ err: error, userId: user.id }, "Failed to queue verification email");
+      }
+
       return {
         user: {
           id: user.id,
@@ -117,6 +132,7 @@ export class AuthService {
           lastName: user.lastName,
           role: user.role,
           avatarUrl: user.avatarUrl,
+          emailVerified: user.emailVerifiedAt != null,
         },
         accessToken,
         refreshToken,
@@ -252,6 +268,7 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         avatarUrl: user.avatarUrl,
+        emailVerified: user.emailVerifiedAt != null,
       },
       accessToken,
       refreshToken,
@@ -641,5 +658,115 @@ export class AuthService {
     } catch {
       // Best-effort cleanup; stale counters self-expire via TTL.
     }
+  }
+
+  private static emailVerifyKey(userId: string): string {
+    return `email_verify:${userId}`;
+  }
+
+  private static verifyResendKey(userId: string): string {
+    return `verify_resend:${userId}`;
+  }
+
+  /**
+   * Issues a fresh link token, stashes its hash in Redis (hashed-at-rest,
+   * mirrors the email-change OTP pattern), and enqueues the delivery email.
+   * A repeat call rotates the token — the SET overwrite invalidates any
+   * link still in flight.
+   */
+  private static async sendVerificationEmail(
+    user: Pick<User, "id" | "email" | "firstName">,
+  ): Promise<void> {
+    const secret = crypto.randomBytes(32).toString("base64url");
+    const token = `${user.id}.${secret}`;
+    const secretHash = crypto.createHash("sha256").update(secret).digest("hex");
+
+    await cacheClient.set(this.emailVerifyKey(user.id), secretHash, "EX", EMAIL_VERIFY_TTL_SECONDS);
+
+    await emailQueue.add("verify-email", {
+      to: user.email,
+      firstName: user.firstName,
+      verifyUrl: `${env.CLIENT_URL}/verify-email?token=${token}`,
+    });
+
+    logger.info({ userId: user.id }, "Verification email queued");
+  }
+
+  /**
+   * Consumes a verification link token. Errors are deliberately generic
+   * (expired/missing/mismatch all read the same) to avoid leaking which
+   * failure mode occurred.
+   */
+  static async verifyEmail(token: string): Promise<void> {
+    const separatorIndex = token.indexOf(".");
+    if (separatorIndex <= 0 || separatorIndex === token.length - 1) {
+      throw new AppError(400, EMAIL_VERIFY_INVALID_MESSAGE);
+    }
+
+    const userId = token.slice(0, separatorIndex);
+    const secret = token.slice(separatorIndex + 1);
+
+    const storedHash = await cacheClient.get(this.emailVerifyKey(userId));
+    if (!storedHash) {
+      throw new AppError(400, EMAIL_VERIFY_INVALID_MESSAGE);
+    }
+
+    const candidateHash = crypto.createHash("sha256").update(secret).digest("hex");
+    const storedBuf = Buffer.from(storedHash, "hex");
+    const candidateBuf = Buffer.from(candidateHash, "hex");
+
+    const isMatch =
+      storedBuf.length === candidateBuf.length && crypto.timingSafeEqual(storedBuf, candidateBuf);
+
+    if (!isMatch) {
+      throw new AppError(400, EMAIL_VERIFY_INVALID_MESSAGE);
+    }
+
+    await cacheClient.del(this.emailVerifyKey(userId));
+
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { emailVerifiedAt: new Date() },
+      });
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new AppError(400, EMAIL_VERIFY_INVALID_MESSAGE);
+      }
+      throw error;
+    }
+
+    logger.info({ userId }, "Email verified");
+  }
+
+  /**
+   * Fixed-window rate limit (3/hour) on top of the standard resend flow.
+   * Already-verified accounts are a silent no-op — nothing to confirm, no
+   * email sent.
+   */
+  static async resendVerificationEmail(userId: string): Promise<void> {
+    const key = this.verifyResendKey(userId);
+    const attempts = await cacheClient.incr(key);
+    if (attempts === 1) {
+      await cacheClient.expire(key, RESEND_VERIFICATION_WINDOW_SECONDS);
+    }
+    if (attempts > RESEND_VERIFICATION_MAX_ATTEMPTS) {
+      logger.warn({ userId, attempts }, "Resend verification email rate limit exceeded");
+      throw new AppError(429, "Too many verification emails requested. Please try again later.");
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: userId, isDeleted: false },
+      select: { id: true, email: true, firstName: true, emailVerifiedAt: true },
+    });
+    if (!user) {
+      throw new AppError(404, "User not found");
+    }
+
+    if (user.emailVerifiedAt !== null) {
+      return;
+    }
+
+    await this.sendVerificationEmail(user);
   }
 }

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
-import { authenticate, optionalAuth } from "../../shared/middlewares/auth.js";
+import { authenticate, optionalAuth, requireVerifiedEmail } from "../../shared/middlewares/auth.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
@@ -299,9 +299,11 @@ propertyRouter.post(
  *               $ref: '#/components/schemas/PropertyWithOwner'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: 'Email not verified (code: EMAIL_NOT_VERIFIED)' }
  */
 propertyRouter.post(
   "/",
+  requireVerifiedEmail,
   validate(createPropertySchema),
   asyncHandler(propertyController.createProperty),
 );

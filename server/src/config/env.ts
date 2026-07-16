@@ -33,6 +33,9 @@ export const env = cleanEnv(process.env, {
   // CORS
   CORS_ORIGIN: str({ default: "http://localhost:3000" }),
 
+  // Frontend base URL (email verification links, etc.)
+  CLIENT_URL: str({ default: "http://localhost:3001" }),
+
   // Rate limiting (global read ceiling; auth/write limiters are separate
   // and hardcoded stricter). Map browse fires 2 requests per pan — 100 was
   // exhausted by ~50 pans and locked real users out for a whole window.

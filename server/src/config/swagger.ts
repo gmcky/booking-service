@@ -163,8 +163,9 @@ export const swaggerOptions: Options = {
             lastName: { type: "string" },
             role: { $ref: "#/components/schemas/Role" },
             avatarUrl: { type: "string", nullable: true },
+            emailVerified: { type: "boolean" },
           },
-          required: ["id", "email", "firstName", "lastName", "role", "avatarUrl"],
+          required: ["id", "email", "firstName", "lastName", "role", "avatarUrl", "emailVerified"],
         },
         AuthResponse: {
           type: "object",
@@ -187,6 +188,7 @@ export const swaggerOptions: Options = {
             isSuspended: { type: "boolean" },
             role: { $ref: "#/components/schemas/Role" },
             createdAt: { type: "string", format: "date-time" },
+            emailVerified: { type: "boolean" },
           },
           required: [
             "id",
@@ -197,6 +199,7 @@ export const swaggerOptions: Options = {
             "isSuspended",
             "role",
             "createdAt",
+            "emailVerified",
           ],
         },
         UserProfile: {
