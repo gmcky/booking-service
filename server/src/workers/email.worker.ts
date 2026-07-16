@@ -37,6 +37,7 @@ import type {
   PasswordChangedNotificationJob,
   AccountDeletedNotificationJob,
   VerifyEmailJob,
+  PasswordResetJob,
 } from "../shared/queues/email.queue.js";
 
 const transporter = nodemailer.createTransport({
@@ -56,7 +57,10 @@ const transporter = nodemailer.createTransport({
  *  - outside the verification email itself, a recipient who exists in our
  *    DB but hasn't verified their email is skipped (defense in depth —
  *    routes should already gate on this, this is the belt-and-suspenders
- *    check at the point mail actually leaves the building).
+ *    check at the point mail actually leaves the building). Password reset
+ *    is also exempt: an unverified user must still be able to reset a
+ *    forgotten password (and a successful reset itself verifies the
+ *    mailbox), so blocking it here would lock them out permanently.
  */
 async function sendMail(jobName: EmailJobName, options: SendMailOptions): Promise<void> {
   const to = typeof options.to === "string" ? options.to : undefined;
@@ -66,7 +70,7 @@ async function sendMail(jobName: EmailJobName, options: SendMailOptions): Promis
     return;
   }
 
-  if (jobName !== "verify-email" && to) {
+  if (jobName !== "verify-email" && jobName !== "password-reset" && to) {
     const recipient = await prisma.user.findUnique({
       where: { email: to },
       select: { emailVerifiedAt: true, isDeleted: true },
@@ -793,6 +797,36 @@ async function sendVerifyEmail(data: VerifyEmailJob): Promise<void> {
   });
 }
 
+async function sendPasswordResetEmail(data: PasswordResetJob): Promise<void> {
+  await sendMail("password-reset", {
+    from: env.EMAIL_FROM,
+    to: data.to,
+    subject: "Reset your password",
+    text: [
+      `Hi ${data.firstName},`,
+      "",
+      "We received a request to reset your password.",
+      "",
+      `Reset password: ${data.resetUrl}`,
+      "",
+      "This link expires in 1 hour.",
+      "",
+      "If you did not request this, you can safely ignore this email. Your password will not change.",
+      "",
+      "– The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.firstName},</p>
+      <p>We received a request to reset your password.</p>
+      <p><a href="${data.resetUrl}" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Reset password</a></p>
+      <p style="color:#888;font-size:12px">Or copy this link into your browser: ${data.resetUrl}</p>
+      <p style="color:#888;font-size:12px">This link expires in 1 hour.</p>
+      <p>If you did not request this, you can safely ignore this email. Your password will not change.</p>
+      <p>– The Booking Service team</p>
+    `,
+  });
+}
+
 async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>): Promise<void> {
   logger.info({ jobId: job.id, name: job.name }, "Processing email job");
 
@@ -862,6 +896,9 @@ async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>):
       break;
     case "verify-email":
       await sendVerifyEmail(job.data as VerifyEmailJob);
+      break;
+    case "password-reset":
+      await sendPasswordResetEmail(job.data as PasswordResetJob);
       break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");
