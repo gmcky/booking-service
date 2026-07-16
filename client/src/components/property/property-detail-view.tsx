@@ -202,6 +202,8 @@ export function PropertyDetailView({ id }: { id: string }) {
               maxGuests={property.maxGuests}
               petsAllowed={property.petsAllowed}
               infantsAllowed={property.infantsAllowed}
+              checkInTime={property.checkInTime}
+              checkOutTime={property.checkOutTime}
               rating={rating}
               checkIn={checkIn}
               checkOut={checkOut}
@@ -424,6 +426,8 @@ function BookingCard({
   maxGuests,
   petsAllowed,
   infantsAllowed,
+  checkInTime,
+  checkOutTime,
   rating,
   checkIn,
   checkOut,
@@ -435,6 +439,8 @@ function BookingCard({
   maxGuests: number;
   petsAllowed: boolean;
   infantsAllowed: boolean;
+  checkInTime: string | null;
+  checkOutTime: string | null;
   rating: string | null;
   checkIn?: Date;
   checkOut?: Date;
@@ -599,6 +605,17 @@ function BookingCard({
         ) : blockedError ? (
           <p className="text-xs text-amber-600">
             Couldn't load availability. We'll double-check when you reserve.
+          </p>
+        ) : null}
+        {checkInTime || checkOutTime ? (
+          <p className="text-xs text-muted-foreground">
+            {[
+              checkInTime ? `Check-in after ${checkInTime}` : null,
+              checkOutTime ? `checkout before ${checkOutTime}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+              .replace(/^checkout/, "Checkout")}
           </p>
         ) : null}
         <div>
