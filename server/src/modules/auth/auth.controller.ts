@@ -3,6 +3,7 @@ import { AuthService } from "./auth.service.js";
 import { env } from "../../config/env.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { parseExpiry } from "../../shared/utils/time.js";
+import type { VerifyEmailInput } from "./auth.types.js";
 
 const REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
 const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
@@ -87,6 +88,34 @@ export async function refreshToken(req: Request, res: Response) {
   setRefreshTokenCookie(res, rotatedRefreshToken);
 
   res.json(responsePayload);
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route POST /api/v1/auth/verify-email
+ * @access Public
+ * @body { token: string }
+ */
+export async function verifyEmail(req: Request, res: Response) {
+  const { token } = req.body as VerifyEmailInput;
+
+  await AuthService.verifyEmail(token);
+
+  res.status(204).send();
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route POST /api/v1/auth/resend-verification
+ * @access Private
+ * @security Bearer token required. Rate-limited to 3/hour.
+ */
+export async function resendVerification(req: Request, res: Response) {
+  const userId = req.user!.id;
+
+  await AuthService.resendVerificationEmail(userId);
+
+  res.status(204).send();
 }
 
 function setRefreshTokenCookie(res: Response, token: string) {

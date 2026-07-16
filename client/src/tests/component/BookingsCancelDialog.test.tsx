@@ -31,6 +31,7 @@ const mockUser: AuthUser = {
   email: "jane@example.com",
   role: "USER",
   avatarUrl: null,
+  emailVerified: true,
 };
 
 function hoursFromNow(hours: number): string {

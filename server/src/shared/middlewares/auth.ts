@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { AppError } from "./error.handler.js";
 import { AuthService } from "../../modules/auth/auth.service.js";
 import { logger } from "../lib/logger.js";
+import { prisma } from "../lib/prisma.js";
 
 /** Mandatory auth middleware. */
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
@@ -41,6 +42,28 @@ export function authorize(...roles: string[]) {
 
     next();
   };
+}
+
+/** Soft-verification gate; requires authenticate() upstream. */
+export async function requireVerifiedEmail(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) {
+      throw new AppError(401, "Authentication required");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { emailVerifiedAt: true },
+    });
+
+    if (!user || user.emailVerifiedAt === null) {
+      throw new AppError(403, "Please verify your email to continue.", true, "EMAIL_NOT_VERIFIED");
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
 /** Best-effort auth for public endpoints. */

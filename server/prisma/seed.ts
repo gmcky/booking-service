@@ -211,6 +211,8 @@ async function main() {
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         createdAt: user.createdAt,
+        // Seed accounts count as verified so demo/dev flows aren't gated.
+        emailVerifiedAt: new Date(),
       },
     });
     createdUsers[user.email] = { id: created.id, createdAt: user.createdAt };
@@ -229,7 +231,9 @@ async function main() {
       );
     }
   }
-  console.log(`  ✅ ${users.length} users upserted (${baseUsers.length} base, ${hostUsers.length} hosts, ${guestUsers.length} guests)`);
+  console.log(
+    `  ✅ ${users.length} users upserted (${baseUsers.length} base, ${hostUsers.length} hosts, ${guestUsers.length} guests)`,
+  );
 
   const createdProperties: Array<{
     id: string;
@@ -584,7 +588,12 @@ async function main() {
 
     if (faker.number.float() < 0.4) {
       const nights = faker.number.int({ min: 2, max: 7 });
-      const stay = placeStay(prop.id, now + 5 * DAY_MS, now + 60 * DAY_MS + nights * DAY_MS, nights);
+      const stay = placeStay(
+        prop.id,
+        now + 5 * DAY_MS,
+        now + 60 * DAY_MS + nights * DAY_MS,
+        nights,
+      );
       if (stay) {
         await createBulk(prop, stay, "CONFIRMED", faker.helpers.arrayElement(guestPool));
       }
@@ -594,7 +603,11 @@ async function main() {
     if (propIndex % 10 === 3) {
       const nights = faker.number.int({ min: 2, max: 5 });
       const guest = faker.helpers.arrayElement(guestPool);
-      const earliestMs = Math.max(propEarliestMs, guest.createdAt.getTime() + 2 * DAY_MS, now - 90 * DAY_MS);
+      const earliestMs = Math.max(
+        propEarliestMs,
+        guest.createdAt.getTime() + 2 * DAY_MS,
+        now - 90 * DAY_MS,
+      );
       const stay = placeStay(prop.id, earliestMs, now + 30 * DAY_MS, nights);
       if (stay) {
         await createBulk(prop, stay, "CANCELLED", guest);
@@ -618,8 +631,7 @@ async function main() {
   // Falls back to the nearest non-empty bucket; caller stores the text's own
   // bucket as the rating so text and stars never disagree.
   function takeReview(wanted: 5 | 4 | 3): { text: string; rating: number } | null {
-    const order: Array<5 | 4 | 3> =
-      wanted === 5 ? [5, 4, 3] : wanted === 4 ? [4, 5, 3] : [3, 4, 5];
+    const order: Array<5 | 4 | 3> = wanted === 5 ? [5, 4, 3] : wanted === 4 ? [4, 5, 3] : [3, 4, 5];
     for (const b of order) {
       const text = buckets[b].pop();
       if (text) return { text, rating: b };
@@ -732,9 +744,7 @@ async function main() {
       where: { id: propertyId },
       data: {
         averageRating:
-          reviewStats._avg.rating === null
-            ? null
-            : Number(reviewStats._avg.rating.toFixed(1)),
+          reviewStats._avg.rating === null ? null : Number(reviewStats._avg.rating.toFixed(1)),
         reviewCount: reviewStats._count.id,
       },
     });
@@ -764,7 +774,7 @@ async function main() {
         propertyId: prop.id,
         startDate: new Date(startMs),
         endDate: new Date(endMs),
-        reason: blockReasons[propIndex / 5 % blockReasons.length | 0],
+        reason: blockReasons[((propIndex / 5) % blockReasons.length) | 0],
       },
     });
     blockedRanges++;
@@ -793,7 +803,9 @@ async function main() {
     } else if (cred.origin === "env") {
       console.log(`  ${cred.role.padEnd(5)} ${cred.email}  /  <from env>`);
     } else {
-      console.log(`  ${cred.role.padEnd(5)} ${cred.email}  /  ${cred.password}  (GENERATED — save now)`);
+      console.log(
+        `  ${cred.role.padEnd(5)} ${cred.email}  /  ${cred.password}  (GENERATED — save now)`,
+      );
     }
   }
   for (const [envVar, count] of [
