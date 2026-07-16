@@ -71,7 +71,11 @@ vi.mock("jose", () => {
       return "mock-jwt-token";
     }
   }
-  return { SignJWT: MockSignJWT, jwtVerify: vi.fn() };
+  return {
+    SignJWT: MockSignJWT,
+    jwtVerify: vi.fn(),
+    createRemoteJWKSet: vi.fn(() => "mock-jwks"),
+  };
 });
 
 vi.mock("../../modules/auth/auth.cache.js", () => ({
@@ -95,6 +99,8 @@ function makeUser(overrides = {}) {
     id: "user-1",
     email: "user@test.com",
     passwordHash: "hashed-password",
+    googleId: null,
+    hasPassword: true,
     firstName: "Test",
     lastName: "User",
     role: "USER" as const,

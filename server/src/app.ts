@@ -165,6 +165,7 @@ export function createApp(): Application {
   });
   app.use(`${apiPrefix}/auth/register`, registerLimiter);
   app.use(`${apiPrefix}/auth/login`, loginLimiter);
+  app.use(`${apiPrefix}/auth/google`, loginLimiter);
   app.use(`${apiPrefix}/properties`, writeMethodLimiter);
   app.use(`${apiPrefix}/bookings`, writeMethodLimiter);
   app.use(`${apiPrefix}/reviews`, writeMethodLimiter);
