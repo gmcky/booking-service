@@ -28,7 +28,7 @@ import {
 import { ReviewFormDialog } from "@/components/reviews/review-form-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { reviewApi, type Review } from "@/lib/api/reviews";
-import { canEditReview } from "@/lib/utils/reviews";
+import { reviewEditWindow } from "@/lib/utils/reviews";
 import { useAuthStore } from "@/lib/auth/store";
 
 const REPLY_MAX = 2000;
@@ -65,7 +65,8 @@ export function ReviewItem({
 
   const isOwn = user?.id === review.userId;
   const isPropertyOwner = user?.id === propertyOwnerId;
-  const canEdit = isOwn && canEditReview(review.createdAt);
+  const editWindow = reviewEditWindow(review.createdAt);
+  const canEdit = isOwn && editWindow.eligible;
 
   return (
     <div>
@@ -105,13 +106,20 @@ export function ReviewItem({
         {isOwn ? (
           <>
             {canEdit ? (
-              <ReviewFormDialog
-                mode="edit"
-                review={review}
-                trigger={<Button variant="ghost" size="xs" />}
-              >
-                Edit
-              </ReviewFormDialog>
+              <>
+                <ReviewFormDialog
+                  mode="edit"
+                  review={review}
+                  trigger={<Button variant="ghost" size="xs" />}
+                >
+                  Edit
+                </ReviewFormDialog>
+                <span className="text-xs text-muted-foreground">
+                  {editWindow.daysRemaining === 1
+                    ? "1 day left to edit"
+                    : `${editWindow.daysRemaining} days left to edit`}
+                </span>
+              </>
             ) : null}
             <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
               <AlertDialogTrigger

@@ -21,7 +21,10 @@ export function reviewEligibility(
   return { eligible: elapsedMs <= windowMs, daysRemaining };
 }
 
-export function canEditReview(createdAt: string): boolean {
+/** Edit window counts from createdAt (not updatedAt) so edits can't extend it. */
+export function reviewEditWindow(createdAt: string): ReviewEligibility {
   const elapsedMs = Date.now() - new Date(createdAt).getTime();
-  return elapsedMs <= REVIEW_EDIT_WINDOW_DAYS * DAY_MS;
+  const windowMs = REVIEW_EDIT_WINDOW_DAYS * DAY_MS;
+  const daysRemaining = Math.max(0, Math.ceil((windowMs - elapsedMs) / DAY_MS));
+  return { eligible: elapsedMs <= windowMs, daysRemaining };
 }
