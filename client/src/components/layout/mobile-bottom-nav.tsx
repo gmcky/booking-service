@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Heart, Luggage, House, CircleUser } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/lib/auth/store";
 import { useUiStore } from "@/lib/stores/ui-store";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ function isActive(pathname: string, href: string): boolean {
 export function MobileBottomNav() {
   const pathname = usePathname();
   const authed = useAuthStore((s) => s.status === "authed");
+  const user = useAuthStore((s) => s.user);
   const mapOverlayOpen = useUiStore((s) => s.mapOverlayOpen);
   const items = authed ? AUTHED : ANON;
 
@@ -54,7 +56,23 @@ export function MobileBottomNav() {
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
-                <Icon className={cn("size-5", active && href === "/favorites" && "fill-current")} />
+                {href === "/profile" && user ? (
+                  <Avatar
+                    className={cn(
+                      "size-5 border border-border",
+                      active && "ring-1 ring-primary ring-offset-1 ring-offset-background",
+                    )}
+                  >
+                    <AvatarImage src={user.avatarUrl ?? undefined} alt="" />
+                    <AvatarFallback className="text-[9px]">
+                      {user.firstName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <Icon
+                    className={cn("size-5", active && href === "/favorites" && "fill-current")}
+                  />
+                )}
                 {label}
               </Link>
             </li>
