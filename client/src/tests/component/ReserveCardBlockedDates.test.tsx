@@ -49,6 +49,7 @@ const mockUser: AuthUser = {
   email: "jane@example.com",
   role: "USER",
   avatarUrl: null,
+  emailVerified: true,
 };
 
 const property: PropertyDetail = {

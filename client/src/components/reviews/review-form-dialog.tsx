@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { reviewApi, type Review } from "@/lib/api/reviews";
 import { queryKeys } from "@/lib/query/keys";
 import { cn } from "@/lib/utils";
+import type { ApiError } from "@/lib/api/unwrap";
 
 const COMMENT_MIN = 10;
 const COMMENT_MAX = 1000;
@@ -127,12 +128,16 @@ export function ReviewFormDialog(props: ReviewFormDialogProps) {
       queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(propertyId) });
     },
     onError: (err) => {
-      const message = (err as Error).message;
-      if (props.mode === "create" && message === "This booking already has a review") {
+      const apiErr = err as ApiError;
+      if (apiErr.code === "EMAIL_NOT_VERIFIED") {
+        toast.error("Verify your email to continue. Check your inbox for the link.");
+        return;
+      }
+      if (props.mode === "create" && apiErr.message === "This booking already has a review") {
         toast.error("You've already reviewed this stay");
         return;
       }
-      toast.error(message);
+      toast.error(apiErr.message);
     },
   });
 
