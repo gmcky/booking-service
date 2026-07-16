@@ -23,7 +23,8 @@ export type EmailJobName =
   | "email-changed-notification"
   | "password-changed-notification"
   | "account-deleted-notification"
-  | "verify-email";
+  | "verify-email"
+  | "password-reset";
 
 export interface PropertyCreatedHostJob {
   ownerEmail: string;
@@ -259,6 +260,12 @@ export interface VerifyEmailJob {
   verifyUrl: string;
 }
 
+export interface PasswordResetJob {
+  to: string;
+  firstName: string;
+  resetUrl: string;
+}
+
 export type EmailJobData =
   | { name: "property-created-host"; data: PropertyCreatedHostJob }
   | { name: "booking-created-guest"; data: BookingCreatedGuestJob }
@@ -287,7 +294,8 @@ export type EmailJobData =
       name: "account-deleted-notification";
       data: AccountDeletedNotificationJob;
     }
-  | { name: "verify-email"; data: VerifyEmailJob };
+  | { name: "verify-email"; data: VerifyEmailJob }
+  | { name: "password-reset"; data: PasswordResetJob };
 
 export const emailQueue = new Queue<EmailJobData["data"], void, EmailJobName>("email", {
   connection: redisConnection,

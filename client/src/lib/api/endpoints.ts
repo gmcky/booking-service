@@ -78,4 +78,18 @@ export const endpoints = {
     const { error, response } = await apiClient.POST("/auth/resend-verification");
     unwrapVoid({ error, response });
   },
+
+  forgotPassword: async (email: string): Promise<void> => {
+    const { error, response } = await apiClient.POST("/auth/forgot-password", {
+      body: { email },
+    });
+    unwrapVoid({ error, response });
+  },
+
+  resetPassword: async (token: string, newPassword: string): Promise<void> => {
+    const { error, response } = await apiClient.POST("/auth/reset-password", {
+      body: { token, newPassword },
+    });
+    unwrapVoid({ error, response });
+  },
 };

@@ -3,7 +3,7 @@ import { AuthService } from "./auth.service.js";
 import { env } from "../../config/env.js";
 import { AppError } from "../../shared/middlewares/error.handler.js";
 import { parseExpiry } from "../../shared/utils/time.js";
-import type { VerifyEmailInput } from "./auth.types.js";
+import type { VerifyEmailInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.types.js";
 
 const REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
 const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
@@ -114,6 +114,36 @@ export async function resendVerification(req: Request, res: Response) {
   const userId = req.user!.id;
 
   await AuthService.resendVerificationEmail(userId);
+
+  res.status(204).send();
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route POST /api/v1/auth/forgot-password
+ * @access Public
+ * @body { email: string }
+ * @security Rate-limited to 3/hour per email. Always 204 — never discloses
+ * whether the account exists.
+ */
+export async function forgotPassword(req: Request, res: Response) {
+  const { email } = req.body as ForgotPasswordInput;
+
+  await AuthService.forgotPassword(email);
+
+  res.status(204).send();
+}
+
+/**
+ * @server\src\api.routes.ts
+ * @route POST /api/v1/auth/reset-password
+ * @access Public
+ * @body { token: string, newPassword: string }
+ */
+export async function resetPassword(req: Request, res: Response) {
+  const { token, newPassword } = req.body as ResetPasswordInput;
+
+  await AuthService.resetPassword(token, newPassword);
 
   res.status(204).send();
 }
