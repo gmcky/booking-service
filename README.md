@@ -5,7 +5,7 @@
 <h1 align="center">booking-service</h1>
 
 <p align="center">
-  <strong>Property rental API.</strong>
+  <strong>Property rental platform.</strong>
 </p>
 
 <p align="center">
@@ -28,10 +28,11 @@
 
 ---
 
-Property rental API built as a portfolio project. Covers property listings, bookings with overlap prevention, Stripe payments with webhook idempotency, JWT rotation with reuse detection, and async email/image processing via BullMQ workers. Everything runs in Docker.
+Full-stack property rental platform built as a portfolio project. The backend covers property listings, bookings with overlap prevention, Stripe payments with webhook idempotency, JWT rotation with reuse detection, email verification with real delivery, Google sign-in, and async email/image processing via BullMQ workers. The frontend is a Next.js app with map-driven search, a full booking and checkout flow, host tools, and a mobile layout. Everything runs in Docker.
 
 ## Live demo
 
+- **Web app:** https://booking.gmcky.dev
 - **API base:** https://booking-api.gmcky.dev/api/v1
 - **Interactive docs (Swagger):** https://booking-api.gmcky.dev/api-docs
 - **Health check:** https://booking-api.gmcky.dev/health
@@ -40,29 +41,38 @@ Property rental API built as a portfolio project. Covers property listings, book
 
 | Role | Email | Password | Notes |
 |------|-------|----------|-------|
-| USER | `demo@booking.dev` | `demo1234` | Empty account — create your own properties and bookings here. |
+| USER | `demo@booking.dev` | `demo1234` | Empty account. Create your own properties and bookings here, or sign in with Google to get a fresh one. |
 
-The database is seeded with ~20 properties across several cities, plus ~9 bookings covering every status (pending, confirmed, refund-requested, cancelled, completed). Only the demo user above is public; the seeded host/admin accounts use private passwords.
+The database is seeded with 80+ properties across 38 cities, 40+ hosts, ~200 bookings in every status, and hand-written reviews with category ratings. Only the demo user above is public; seeded host/admin accounts use private passwords.
 
 ### Try it
 
-Everything below happens inside Swagger UI — no terminal required.
+The web app is the quickest tour: browse, open the map, book a stay, pay with Stripe test card `4242 4242 4242 4242` (any future date, any CVC).
+
+For the API directly, everything below happens inside Swagger UI, no terminal required.
 
 1. Open the [interactive docs](https://booking-api.gmcky.dev/api-docs).
-2. Expand `POST /auth/login`. The demo credentials are pre-filled — click **Try it out → Execute** and copy the `accessToken` from the response.
+2. Expand `POST /auth/login`. The demo credentials are pre-filled. Click **Try it out → Execute** and copy the `accessToken` from the response.
 3. Click the **Authorize** button at the top of the page, paste the token, then close the dialog. Every protected endpoint is now unlocked.
 4. From there: browse properties, create a booking, leave a review, etc. Public endpoints like `GET /properties` work without logging in.
 
 ## Design decisions
 
-- **Double-booking prevention** — Serializable transaction isolation on booking creation ensures concurrent requests for the same dates resolve correctly.
-- **JWT rotation with reuse detection** — refresh tokens are hashed and tracked by jti. Reuse of a token (e.g. from a stolen session) triggers full invalidation for that user.
-- **Stripe payment flow** — PaymentIntent lifecycle, webhook signature verification, and idempotent event processing via a processed-events table.
-- **Background workers** — email, image resizing, payouts, and cleanup run as separate BullMQ processes with retry and exponential backoff.
-- **Brute-force protection** — failed login attempts tracked in Redis; account locks after 5 failures for 15 minutes.
-- **Error monitoring** — Sentry captures unhandled exceptions and 5xx responses in production with full stack traces, request context, and trace sampling for performance insights.
+- **Double-booking prevention.** Serializable transaction isolation on booking creation ensures concurrent requests for the same dates resolve correctly, with automatic retry on serialization conflicts.
+- **JWT rotation with reuse detection.** Refresh tokens are hashed and tracked by jti. Reuse of a token (e.g. from a stolen session) triggers full session invalidation for that user.
+- **Stripe payment flow.** PaymentIntent lifecycle with server-side amounts, webhook signature verification, and idempotent event processing via a processed-events table.
+- **Email verification as an abuse gate.** Real delivery via Resend. Unverified accounts can browse and search but cannot book, host, or review: every platform email is potential spam to someone else's address until that address is proven.
+- **Google sign-in without a session library.** The GIS ID token is verified against Google's JWKS (issuer, audience, RS256). Accounts link by verified email; linking to an unverified password account scrubs the password and revokes sessions to close the pre-registration hijack vector. Token custody stays in-house because rotation and reuse detection are the point.
+- **Host cancellations via admin approval.** A host cannot silently drop a confirmed guest. Cancellation requests go through review (configurable auto-approval window) and the guest always gets a full refund.
+- **Cache invalidation without key scans.** Cached queries embed a namespace version; invalidation is a single Redis INCR, safe under any number of instances.
+- **Background workers.** Email, image processing, payouts, and cleanup run as separate BullMQ processes with retry and exponential backoff.
+- **Brute-force protection.** Failed login attempts tracked in Redis, account locks after 5 failures for 15 minutes. Login timing is equalized against a dummy bcrypt hash so unknown emails cannot be enumerated by response time.
+- **Typed API contract.** OpenAPI annotations on every route generate the client's TypeScript types; a contract drift is a compile error on the frontend, not a runtime surprise.
+- **Error monitoring.** Sentry captures unhandled exceptions and 5xx responses in production with full stack traces and request context.
 
 ## Tech stack
+
+### Backend
 
 | Layer | Tech |
 |-------|------|
@@ -70,20 +80,35 @@ Everything below happens inside Swagger UI — no terminal required.
 | Framework | Express 5 |
 | Database | PostgreSQL 16, Prisma 7 |
 | Cache & Queues | Redis 7, BullMQ |
-| Auth | JWT via jose, bcrypt |
+| Auth | JWT via jose, bcrypt, Google OIDC |
 | Payments | Stripe (PaymentIntent + webhooks) |
 | Validation | Zod 4 |
 | Images | Sharp (resize, webp conversion) |
 | Storage | AWS S3 |
-| Email | Nodemailer via BullMQ worker |
+| Email | Nodemailer via BullMQ worker, Resend in production |
 | Logging | Pino (structured JSON) |
 | Monitoring | Sentry (errors + performance) |
 | Testing | Vitest, Testcontainers, Supertest |
 | Infra | Docker, Docker Compose (dev + prod) |
 
+### Frontend
+
+| Layer | Tech |
+|-------|------|
+| Framework | Next.js 16 (App Router), TypeScript strict |
+| UI | Tailwind CSS 4, shadcn/ui on base-ui primitives, motion |
+| Server state | TanStack Query 5 |
+| Client state | Zustand (auth only, in-memory) |
+| Forms | react-hook-form + Zod |
+| API client | openapi-fetch with types generated from the backend OpenAPI spec |
+| Maps | MapLibre GL, OpenFreeMap tiles, Nominatim/Photon geocoding |
+| Testing | Vitest, Testing Library, Playwright |
+
 ## Getting started
 
 Prerequisites: Node.js 22+, pnpm, Docker.
+
+**Backend:**
 
 ```bash
 git clone https://github.com/gmcky/booking-service
@@ -109,69 +134,101 @@ pnpm workers
 pnpm docker:dev
 ```
 
+**Frontend:**
+
+```bash
+cd booking-service/client
+
+pnpm install
+pnpm dev               # http://localhost:3001, expects the API on :3000
+```
+
+API types are committed, so the client builds without a live backend. After changing the API contract, regenerate them with `pnpm gen:api` (needs the backend running).
+
 ## Project structure
 
 ```
-server/
-├── src/
-│   ├── modules/           # feature modules, each with controller/service/routes/validators
-│   │   ├── auth/          # register, login, refresh, logout
-│   │   ├── users/         # profiles, avatars, password change, soft delete
-│   │   ├── properties/    # CRUD, search filters, image pipeline
-│   │   ├── bookings/      # availability, reservations, date management
-│   │   ├── payments/      # Stripe integration, webhooks, refunds
-│   │   └── reviews/       # ratings, host replies, moderation
-│   ├── shared/
-│   │   ├── lib/           # prisma, redis, stripe, logger clients
-│   │   ├── middlewares/   # auth, validation, error handling
-│   │   ├── queues/        # BullMQ queue definitions
-│   │   └── utils/         # date helpers, pagination
-│   └── workers/           # BullMQ workers (email, image, cleanup, payout)
-├── prisma/
-│   ├── schema.prisma      # 7 models + 2 helper tables
-│   └── migrations/
-├── bruno/                 # API test collection
-└── docker-compose*.yml    # infra / dev / prod configs
+booking-service/
+├── server/
+│   ├── src/
+│   │   ├── modules/           # feature modules, each with controller/service/routes/validators
+│   │   │   ├── auth/          # register, login, refresh, Google sign-in, email verification, password reset
+│   │   │   ├── users/         # profiles, avatars, password change, soft delete
+│   │   │   ├── properties/    # CRUD, search filters, map markers, image pipeline
+│   │   │   ├── bookings/      # availability, reservations, date management, host cancellations
+│   │   │   ├── payments/      # Stripe integration, webhooks, refunds, payouts
+│   │   │   ├── reviews/       # ratings with categories, host replies, moderation
+│   │   │   ├── favorites/     # wishlists
+│   │   │   └── admin/         # host cancellation review, platform settings
+│   │   ├── shared/
+│   │   │   ├── lib/           # prisma, redis, stripe, logger clients
+│   │   │   ├── middlewares/   # auth, validation, error handling
+│   │   │   ├── queues/        # BullMQ queue definitions
+│   │   │   └── utils/         # date helpers, pagination
+│   │   └── workers/           # BullMQ workers (email, image, cleanup, payout, geocode)
+│   ├── prisma/
+│   │   ├── schema.prisma      # 12 models
+│   │   └── migrations/
+│   ├── bruno/                 # API test collection
+│   └── docker-compose*.yml    # infra / dev / prod configs
+└── client/
+    └── src/
+        ├── app/               # App Router pages: browse, property, checkout, trips, host area, profile
+        ├── components/        # ui primitives, search pill, map panel, booking card, forms
+        ├── lib/
+        │   ├── api/           # generated types, openapi-fetch client with 401 refresh middleware
+        │   ├── auth/          # Zustand store, session hook
+        │   └── query/         # QueryClient, query key factory
+        └── tests/             # unit, component, e2e
 ```
 
 ## API overview
 
 All endpoints under `/api/v1`. Auth via Bearer token (access) + HttpOnly cookie (refresh).
 
-**Auth** — register, login, logout, refresh (with rotation)
+**Auth**: register, login, logout, refresh (with rotation), Google sign-in, email verification, password reset
 
-**Properties** — list with filters (city, dates, guests, amenities, price range), CRUD, image upload
+**Properties**: list with filters (city, dates, guests, amenities, price range), map markers, CRUD, image upload
 
-**Bookings** — create (with availability check), reschedule, cancel, status transitions, blocked dates
+**Bookings**: create (with availability check), reschedule, cancel with refund policy, early checkout, blocked dates, host cancellation requests
 
-**Payments** — Stripe PaymentIntent, webhook processing, refund flow
+**Payments**: Stripe PaymentIntent, webhook processing, refund flow, host payouts
 
-**Reviews** — create (only after completed booking), host replies, reporting
+**Reviews**: create (only after completed booking), category ratings, host replies, reporting
 
-**Users** — profile, avatar upload, password change, account deletion
+**Favorites**: wishlist add/remove/list
+
+**Users**: profile, avatar upload, password change, account deletion
+
+**Admin**: host cancellation approve/reject, platform settings
 
 ## API documentation & testing
 
-**Swagger UI** — available at `/api/v1/docs` when the server is running. Good for a quick look at schemas and endpoint signatures.
+**Swagger UI**: available at `/api-docs` when the server is running. Good for a quick look at schemas and endpoint signatures.
 
-**Bruno collection** — located in `server/bruno/`. The better option for testing actual flows — auth, booking lifecycle, Stripe webhooks. Install [Bruno](https://www.usebruno.com/), open the folder, use the `Local` environment, and run requests in sequence (e.g. Login → Create Property → Book → Pay).
+**Bruno collection**: located in `server/bruno/`. The better option for testing actual flows: auth, booking lifecycle, Stripe webhooks. Install [Bruno](https://www.usebruno.com/), open the folder, use the `Local` environment, and run requests in sequence (e.g. Login → Create Property → Book → Pay).
 
 ## Testing
 
 ```bash
+# server
 pnpm test              # all tests
-pnpm test:unit         # unit only
+pnpm test:unit         # unit only (~275 tests)
 pnpm test:integration  # uses Testcontainers (needs Docker running)
 pnpm test:coverage     # with coverage report
+
+# client
+pnpm test              # unit + component (~157 tests)
+pnpm test:e2e          # Playwright smoke (needs both servers running)
 ```
 
-Unit tests cover booking logic, payment helpers, date utilities, auth lockout. Integration tests use real Postgres via Testcontainers — no mocked database for integration scenarios.
+Unit tests cover booking logic, payment helpers, refund policy, auth lockout, Google sign-in. Integration tests use real Postgres via Testcontainers, no mocked database for integration scenarios.
 
 ## CI/CD
 
 Every push runs typecheck, lint, and unit tests on GitHub Actions. Branches get the checks, `main` gets the full pipeline.
 
-On merge to `main`: the Docker image is built and pushed to GHCR, then the VPS pulls it and restarts the containers over SSH — no manual deploys. The whole thing takes under 2 minutes from merge to live.
+On merge to `main`: the Docker image is built and pushed to GHCR, then the VPS pulls it, applies migrations, and restarts the containers over SSH. No manual deploys, under 2 minutes from merge to live. The frontend deploys to Vercel on the same push.
 
 ```
 push → Tests & Checks → Build & Push (GHCR) → Deploy (VPS)
@@ -183,12 +240,15 @@ Workers and the API server run as separate containers from the same image. SSH k
 
 Copy `.env.example` to `.env`. Key variables:
 
-- `DATABASE_URL` — Postgres connection string
-- `REDIS_HOST`, `REDIS_PORT` — Redis for cache, queues, rate limiting
-- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` — signing keys
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe API
-- `SMTP_*` — email sending
-- `S3_BUCKET`, `AWS_REGION` — image storage
+- `DATABASE_URL`: Postgres connection string
+- `REDIS_HOST`, `REDIS_PORT`: Redis for cache, queues, rate limiting
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`: signing keys
+- `GOOGLE_CLIENT_ID`: Google sign-in (OIDC audience check)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: Stripe API
+- `SMTP_*`: email sending
+- `S3_BUCKET`, `AWS_REGION`: image storage
+
+Client env lives in `client/.env.local`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
 
 ## License
 
