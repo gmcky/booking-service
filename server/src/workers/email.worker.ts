@@ -92,20 +92,20 @@ async function sendPropertyCreatedHost(data: PropertyCreatedHostJob): Promise<vo
     text: [
       `Hi ${data.ownerFirstName},`,
       "",
-      `Great news — your property "${data.propertyTitle}" has been published and is now visible to guests.`,
+      `Great news: your property "${data.propertyTitle}" has been published and is now visible to guests.`,
       "",
       `Property ID: ${data.propertyId}`,
       "",
       "If you have any questions, reply to this email.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.ownerFirstName},</p>
-      <p>Great news — your property <strong>${data.propertyTitle}</strong> has been published and is now visible to guests.</p>
+      <p>Great news: your property <strong>${data.propertyTitle}</strong> has been published and is now visible to guests.</p>
       <p style="color:#888;font-size:12px">Property ID: ${data.propertyId}</p>
       <p>If you have any questions, reply to this email.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -114,7 +114,7 @@ async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<vo
   await sendMail("booking-created-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Booking confirmed — ${data.propertyTitle} ✅`,
+    subject: `Booking confirmed · ${data.propertyTitle} ✅`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
@@ -128,7 +128,7 @@ async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<vo
       "",
       `Booking ID: ${data.bookingId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
@@ -141,7 +141,7 @@ async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<vo
         <tr><td style="padding:4px 12px 4px 0;color:#666">Total</td><td><strong>$${data.totalPrice.toFixed(2)}</strong></td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -150,7 +150,7 @@ async function sendBookingCreatedHost(data: BookingCreatedHostJob): Promise<void
   await sendMail("booking-created-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
-    subject: `New booking request — ${data.propertyTitle}`,
+    subject: `New booking request · ${data.propertyTitle}`,
     text: [
       `Hi ${data.hostFirstName},`,
       "",
@@ -163,7 +163,7 @@ async function sendBookingCreatedHost(data: BookingCreatedHostJob): Promise<void
       `Guests:    ${data.guests}`,
       `Booking ID:${data.bookingId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.hostFirstName},</p>
@@ -176,7 +176,7 @@ async function sendBookingCreatedHost(data: BookingCreatedHostJob): Promise<void
         <tr><td style="padding:4px 12px 4px 0;color:#666">Guests</td><td>${data.guests}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -185,26 +185,26 @@ async function sendBookingCancelledGuest(data: BookingCancelledGuestJob): Promis
   await sendMail("booking-cancelled-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Booking cancelled — ${data.propertyTitle}`,
+    subject: `Booking cancelled · ${data.propertyTitle}`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
       `Your booking for "${data.propertyTitle}" has been cancelled.`,
       "",
-      `Original dates: ${data.checkIn} — ${data.checkOut}`,
+      `Original dates: ${data.checkIn} to ${data.checkOut}`,
       `Booking ID: ${data.bookingId}`,
       "",
       "If this was unintentional, please create a new booking.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
       <p>Your booking for <strong>${data.propertyTitle}</strong> has been cancelled.</p>
-      <p>Original dates: ${data.checkIn} — ${data.checkOut}</p>
+      <p>Original dates: ${data.checkIn} to ${data.checkOut}</p>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
       <p>If this was unintentional, please create a new booking.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -213,28 +213,28 @@ async function sendBookingCancelledHost(data: BookingCancelledHostJob): Promise<
   await sendMail("booking-cancelled-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
-    subject: `Booking cancelled — ${data.propertyTitle}`,
+    subject: `Booking cancelled · ${data.propertyTitle}`,
     text: [
       `Hi ${data.hostFirstName},`,
       "",
       `A booking for "${data.propertyTitle}" has been cancelled by the guest.`,
       "",
       `Guest: ${data.guestFirstName} ${data.guestLastName}`,
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       `Booking ID: ${data.bookingId}`,
       "",
       "The dates are now available for new bookings.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.hostFirstName},</p>
       <p>A booking for <strong>${data.propertyTitle}</strong> has been cancelled by the guest.</p>
       <p>Guest: ${data.guestFirstName} ${data.guestLastName}</p>
-      <p>Dates: ${data.checkIn} — ${data.checkOut}</p>
+      <p>Dates: ${data.checkIn} to ${data.checkOut}</p>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
       <p>The dates are now available for new bookings.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -301,7 +301,7 @@ async function sendPaymentSuccessGuest(data: PaymentSuccessGuestJob): Promise<vo
   await sendMail("payment-success-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Payment successful — ${data.propertyTitle} ✅`,
+    subject: `Payment successful · ${data.propertyTitle} ✅`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
@@ -313,7 +313,7 @@ async function sendPaymentSuccessGuest(data: PaymentSuccessGuestJob): Promise<vo
       `Booking ID:  ${data.bookingId}`,
       `Payment ID:  ${data.paymentId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
@@ -324,7 +324,7 @@ async function sendPaymentSuccessGuest(data: PaymentSuccessGuestJob): Promise<vo
         <tr><td style="padding:4px 12px 4px 0;color:#666">Check-out</td><td>${data.checkOut}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -333,7 +333,7 @@ async function sendPaymentSuccessHost(data: PaymentSuccessHostJob): Promise<void
   await sendMail("payment-success-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
-    subject: `Payment received — ${data.propertyTitle} ✅`,
+    subject: `Payment received · ${data.propertyTitle} ✅`,
     text: [
       `Hi ${data.hostFirstName},`,
       "",
@@ -346,7 +346,7 @@ async function sendPaymentSuccessHost(data: PaymentSuccessHostJob): Promise<void
       `Booking ID: ${data.bookingId}`,
       `Payment ID: ${data.paymentId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.hostFirstName},</p>
@@ -358,7 +358,7 @@ async function sendPaymentSuccessHost(data: PaymentSuccessHostJob): Promise<void
         <tr><td style="padding:4px 12px 4px 0;color:#666">Check-out</td><td>${data.checkOut}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -367,7 +367,7 @@ async function sendRefundRequestedAdmin(data: RefundRequestedAdminJob): Promise<
   await sendMail("refund-requested-admin", {
     from: env.EMAIL_FROM,
     to: data.adminEmail,
-    subject: `Refund request received — Booking ${data.bookingId}`,
+    subject: `Refund request received · Booking ${data.bookingId}`,
     text: [
       `Hi ${data.adminFirstName},`,
       "",
@@ -375,7 +375,7 @@ async function sendRefundRequestedAdmin(data: RefundRequestedAdminJob): Promise<
       "",
       `Guest: ${data.guestFullName} (${data.guestEmail})`,
       `Property: ${data.propertyTitle}`,
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       `Requested refund: ${data.refundPercent}% (${data.refundAmount.toFixed(2)} USD)`,
       `Reason: ${data.reason ?? "Not provided"}`,
       `Booking ID: ${data.bookingId}`,
@@ -383,7 +383,7 @@ async function sendRefundRequestedAdmin(data: RefundRequestedAdminJob): Promise<
       "",
       "Please review and process this request in the admin panel.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.adminFirstName},</p>
@@ -391,13 +391,13 @@ async function sendRefundRequestedAdmin(data: RefundRequestedAdminJob): Promise<
       <table style="border-collapse:collapse">
         <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFullName} (${data.guestEmail})</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Property</td><td>${data.propertyTitle}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Requested refund</td><td><strong>${data.refundPercent}% (${data.refundAmount.toFixed(2)} USD)</strong></td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Reason</td><td>${data.reason ?? "Not provided"}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
       <p>Please review and process this request in the admin panel.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -409,7 +409,7 @@ async function sendRefundProcessedGuest(data: RefundProcessedGuestJob): Promise<
   await sendMail("refund-processed-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Refund ${decision} — ${data.propertyTitle}`,
+    subject: `Refund ${decision} · ${data.propertyTitle}`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
@@ -419,14 +419,14 @@ async function sendRefundProcessedGuest(data: RefundProcessedGuestJob): Promise<
       `Booking ID: ${data.bookingId}`,
       `Payment ID: ${data.paymentId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
       <p>Your refund request for <strong>${data.propertyTitle}</strong> was <strong>${decision}</strong>.</p>
       ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ""}
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
     headers: {
       "X-Refund-Decision": decisionLabel,
@@ -445,14 +445,14 @@ async function sendRefundProcessedHost(data: RefundProcessedHostJob): Promise<vo
   await sendMail("refund-processed-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
-    subject: `Refund processed — booking cancelled (${data.propertyTitle})`,
+    subject: `Refund processed · booking cancelled (${data.propertyTitle})`,
     text: [
       `Hi ${data.hostFirstName},`,
       "",
       `The booking for \"${data.propertyTitle}\" has been cancelled after a refund was processed.`,
       "",
       `Guest: ${data.guestFirstName} ${data.guestLastName}`,
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       `Refund: ${data.refundedAmount.toFixed(2)} ${data.currency} (${data.refundPercent}%)`,
       payoutMessage,
       "",
@@ -460,20 +460,20 @@ async function sendRefundProcessedHost(data: RefundProcessedHostJob): Promise<vo
       `Booking ID: ${data.bookingId}`,
       `Payment ID: ${data.paymentId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.hostFirstName},</p>
       <p>The booking for <strong>${data.propertyTitle}</strong> has been cancelled after a refund was processed.</p>
       <table style="border-collapse:collapse">
         <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFirstName} ${data.guestLastName}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Refund</td><td><strong>${data.refundedAmount.toFixed(2)} ${data.currency} (${data.refundPercent}%)</strong></td></tr>
       </table>
       <p>${payoutMessage}</p>
       <p>The calendar dates are now available for new bookings.</p>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}<br/>Payment ID: ${data.paymentId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -482,13 +482,13 @@ async function sendHostCancelRequestedGuest(data: HostCancelRequestedGuestJob): 
   await sendMail("host-cancel-requested-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Your host requested to cancel — ${data.propertyTitle}`,
+    subject: `Your host requested to cancel · ${data.propertyTitle}`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
       `The host of "${data.propertyTitle}" has requested to cancel your booking.`,
       "",
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       `Host's reason: ${data.reason}`,
       "",
       "The request is under review by our team. If it is approved, you will be",
@@ -496,18 +496,18 @@ async function sendHostCancelRequestedGuest(data: HostCancelRequestedGuestJob): 
       "",
       `Booking ID: ${data.bookingId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
       <p>The host of <strong>${data.propertyTitle}</strong> has requested to cancel your booking.</p>
       <table style="border-collapse:collapse">
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Host's reason</td><td>${data.reason}</td></tr>
       </table>
       <p>The request is under review by our team. If it is approved, you will be <strong>refunded in full</strong>. No action is needed from you.</p>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -516,7 +516,7 @@ async function sendHostCancelRequestedAdmin(data: HostCancelRequestedAdminJob): 
   await sendMail("host-cancel-requested-admin", {
     from: env.EMAIL_FROM,
     to: data.adminEmail,
-    subject: `Host cancellation request — ${data.propertyTitle}`,
+    subject: `Host cancellation request · ${data.propertyTitle}`,
     text: [
       `Hi ${data.adminFirstName},`,
       "",
@@ -525,14 +525,14 @@ async function sendHostCancelRequestedAdmin(data: HostCancelRequestedAdminJob): 
       `Property: ${data.propertyTitle}`,
       `Host: ${data.hostFullName}`,
       `Guest: ${data.guestFullName}`,
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       `Reason: ${data.reason}`,
       `Request ID: ${data.requestId}`,
       `Booking ID: ${data.bookingId}`,
       "",
       "Review and approve or reject this request in the admin panel.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.adminFirstName},</p>
@@ -541,12 +541,12 @@ async function sendHostCancelRequestedAdmin(data: HostCancelRequestedAdminJob): 
         <tr><td style="padding:4px 12px 4px 0;color:#666">Property</td><td>${data.propertyTitle}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Host</td><td>${data.hostFullName}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Guest</td><td>${data.guestFullName}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#666">Reason</td><td>${data.reason}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Request ID: ${data.requestId}<br/>Booking ID: ${data.bookingId}</p>
       <p>Review and approve or reject this request in the admin panel.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -555,7 +555,7 @@ async function sendHostCancelApprovedGuest(data: HostCancelApprovedGuestJob): Pr
   await sendMail("host-cancel-approved-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Booking cancelled, full refund issued — ${data.propertyTitle}`,
+    subject: `Booking cancelled, full refund issued · ${data.propertyTitle}`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
@@ -564,23 +564,23 @@ async function sendHostCancelApprovedGuest(data: HostCancelApprovedGuestJob): Pr
       `A full refund of ${data.refundedAmount.toFixed(2)} ${data.currency} has been issued to your`,
       "original payment method. It may take a few business days to appear.",
       "",
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       `Booking ID: ${data.bookingId}`,
       "",
       "We're sorry for the disruption. The dates are free again if you'd like to rebook elsewhere.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
       <p>Your booking for <strong>${data.propertyTitle}</strong> has been cancelled at the host's request.</p>
       <p>A <strong>full refund of ${data.refundedAmount.toFixed(2)} ${data.currency}</strong> has been issued to your original payment method. It may take a few business days to appear.</p>
       <table style="border-collapse:collapse">
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
       </table>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
       <p>We're sorry for the disruption.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -589,28 +589,28 @@ async function sendHostCancelRejectedHost(data: HostCancelRejectedHostJob): Prom
   await sendMail("host-cancel-rejected-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
-    subject: `Cancellation request declined — ${data.propertyTitle}`,
+    subject: `Cancellation request declined · ${data.propertyTitle}`,
     text: [
       `Hi ${data.hostFirstName},`,
       "",
       `Your request to cancel the booking for "${data.propertyTitle}" was declined.`,
       ...(data.reason ? ["", `Reason: ${data.reason}`] : []),
       "",
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       "The booking remains active. Contact support if you need help.",
       "",
       `Booking ID: ${data.bookingId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.hostFirstName},</p>
       <p>Your request to cancel the booking for <strong>${data.propertyTitle}</strong> was declined.</p>
       ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ""}
-      <p>Dates: ${data.checkIn} — ${data.checkOut}</p>
+      <p>Dates: ${data.checkIn} to ${data.checkOut}</p>
       <p>The booking remains active. Contact support if you need help.</p>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -624,31 +624,31 @@ async function sendHostDeclinedGuest(data: HostDeclinedGuestJob): Promise<void> 
   await sendMail("host-declined-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
-    subject: `Reservation declined — ${data.propertyTitle}`,
+    subject: `Reservation declined · ${data.propertyTitle}`,
     text: [
       `Hi ${data.guestFirstName},`,
       "",
       `The host was unable to accept your reservation request for "${data.propertyTitle}".`,
       "",
-      `Dates: ${data.checkIn} — ${data.checkOut}`,
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
       refundLine,
       "",
       "The dates are free again if you'd like to book a different stay.",
       "",
       `Booking ID: ${data.bookingId}`,
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.guestFirstName},</p>
       <p>The host was unable to accept your reservation request for <strong>${data.propertyTitle}</strong>.</p>
       <table style="border-collapse:collapse">
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} — ${data.checkOut}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
       </table>
       <p>${refundLine}</p>
       <p>The dates are free again if you'd like to book a different stay.</p>
       <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -657,7 +657,7 @@ async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
   await sendMail("email-change-otp", {
     from: env.EMAIL_FROM,
     to: data.newEmail,
-    subject: `Your email change verification code — ${data.otp}`,
+    subject: `Your email change verification code · ${data.otp}`,
     text: [
       `Hi ${data.firstName},`,
       "",
@@ -669,7 +669,7 @@ async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
       "",
       "If you did not request this change, you can safely ignore this email.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.firstName},</p>
@@ -677,7 +677,7 @@ async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
       <p style="font-size:28px;font-weight:bold;letter-spacing:6px;text-align:center;padding:16px 0">${data.otp}</p>
       <p style="color:#888;font-size:12px;text-align:center">Expires in ${data.expiresInMinutes} minutes</p>
       <p>If you did not request this change, you can safely ignore this email.</p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -697,14 +697,14 @@ async function sendEmailChangedNotification(data: EmailChangedNotificationJob): 
       "If you did NOT request this change, your account may be compromised.",
       "Please contact our support team immediately.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.firstName},</p>
       <p>The email address on your Booking Service account was successfully changed to: <strong>${data.newEmail}</strong></p>
       <p>If you made this change, no further action is needed.</p>
       <p style="color:#c0392b"><strong>If you did NOT request this change, your account may be compromised. Please contact our support team immediately.</strong></p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -725,7 +725,7 @@ async function sendPasswordChangedNotification(
       "If you made this change, no further action is needed.",
       "If you did NOT change your password, secure your account immediately.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.firstName},</p>
@@ -733,7 +733,7 @@ async function sendPasswordChangedNotification(
       <p style="color:#666">Changed at: ${data.changedAtIso}</p>
       <p>If you made this change, no further action is needed.</p>
       <p style="color:#c0392b"><strong>If you did NOT change your password, secure your account immediately.</strong></p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -751,14 +751,14 @@ async function sendAccountDeletedNotification(data: AccountDeletedNotificationJo
       "",
       "If you did not initiate this action, please contact support immediately.",
       "",
-      "— The Booking Service team",
+      "– The Booking Service team",
     ].join("\n"),
     html: `
       <p>Hi ${data.firstName},</p>
       <p>Your Booking Service account has been deleted.</p>
       <p style="color:#666">Deleted at: ${data.deletedAtIso}</p>
       <p style="color:#c0392b"><strong>If you did not initiate this action, please contact support immediately.</strong></p>
-      <p>— The Booking Service team</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
