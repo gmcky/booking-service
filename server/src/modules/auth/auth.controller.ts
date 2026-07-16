@@ -53,6 +53,24 @@ export async function login(req: Request, res: Response) {
 
 /**
  * @server\src\api.routes.ts
+ * @route POST /api/v1/auth/google
+ * @access Public
+ * @security Rate-limited (shares the login limiter).
+ */
+export async function googleAuth(req: Request, res: Response) {
+  const result = await AuthService.googleAuth(req.body, {
+    ip: req.ip,
+    userAgent: req.get("user-agent") || undefined,
+  });
+  const { refreshToken, ...responsePayload } = result;
+
+  setRefreshTokenCookie(res, refreshToken);
+
+  res.json(responsePayload);
+}
+
+/**
+ * @server\src\api.routes.ts
  * @route POST /api/v1/auth/logout
  * @access Private
  * @security Requires refresh token cookie.
