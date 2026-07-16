@@ -1,10 +1,18 @@
 import type { z } from "zod";
-import { registerSchema, loginSchema, verifyEmailSchema } from "./auth.validators.js";
+import {
+  registerSchema,
+  loginSchema,
+  verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./auth.validators.js";
 import type { Role } from "@prisma/client";
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export interface AuthTokens {
   accessToken: string;
