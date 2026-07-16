@@ -19,6 +19,7 @@ import { loginSchema, type LoginInput } from "@/lib/auth/schemas";
 import { useAuthStore } from "@/lib/auth/store";
 import { endpoints } from "@/lib/api/endpoints";
 import { safeReturnTo } from "@/lib/utils/return-to";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 export function LoginForm() {
   const router = useRouter();
@@ -80,6 +81,17 @@ export function LoginForm() {
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or</span>
+          </div>
+        </div>
+
+        <GoogleSignInButton />
       </form>
     </Form>
   );

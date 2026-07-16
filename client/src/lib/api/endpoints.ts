@@ -44,6 +44,15 @@ export const endpoints = {
     return { accessToken: result.accessToken, user: toAuthUser(result.user) };
   },
 
+  googleSignIn: async (credential: string): Promise<AuthResult> => {
+    const { data, error, response } = await apiClient.POST("/auth/google", {
+      body: { credential },
+      credentials: "include",
+    });
+    const result = unwrap({ data, error, response });
+    return { accessToken: result.accessToken, user: toAuthUser(result.user) };
+  },
+
   logout: async (): Promise<void> => {
     // Best-effort: refresh cookie is cleared server-side regardless of outcome.
     await apiClient.POST("/auth/logout", { credentials: "include" });
