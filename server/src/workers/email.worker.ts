@@ -6,10 +6,12 @@
  */
 import "../instrument.js";
 import { Worker, type Job } from "bullmq";
-import nodemailer from "nodemailer";
+import nodemailer, { type SendMailOptions } from "nodemailer";
 import { redisConnection } from "../shared/lib/redis.js";
 import { logger } from "../shared/lib/logger.js";
 import { env } from "../config/env.js";
+import { prisma } from "../shared/lib/prisma.js";
+import { isSeedEmail } from "../shared/utils/seed-email.js";
 import type {
   EmailJobData,
   EmailJobName,
@@ -34,6 +36,7 @@ import type {
   EmailChangedNotificationJob,
   PasswordChangedNotificationJob,
   AccountDeletedNotificationJob,
+  VerifyEmailJob,
 } from "../shared/queues/email.queue.js";
 
 const transporter = nodemailer.createTransport({
@@ -45,8 +48,44 @@ const transporter = nodemailer.createTransport({
   }),
 });
 
+/**
+ * Single choke point for every outbound email. Two guards sit in front of
+ * the real transporter call:
+ *  - seed/demo recipients never get mailed in production (they're fixture
+ *    data, not real inboxes).
+ *  - outside the verification email itself, a recipient who exists in our
+ *    DB but hasn't verified their email is skipped (defense in depth —
+ *    routes should already gate on this, this is the belt-and-suspenders
+ *    check at the point mail actually leaves the building).
+ */
+async function sendMail(jobName: EmailJobName, options: SendMailOptions): Promise<void> {
+  const to = typeof options.to === "string" ? options.to : undefined;
+
+  if (env.NODE_ENV === "production" && to && isSeedEmail(to)) {
+    logger.info({ to, subject: options.subject }, "Skipping email send: seed/demo recipient");
+    return;
+  }
+
+  if (jobName !== "verify-email" && to) {
+    const recipient = await prisma.user.findUnique({
+      where: { email: to },
+      select: { emailVerifiedAt: true, isDeleted: true },
+    });
+
+    if (recipient && recipient.emailVerifiedAt === null) {
+      logger.info(
+        { to, subject: options.subject, jobName },
+        "Skipping email send: recipient has not verified their email",
+      );
+      return;
+    }
+  }
+
+  await transporter.sendMail(options);
+}
+
 async function sendPropertyCreatedHost(data: PropertyCreatedHostJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("property-created-host", {
     from: env.EMAIL_FROM,
     to: data.ownerEmail,
     subject: `Your listing "${data.propertyTitle}" is live! 🎉`,
@@ -72,7 +111,7 @@ async function sendPropertyCreatedHost(data: PropertyCreatedHostJob): Promise<vo
 }
 
 async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("booking-created-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Booking confirmed — ${data.propertyTitle} ✅`,
@@ -108,7 +147,7 @@ async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<vo
 }
 
 async function sendBookingCreatedHost(data: BookingCreatedHostJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("booking-created-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
     subject: `New booking request — ${data.propertyTitle}`,
@@ -143,7 +182,7 @@ async function sendBookingCreatedHost(data: BookingCreatedHostJob): Promise<void
 }
 
 async function sendBookingCancelledGuest(data: BookingCancelledGuestJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("booking-cancelled-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Booking cancelled — ${data.propertyTitle}`,
@@ -171,7 +210,7 @@ async function sendBookingCancelledGuest(data: BookingCancelledGuestJob): Promis
 }
 
 async function sendBookingCancelledHost(data: BookingCancelledHostJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("booking-cancelled-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
     subject: `Booking cancelled — ${data.propertyTitle}`,
@@ -201,7 +240,7 @@ async function sendBookingCancelledHost(data: BookingCancelledHostJob): Promise<
 }
 
 async function sendReviewReceivedHost(data: ReviewReceivedHostJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("review-received-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
     subject: `New review for ${data.propertyTitle}`,
@@ -228,7 +267,7 @@ async function sendReviewReceivedHost(data: ReviewReceivedHostJob): Promise<void
 }
 
 async function sendReviewReportedAdmin(data: ReviewReportedAdminJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("review-reported-admin", {
     from: env.EMAIL_FROM,
     to: data.adminEmail,
     subject: `Review reported - ${data.propertyTitle}`,
@@ -259,7 +298,7 @@ async function sendReviewReportedAdmin(data: ReviewReportedAdminJob): Promise<vo
 }
 
 async function sendPaymentSuccessGuest(data: PaymentSuccessGuestJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("payment-success-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Payment successful — ${data.propertyTitle} ✅`,
@@ -291,7 +330,7 @@ async function sendPaymentSuccessGuest(data: PaymentSuccessGuestJob): Promise<vo
 }
 
 async function sendPaymentSuccessHost(data: PaymentSuccessHostJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("payment-success-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
     subject: `Payment received — ${data.propertyTitle} ✅`,
@@ -325,7 +364,7 @@ async function sendPaymentSuccessHost(data: PaymentSuccessHostJob): Promise<void
 }
 
 async function sendRefundRequestedAdmin(data: RefundRequestedAdminJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("refund-requested-admin", {
     from: env.EMAIL_FROM,
     to: data.adminEmail,
     subject: `Refund request received — Booking ${data.bookingId}`,
@@ -367,7 +406,7 @@ async function sendRefundProcessedGuest(data: RefundProcessedGuestJob): Promise<
   const decision = data.isApproved ? "approved" : "rejected";
   const decisionLabel = data.isApproved ? "Approved" : "Rejected";
 
-  await transporter.sendMail({
+  await sendMail("refund-processed-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Refund ${decision} — ${data.propertyTitle}`,
@@ -403,7 +442,7 @@ async function sendRefundProcessedHost(data: RefundProcessedHostJob): Promise<vo
       ? "You will not receive a payout for this booking."
       : `Expected payout after refund: ${hostPayoutAmount.toFixed(2)} ${data.currency} (${hostPayoutPercent}%).`;
 
-  await transporter.sendMail({
+  await sendMail("refund-processed-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
     subject: `Refund processed — booking cancelled (${data.propertyTitle})`,
@@ -440,7 +479,7 @@ async function sendRefundProcessedHost(data: RefundProcessedHostJob): Promise<vo
 }
 
 async function sendHostCancelRequestedGuest(data: HostCancelRequestedGuestJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("host-cancel-requested-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Your host requested to cancel — ${data.propertyTitle}`,
@@ -474,7 +513,7 @@ async function sendHostCancelRequestedGuest(data: HostCancelRequestedGuestJob): 
 }
 
 async function sendHostCancelRequestedAdmin(data: HostCancelRequestedAdminJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("host-cancel-requested-admin", {
     from: env.EMAIL_FROM,
     to: data.adminEmail,
     subject: `Host cancellation request — ${data.propertyTitle}`,
@@ -513,7 +552,7 @@ async function sendHostCancelRequestedAdmin(data: HostCancelRequestedAdminJob): 
 }
 
 async function sendHostCancelApprovedGuest(data: HostCancelApprovedGuestJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("host-cancel-approved-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Booking cancelled, full refund issued — ${data.propertyTitle}`,
@@ -547,7 +586,7 @@ async function sendHostCancelApprovedGuest(data: HostCancelApprovedGuestJob): Pr
 }
 
 async function sendHostCancelRejectedHost(data: HostCancelRejectedHostJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("host-cancel-rejected-host", {
     from: env.EMAIL_FROM,
     to: data.hostEmail,
     subject: `Cancellation request declined — ${data.propertyTitle}`,
@@ -582,7 +621,7 @@ async function sendHostDeclinedGuest(data: HostDeclinedGuestJob): Promise<void> 
       ? `A full refund of ${data.refundedAmount.toFixed(2)} ${data.currency} has been issued to your original payment method. It may take a few business days to appear.`
       : "No payment had been captured, so there is nothing to refund.";
 
-  await transporter.sendMail({
+  await sendMail("host-declined-guest", {
     from: env.EMAIL_FROM,
     to: data.guestEmail,
     subject: `Reservation declined — ${data.propertyTitle}`,
@@ -615,7 +654,7 @@ async function sendHostDeclinedGuest(data: HostDeclinedGuestJob): Promise<void> 
 }
 
 async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("email-change-otp", {
     from: env.EMAIL_FROM,
     to: data.newEmail,
     subject: `Your email change verification code — ${data.otp}`,
@@ -644,7 +683,7 @@ async function sendEmailChangeOtp(data: EmailChangeOtpJob): Promise<void> {
 }
 
 async function sendEmailChangedNotification(data: EmailChangedNotificationJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("email-changed-notification", {
     from: env.EMAIL_FROM,
     to: data.oldEmail,
     subject: `⚠️ Your account email has been changed`,
@@ -673,7 +712,7 @@ async function sendEmailChangedNotification(data: EmailChangedNotificationJob): 
 async function sendPasswordChangedNotification(
   data: PasswordChangedNotificationJob,
 ): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("password-changed-notification", {
     from: env.EMAIL_FROM,
     to: data.email,
     subject: "Your password was changed",
@@ -700,7 +739,7 @@ async function sendPasswordChangedNotification(
 }
 
 async function sendAccountDeletedNotification(data: AccountDeletedNotificationJob): Promise<void> {
-  await transporter.sendMail({
+  await sendMail("account-deleted-notification", {
     from: env.EMAIL_FROM,
     to: data.email,
     subject: "Your account was deleted",
@@ -720,6 +759,36 @@ async function sendAccountDeletedNotification(data: AccountDeletedNotificationJo
       <p style="color:#666">Deleted at: ${data.deletedAtIso}</p>
       <p style="color:#c0392b"><strong>If you did not initiate this action, please contact support immediately.</strong></p>
       <p>— The Booking Service team</p>
+    `,
+  });
+}
+
+async function sendVerifyEmail(data: VerifyEmailJob): Promise<void> {
+  await sendMail("verify-email", {
+    from: env.EMAIL_FROM,
+    to: data.to,
+    subject: "Verify your email",
+    text: [
+      `Hi ${data.firstName},`,
+      "",
+      "Please verify your email address to finish setting up your account.",
+      "",
+      `Verify your email: ${data.verifyUrl}`,
+      "",
+      "This link expires in 24 hours.",
+      "",
+      "If you did not create this account, you can safely ignore this email.",
+      "",
+      "– The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.firstName},</p>
+      <p>Please verify your email address to finish setting up your account.</p>
+      <p><a href="${data.verifyUrl}" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Verify email</a></p>
+      <p style="color:#888;font-size:12px">Or copy this link into your browser: ${data.verifyUrl}</p>
+      <p style="color:#888;font-size:12px">This link expires in 24 hours.</p>
+      <p>If you did not create this account, you can safely ignore this email.</p>
+      <p>– The Booking Service team</p>
     `,
   });
 }
@@ -790,6 +859,9 @@ async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>):
       break;
     case "account-deleted-notification":
       await sendAccountDeletedNotification(job.data as AccountDeletedNotificationJob);
+      break;
+    case "verify-email":
+      await sendVerifyEmail(job.data as VerifyEmailJob);
       break;
     default:
       logger.warn({ name: job.name }, "Unknown email job name — skipping");

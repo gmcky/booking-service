@@ -107,6 +107,7 @@ function makeUser(overrides = {}) {
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    emailVerifiedAt: new Date(),
     ...overrides,
   };
 }

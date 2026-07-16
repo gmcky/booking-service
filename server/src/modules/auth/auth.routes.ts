@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
+import { authenticate } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as authController from "./auth.controller.js";
-import { loginSchema, registerSchema } from "./auth.validators.js";
+import { loginSchema, registerSchema, verifyEmailSchema } from "./auth.validators.js";
 
 export const authRouter: IRouter = Router();
 
@@ -133,3 +134,59 @@ authRouter.post("/logout", asyncHandler(authController.logout));
  *         description: Refresh token missing or invalid
  */
 authRouter.post("/refresh", asyncHandler(authController.refreshToken));
+
+/**
+ * @openapi
+ * /auth/verify-email:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verify email address via link token
+ *     description: |
+ *       Consumes the link token emailed to the user on registration
+ *       (`{token}` query param appended to `CLIENT_URL/verify-email`).
+ *       The token is single-use and expires 24 hours after issuance.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       204:
+ *         description: Email verified
+ *       400:
+ *         description: Token is invalid, expired, or already used
+ */
+authRouter.post(
+  "/verify-email",
+  validate(verifyEmailSchema),
+  asyncHandler(authController.verifyEmail),
+);
+
+/**
+ * @openapi
+ * /auth/resend-verification:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Resend the email verification link
+ *     description: |
+ *       Rotates and re-sends the verification token. Rate-limited to 3
+ *       requests per hour per user. A no-op (still 204, no email sent) if
+ *       the account is already verified.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       204:
+ *         description: Verification email re-sent (or account already verified)
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       429:
+ *         description: Too many resend requests this hour
+ */
+authRouter.post(
+  "/resend-verification",
+  authenticate,
+  asyncHandler(authController.resendVerification),
+);

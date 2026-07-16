@@ -100,6 +100,7 @@ export class UserService {
         isSuspended: true,
         role: true,
         createdAt: true,
+        emailVerifiedAt: true,
       },
     });
 
@@ -107,7 +108,8 @@ export class UserService {
       throw new AppError(404, "User not found");
     }
 
-    return user;
+    const { emailVerifiedAt, ...rest } = user;
+    return { ...rest, emailVerified: emailVerifiedAt != null };
   }
 
   /**
