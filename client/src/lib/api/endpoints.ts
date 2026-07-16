@@ -2,7 +2,7 @@ import { apiClient } from "./client";
 import { useAuthStore } from "@/lib/auth/store";
 import type { AuthUser } from "@/lib/auth/store";
 import type { LoginInput, RegisterInput } from "@/lib/auth/schemas";
-import { unwrap } from "./unwrap";
+import { unwrap, unwrapVoid } from "./unwrap";
 
 export interface AuthResult {
   accessToken: string;
@@ -20,6 +20,7 @@ function toAuthUser(user: {
   lastName: string;
   role: "USER" | "ADMIN";
   avatarUrl: string | null;
+  emailVerified: boolean;
 }): AuthUser {
   return { ...user };
 }
@@ -64,5 +65,17 @@ export const endpoints = {
       credentials: "include",
     });
     return unwrap({ data, error, response });
+  },
+
+  verifyEmail: async (token: string): Promise<void> => {
+    const { error, response } = await apiClient.POST("/auth/verify-email", {
+      body: { token },
+    });
+    unwrapVoid({ error, response });
+  },
+
+  resendVerification: async (): Promise<void> => {
+    const { error, response } = await apiClient.POST("/auth/resend-verification");
+    unwrapVoid({ error, response });
   },
 };
