@@ -55,3 +55,7 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Token is required"),
   newPassword: passwordSchema,
 });
+
+export const googleAuthSchema = z.object({
+  credential: z.string().min(1, "Credential is required"),
+});

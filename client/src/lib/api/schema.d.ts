@@ -348,6 +348,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in (or sign up) with a Google ID token
+         * @description Verifies the Google Identity Services ID token (`credential`) against
+         *     Google's published JWKS (issuer + audience + signature + expiry).
+         *     Resolution order: match by `googleId`, then fall back to a
+         *     case-insensitive email match (which auto-links the Google account to
+         *     that user), then create a new account. New accounts get
+         *     `hasPassword: false` — the password grant is disabled until the
+         *     account sets one — and `emailVerifiedAt` is set immediately, since
+         *     Google already confirmed the address. Soft-deleted accounts are
+         *     never linked or resurrected by this path.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The ID token returned by Google Identity Services. */
+                        credential: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Signed in (existing or newly created account) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthResponse"];
+                    };
+                };
+                /** @description Invalid, expired, or unverified Google credential */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Account is suspended */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;

@@ -20,6 +20,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { endpoints } from "@/lib/api/endpoints";
 import { safeReturnTo } from "@/lib/utils/return-to";
 import { cn } from "@/lib/utils";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 // Backend rejects passwords scoring below 3 on zxcvbn's 0-4 scale
 // (see server/src/modules/auth/auth.validators.ts). Mirror the gate here so
@@ -188,6 +189,17 @@ export function RegisterForm() {
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? "Creating account…" : "Create account"}
         </Button>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or</span>
+          </div>
+        </div>
+
+        <GoogleSignInButton />
       </form>
     </Form>
   );

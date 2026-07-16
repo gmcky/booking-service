@@ -23,6 +23,9 @@ export const env = cleanEnv(process.env, {
   JWT_ACCESS_EXPIRES_IN: str({ default: "15m" }),
   JWT_REFRESH_EXPIRES_IN: str({ default: "7d" }),
 
+  // Google Sign-In (OIDC ID-token audience, verified against Google's JWKS)
+  GOOGLE_CLIENT_ID: str(),
+
   // Logging
   LOG_LEVEL: str({
     default: "info",
