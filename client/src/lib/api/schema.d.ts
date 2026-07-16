@@ -526,6 +526,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password reset link
+         * @description Always responds 204, whether or not the email belongs to an
+         *     account — this endpoint never discloses account existence.
+         *     Rate-limited to 3 requests per hour per email; requests beyond
+         *     that limit are silently dropped (still 204, no email sent).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Request accepted (email sent if the account exists and is under the rate limit) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation error (malformed email) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset password via link token
+         * @description Consumes the link token emailed by `/auth/forgot-password`
+         *     (`{token}` query param appended to `CLIENT_URL/reset-password`).
+         *     The token is single-use and expires 1 hour after issuance. On
+         *     success, every refresh token for the account is revoked (all
+         *     sessions are logged out) and, if the email had not been verified
+         *     yet, it is marked verified — a successful reset proves mailbox
+         *     ownership.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        /** @description Must pass zxcvbn strength check (score ≥ 3), same rule as registration. */
+                        newPassword: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password reset; all sessions revoked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Token is invalid, expired, already used, or the new password is too weak (deliberately generic for the token failure modes to avoid leaking which one occurred) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bookings/check-availability": {
         parameters: {
             query?: never;

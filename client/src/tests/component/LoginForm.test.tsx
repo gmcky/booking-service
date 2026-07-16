@@ -39,4 +39,12 @@ describe("LoginForm", () => {
       expect(screen.getByText("Invalid email")).toBeInTheDocument();
     });
   });
+
+  it("renders a forgot password link", () => {
+    render(<LoginForm />);
+    expect(screen.getByRole("link", { name: "Forgot password?" })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
+  });
 });
