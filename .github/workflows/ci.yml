@@ -109,7 +109,7 @@ jobs:
           script: |
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            cd /root/booking-api
+            cd /opt/stacks/booking-api
             git pull origin main
             cd server
             docker compose pull app workers
