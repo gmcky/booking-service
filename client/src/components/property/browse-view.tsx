@@ -352,6 +352,10 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
         <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
         <motion.div
           layout
+          // Only animate layout when the map opens/closes. Without the
+          // dependency framer re-animates on ANY size change, so appending a
+          // page of cards ("Show more stays") made the whole column jump.
+          layoutDependency={mapMode}
           transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
           className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}
         >
