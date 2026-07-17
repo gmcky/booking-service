@@ -93,6 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     permissions:
+      contents: read
       packages: read
 
     steps:
@@ -110,7 +111,8 @@ jobs:
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd /opt/stacks/booking-api
-            git pull origin main
+            git -c http.extraheader="AUTHORIZATION: basic $(printf '%s' "x-access-token:${GHCR_TOKEN}" | base64 -w0)" fetch origin main
+            git reset --hard FETCH_HEAD
             cd server
             docker compose pull app workers
             docker compose run --rm --no-deps app node_modules/.bin/prisma migrate deploy
