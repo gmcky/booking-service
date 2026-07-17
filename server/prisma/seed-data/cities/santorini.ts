@@ -26,7 +26,7 @@ export const santoriniProperties: SeedPropertyTemplate[] = [
   {
     title: "Blue-Domed Studio in Imerovigli",
     description:
-      "The classic postcard shot, minus the crowds — a small studio with its own blue-domed terrace in quiet Imerovigli, a short walk from the Skaros Rock viewpoint. Sunset views without the Oia queues.",
+      "The classic postcard shot, minus the crowds: a small studio with its own blue-domed terrace in quiet Imerovigli, a short walk from the Skaros Rock viewpoint. Sunset views without the Oia queues.",
     type: PropertyType.APARTMENT,
     city: "Santorini",
     country: "Greece",

@@ -7,7 +7,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "petra.horvat@seedhost.dev",
     firstName: "Petra",
     lastName: "Horvat",
-    bio: "Grew up sailing this coastline with my dad — now I rent out the house we used as a base every summer.",
+    bio: "Grew up sailing this coastline with my dad. Now I rent out the house we used as a base every summer.",
     createdYearsAgo: 3,
   },
   {
@@ -28,7 +28,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "dimitris.papadopoulos@seedhost.dev",
     firstName: "Dimitris",
     lastName: "Papadopoulos",
-    bio: "My family has owned this building for decades — finally put the top floor to good use.",
+    bio: "My family has owned this building for decades. Finally put the top floor to good use.",
     createdYearsAgo: 5,
   },
   {
@@ -49,7 +49,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "yusuf.demir@seedhost.dev",
     firstName: "Yusuf",
     lastName: "Demir",
-    bio: "Runs a small tea shop downstairs — guests get the first cup on the house.",
+    bio: "I run a small tea shop downstairs. Guests get the first cup on the house.",
     createdYearsAgo: 4,
   },
   {
@@ -77,7 +77,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "lindiwe.dlamini@seedhost.dev",
     firstName: "Lindiwe",
     lastName: "Dlamini",
-    bio: "Runs three properties across the city with my sister — we split the guest messages evenly.",
+    bio: "I run three properties across the city with my sister. We split the guest messages evenly.",
     createdYearsAgo: 5,
   },
   {
@@ -91,14 +91,14 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "zofia.kaminska@seedhost.dev",
     firstName: "Zofia",
     lastName: "Kaminska",
-    bio: "First year hosting, still learning the ropes — bear with me if something's not perfect yet.",
+    bio: "First year hosting, still learning the ropes. Bear with me if something's not perfect yet.",
     createdYearsAgo: 1,
   },
   {
     email: "erik.johansson@seedhost.dev",
     firstName: "Erik",
     lastName: "Johansson",
-    bio: "Carpenter by trade — built most of the furniture in this place myself.",
+    bio: "Carpenter by trade. Built most of the furniture in this place myself.",
     createdYearsAgo: 4,
   },
 ];

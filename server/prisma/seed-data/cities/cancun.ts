@@ -26,7 +26,7 @@ export const cancunProperties: SeedPropertyTemplate[] = [
   {
     title: "Jungle-Edge Villa near Puerto Juarez",
     description:
-      "A quieter alternative to the strip — a villa backing onto mangrove jungle near Puerto Juarez, with its own pool and a hammock-strung palapa. Ferry to Isla Mujeres ten minutes away.",
+      "A quieter alternative to the strip: a villa backing onto mangrove jungle near Puerto Juarez, with its own pool and a hammock-strung palapa. Ferry to Isla Mujeres ten minutes away.",
     type: PropertyType.HOUSE,
     city: "Cancún",
     country: "Mexico",

@@ -26,7 +26,7 @@ export const berlinProperties: SeedPropertyTemplate[] = [
   {
     title: "Kreuzberg Loft with Courtyard",
     description:
-      "A spacious loft in Berlin's most creative district. Industrial-chic aesthetics — steel beams, polished concrete floors, floor-to-ceiling bookshelves. Private access to a shared courtyard garden.",
+      "A spacious loft in Berlin's most creative district. Industrial-chic aesthetics: steel beams, polished concrete floors, floor-to-ceiling bookshelves. Private access to a shared courtyard garden.",
     type: PropertyType.APARTMENT,
     city: "Berlin",
     country: "Germany",

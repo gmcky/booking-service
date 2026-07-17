@@ -23,7 +23,7 @@ export const amsterdamProperties: SeedPropertyTemplate[] = [
   {
     title: "Canal House Apartment, Jordaan",
     description:
-      "Live like a local in a narrow Dutch canal house in the Jordaan — Amsterdam's most picturesque neighbourhood. Original wooden beams, a steep canal-house staircase and a private terrace overlooking the Prinsengracht canal.",
+      "Live like a local in a narrow Dutch canal house in the Jordaan, Amsterdam's most picturesque neighbourhood. Original wooden beams, a steep canal-house staircase and a private terrace overlooking the Prinsengracht canal.",
     type: PropertyType.APARTMENT,
     city: "Amsterdam",
     country: "Netherlands",
@@ -42,7 +42,7 @@ export const amsterdamProperties: SeedPropertyTemplate[] = [
   {
     title: "Modern Houseboat on the IJ",
     description:
-      "An innovative stay — a fully renovated houseboat moored on the IJ river with stunning views of Amsterdam's skyline. Two bedrooms, a sun deck and a kayak available for guests. Unique, unforgettable, quintessentially Amsterdam.",
+      "An innovative stay: a fully renovated houseboat moored on the IJ river with stunning views of Amsterdam's skyline. Two bedrooms, a sun deck and a kayak available for guests. Unique, unforgettable, quintessentially Amsterdam.",
     type: PropertyType.HOUSE,
     city: "Amsterdam",
     country: "Netherlands",

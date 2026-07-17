@@ -32,7 +32,7 @@ export const odesaProperties: SeedPropertyTemplate[] = [
   {
     title: "Heritage Apartment on Derybasivska",
     description:
-      "Step back in time in this stunning apartment inside a 19th-century mansion on Odesa's most famous pedestrian street. Antique furniture, high ceilings and ornate moulding — combined with modern Wi-Fi and air conditioning.",
+      "Step back in time in this stunning apartment inside a 19th-century mansion on Odesa's most famous pedestrian street. Antique furniture, high ceilings and ornate moulding, combined with modern Wi-Fi and air conditioning.",
     type: PropertyType.APARTMENT,
     city: "Odesa",
     country: "Ukraine",
