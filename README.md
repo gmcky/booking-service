@@ -30,6 +30,17 @@
 
 Full-stack property rental platform built as a portfolio project. The backend covers property listings, bookings with overlap prevention, Stripe payments with webhook idempotency, JWT rotation with reuse detection, email verification with real delivery, Google sign-in, and async email/image processing via BullMQ workers. The frontend is a Next.js app with map-driven search, a full booking and checkout flow, host tools, and a mobile layout. Everything runs in Docker.
 
+![Home page](docs/screenshots/home.webp)
+
+| Map-driven browse | Property page |
+|---|---|
+| ![Browse with map](docs/screenshots/browse-map.webp) | ![Property detail](docs/screenshots/property.webp) |
+
+<p align="center">
+  <img src="docs/screenshots/mobile-home.webp" width="24%" alt="Mobile home" />
+  <img src="docs/screenshots/mobile-property.webp" width="24%" alt="Mobile property page" />
+</p>
+
 ## Live demo
 
 - **Web app:** https://booking.gmcky.dev
