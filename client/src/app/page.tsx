@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { Button } from "@/components/ui/button";
 import { SearchPill } from "@/components/search/search-pill";
 import { PropertyGrid } from "@/components/property/property-grid";
 import { HomeCityRows } from "@/components/property/home-city-rows";
@@ -59,6 +60,19 @@ export default function HomePage() {
         </section>
 
         <DetectedCityRows />
+
+        <section className="mt-20 flex flex-col items-center gap-4 rounded-2xl bg-muted/50 px-6 py-14 text-center">
+          <h2 className="text-[22px] font-semibold tracking-tight">
+            Haven't found your place yet?
+          </h2>
+          <p className="max-w-md text-[15px] text-muted-foreground">
+            This is just a taste. Browse every stay with filters, dates and a live map.
+          </p>
+          <Button size="lg" nativeButton={false} className="mt-2" render={<Link href="/browse" />}>
+            Explore all stays
+            <ArrowRight className="size-4" />
+          </Button>
+        </section>
 
         <SiteFooter className="mt-20" />
       </main>
