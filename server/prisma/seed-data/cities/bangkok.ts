@@ -25,7 +25,7 @@ export const bangkokProperties: SeedPropertyTemplate[] = [
   {
     title: "Backpacker Room off Khao San Road",
     description:
-      "A simple private room one street back from the Khao San Road chaos — close enough to walk to everything, far enough to actually sleep. Shared kitchen downstairs, rooftop hangout for guests.",
+      "A simple private room one street back from the Khao San Road chaos. Close enough to walk to everything, far enough to actually sleep. Shared kitchen downstairs, rooftop hangout for guests.",
     type: PropertyType.HOTEL_ROOM,
     city: "Bangkok",
     country: "Thailand",

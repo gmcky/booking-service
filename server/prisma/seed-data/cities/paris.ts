@@ -6,7 +6,7 @@ export const parisProperties: SeedPropertyTemplate[] = [
   {
     title: "Charming Studio near the Eiffel Tower",
     description:
-      "Ooh la la! A romantic studio for two in the 7th arrondissement, a short walk from the Eiffel Tower. French antique furniture, a Nespresso machine and a tiny balcony with iron railings — quintessentially Parisian.",
+      "Ooh la la! A romantic studio for two in the 7th arrondissement, a short walk from the Eiffel Tower. French antique furniture, a Nespresso machine and a tiny balcony with iron railings. Quintessentially Parisian.",
     type: PropertyType.APARTMENT,
     city: "Paris",
     country: "France",
@@ -31,7 +31,7 @@ export const parisProperties: SeedPropertyTemplate[] = [
   {
     title: "Haussmann Apartment in Le Marais",
     description:
-      "A classic Haussmann building apartment in the heart of Le Marais — Paris's most fashionable neighbourhood. Two bedrooms, parquet floors, exposed stone walls and high ceilings. Steps from Place des Vosges.",
+      "A classic Haussmann building apartment in the heart of Le Marais, Paris's most fashionable neighbourhood. Two bedrooms, parquet floors, exposed stone walls and high ceilings. Steps from Place des Vosges.",
     type: PropertyType.APARTMENT,
     city: "Paris",
     country: "France",

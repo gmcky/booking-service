@@ -6,7 +6,7 @@ export const kyivProperties: SeedPropertyTemplate[] = [
   {
     title: "Modern Studio in Podil",
     description:
-      "A stylish studio apartment in the heart of Podil — Kyiv's most vibrant neighbourhood. Floor-to-ceiling windows with views of the Dnipro, a fully equipped kitchen and a fast Wi-Fi connection make it perfect for remote work or a relaxing city break.",
+      "A stylish studio apartment in the heart of Podil, Kyiv's most vibrant neighbourhood. Floor-to-ceiling windows with views of the Dnipro, a fully equipped kitchen and a fast Wi-Fi connection make it perfect for remote work or a relaxing city break.",
     type: PropertyType.APARTMENT,
     city: "Kyiv",
     country: "Ukraine",

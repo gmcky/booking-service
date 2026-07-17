@@ -15,7 +15,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "jonas.becker@seedhost.dev",
     firstName: "Jonas",
     lastName: "Becker",
-    bio: "Architect by trade, host by accident — bought a second unit as an investment and it turned into a small hobby.",
+    bio: "Architect by trade, host by accident. Bought a second unit as an investment and it turned into a small hobby.",
     createdYearsAgo: 3,
   },
   {
@@ -36,7 +36,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "elena.rossi@seedhost.dev",
     firstName: "Elena",
     lastName: "Rossi",
-    bio: "I restore old apartments on the side — this one took almost a year to get right.",
+    bio: "I restore old apartments on the side. This one took almost a year to get right.",
     createdYearsAgo: 3,
   },
   {
@@ -57,7 +57,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "lukas.wagner@seedhost.dev",
     firstName: "Lukas",
     lastName: "Wagner",
-    bio: "Run a small chain of guest apartments across two cities — happy to help with anything during your stay.",
+    bio: "I run a small chain of guest apartments across two cities. Happy to help with anything during your stay.",
     createdYearsAgo: 5,
   },
   {
@@ -78,7 +78,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "clara.dubois@seedhost.dev",
     firstName: "Clara",
     lastName: "Dubois",
-    bio: "I host between freelance illustration gigs — expect quick replies except during deadline week.",
+    bio: "I host between freelance illustration gigs, so expect quick replies except during deadline week.",
     createdYearsAgo: 1,
   },
   {
@@ -92,7 +92,7 @@ const raw: Omit<SeedHost, "avatarUrl">[] = [
     email: "hannah.weiss@seedhost.dev",
     firstName: "Hannah",
     lastName: "Weiss",
-    bio: "Photographer who travels a lot, so this place is empty more often than not — book away.",
+    bio: "Photographer who travels a lot, so this place is empty more often than not. Book away.",
     createdYearsAgo: 3,
   },
   {

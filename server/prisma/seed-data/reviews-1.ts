@@ -21,7 +21,7 @@ export const reviews1: SeedReview[] = [
   { text: "Solid stay. Neighbors were a little loud on Saturday night, otherwise no complaints.", bucket: 4 },
   { text: "Nice and functional, nothing fancy but did exactly what we needed for a weekend trip.", bucket: 4 },
   { text: "Decent place for the price. Furniture is a bit dated but everything worked fine.", bucket: 3 },
-  { text: "It was okay. Photos are flattering — the actual space felt smaller in person.", bucket: 3 },
+  { text: "It was okay. Photos are flattering, the actual space felt smaller in person.", bucket: 3 },
   { text: "Fine for a short stopover, wouldn't pick it again for a longer trip though.", bucket: 3 },
   { text: "Mixed feelings. Location was great but the mattress needs replacing honestly.", bucket: 3 },
 ];
