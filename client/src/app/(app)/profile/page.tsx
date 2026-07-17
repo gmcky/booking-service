@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { User, Lock, BarChart3, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,14 +101,7 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <footer className="mt-18 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
-          <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
-          <nav className="flex gap-5 text-[13px] text-muted-foreground">
-            <a href="#">Support</a>
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
-          </nav>
-        </footer>
+        <SiteFooter className="mt-18" />
       </main>
     </div>
   );

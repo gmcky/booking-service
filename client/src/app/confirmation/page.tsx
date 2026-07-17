@@ -219,7 +219,7 @@ function ConfirmationInner() {
 
         <p className="mt-[22px] text-center text-[13px] text-muted-foreground">
           Need help?{" "}
-          <Link href="#" className="font-medium text-foreground">
+          <Link href="/support" className="font-medium text-foreground">
             Contact support
           </Link>
         </p>

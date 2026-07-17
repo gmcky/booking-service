@@ -7,6 +7,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { addDays } from "date-fns";
 import { ArrowLeft, Award, ChevronDown, MapPin, Star } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -213,14 +214,7 @@ export function PropertyDetailView({ id }: { id: string }) {
           </aside>
         </div>
 
-        <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
-          <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
-          <nav className="flex gap-5 text-[13px] text-muted-foreground">
-            <Link href="#">Support</Link>
-            <Link href="#">Privacy</Link>
-            <Link href="#">Terms</Link>
-          </nav>
-        </footer>
+        <SiteFooter className="mt-20" />
       </main>
     </div>
   );
