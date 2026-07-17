@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { SearchPill } from "@/components/search/search-pill";
 import { PropertyGrid } from "@/components/property/property-grid";
 import { HomeCityRows } from "@/components/property/home-city-rows";
@@ -43,7 +44,7 @@ export default function HomePage() {
         </section>
 
         <section className="flex items-baseline justify-between pt-14">
-          <h2 className="text-[22px] font-semibold tracking-tight">Popular this week</h2>
+          <h2 className="text-[22px] font-semibold tracking-tight">Featured stays</h2>
           <Link
             href="/browse"
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -59,15 +60,7 @@ export default function HomePage() {
 
         <DetectedCityRows />
 
-        <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
-          <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
-          <nav className="flex gap-5 text-[13px] text-muted-foreground">
-            <Link href="#">Support</Link>
-            <Link href="#">Privacy</Link>
-            <Link href="#">Terms</Link>
-            <Link href="#">Hosting</Link>
-          </nav>
-        </footer>
+        <SiteFooter className="mt-20" />
       </main>
     </div>
   );

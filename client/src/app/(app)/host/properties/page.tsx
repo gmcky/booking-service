@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, MapPin, Tag, Home, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { propertyApi, type HostProperty } from "@/lib/api/properties";
@@ -106,14 +107,7 @@ export default function HostPropertiesPage() {
           </section>
         )}
 
-        <footer className="mt-18 flex flex-wrap items-center justify-between gap-4 border-t border-border py-8">
-          <span className="font-mono text-xs text-muted-foreground">© 2026 GMCK Booking</span>
-          <nav className="flex gap-5 text-[13px] text-muted-foreground">
-            <Link href="#">Support</Link>
-            <Link href="#">Privacy</Link>
-            <Link href="#">Terms</Link>
-          </nav>
-        </footer>
+        <SiteFooter className="mt-18" />
       </main>
     </div>
   );
