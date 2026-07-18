@@ -121,7 +121,7 @@ function CheckoutInner() {
         } else if (resumeBookingId) {
           setResumeError(
             b.status === "CANCELLED"
-              ? "This booking was cancelled, so it can no longer be paid. Unpaid bookings are released after 24 hours."
+              ? "This booking was cancelled, so it can no longer be paid. Unpaid bookings are released at check-in, or after 24 hours."
               : "This booking is already confirmed. No payment is due.",
           );
         } else {
@@ -321,7 +321,7 @@ function CheckoutInner() {
                 You&apos;ll enter card details on the next step. Test mode. No real charges.
               </p>
               <p className="mt-1.5 text-center text-xs text-muted-foreground text-pretty">
-                Unpaid bookings are held for 24 hours, then released.
+                Unpaid bookings are held until check-in, up to 24 hours, then released.
               </p>
             </>
           )}

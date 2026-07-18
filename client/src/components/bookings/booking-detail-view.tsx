@@ -332,7 +332,7 @@ function BookingDetailBody({
                 Complete payment · {formatPrice(booking.totalPrice)}
               </Button>
               <p className="text-xs text-muted-foreground">
-                Unpaid bookings are held for 24 hours, then released.
+                Unpaid bookings are held until check-in, up to 24 hours, then released.
               </p>
             </div>
           ) : null}
