@@ -23,9 +23,11 @@ import {
   UNPAID_EXPIRY_HOURS,
   UNPAID_EXPIRY_GRACE_MINUTES,
   UNPAID_CHECKIN_GRACE_HOURS,
+  REFUND_ABUSE_MAX_CANCELLATIONS,
+  REFUND_ABUSE_WINDOW_DAYS,
 } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
-import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
+import { cacheInvalidateNamespace, cacheClient } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import { setTimeout as sleep } from "timers/promises";
 
@@ -290,6 +292,8 @@ export class BookingService {
     const { propertyId, userId, checkIn, checkOut, guests } = data;
 
     // Fail fast on guards before opening Serializable tx.
+    await this.checkRefundAbuse(userId);
+
     if (checkIn.getTime() < new Date().setUTCHours(0, 0, 0, 0)) {
       throw new AppError(400, "Check-in cannot be in the past");
     }
@@ -323,6 +327,24 @@ export class BookingService {
 
           if (!isAvailable) {
             throw new AppError(409, "Property not available for selected dates");
+          }
+
+          // With PENDING no longer blocking availability, stop the same user
+          // stacking duplicate unpaid bookings for the same stay.
+          const ownPending = await tx.booking.count({
+            where: {
+              propertyId,
+              userId,
+              status: "PENDING",
+              checkIn: { lt: checkOut },
+              checkOut: { gt: checkIn },
+            },
+          });
+          if (ownPending > 0) {
+            throw new AppError(
+              409,
+              "You already have an unpaid booking for these dates. Complete its payment from your trips page.",
+            );
           }
 
           const totalPrice = property.pricePerNight.mul(nights);
@@ -545,6 +567,16 @@ export class BookingService {
             include: { property: true },
           });
 
+    // Release any uncaptured authorization (unpaid booking cancelled while a
+    // checkout was open); captured payments went through the refund path above.
+    await this.voidOpenAuthorization(booking.payment, booking.id);
+
+    // Refund-velocity accounting: only guest-initiated cancellations that
+    // actually moved money back count toward the penalty box.
+    if (cancelActor === "GUEST" && refundPercent > 0 && booking.payment?.status === "SUCCESS") {
+      await this.recordRefundedCancellation(userId);
+    }
+
     // A direct cancellation (guest, or admin via this path) supersedes any open
     // host-cancellation request — void it so the admin queue doesn't act on a
     // booking that is already cancelled.
@@ -572,6 +604,80 @@ export class BookingService {
         },
       },
     };
+  }
+
+  // Fixed-window refund-velocity counter; TTL anchored to the first refunded
+  // cancellation, mirroring the login lockout. Fail-open on Redis outage.
+  private static refundAbuseKey(userId: string): string {
+    return `bookings:refund-abuse:${userId}`;
+  }
+
+  private static async checkRefundAbuse(userId: string): Promise<void> {
+    try {
+      const raw = await cacheClient.get(this.refundAbuseKey(userId));
+      if (!raw) return;
+      if (parseInt(raw, 10) >= REFUND_ABUSE_MAX_CANCELLATIONS) {
+        logger.warn({ userId }, "Booking blocked: refund-velocity limit reached");
+        throw new AppError(
+          429,
+          "Too many recently refunded cancellations on this account. Booking is temporarily unavailable.",
+        );
+      }
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.warn(
+        { userId, error: (error as Error).message },
+        "Refund-abuse check skipped — Redis unavailable",
+      );
+    }
+  }
+
+  private static async recordRefundedCancellation(userId: string): Promise<void> {
+    try {
+      const key = this.refundAbuseKey(userId);
+      const count = await cacheClient.incr(key);
+      if (count === 1) {
+        await cacheClient.expire(key, REFUND_ABUSE_WINDOW_DAYS * 24 * 60 * 60);
+      }
+      if (count >= REFUND_ABUSE_MAX_CANCELLATIONS) {
+        logger.warn(
+          { userId, count },
+          "Refund-velocity limit reached — booking blocked for this account",
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        { userId, error: (error as Error).message },
+        "Failed to record refunded cancellation — Redis unavailable",
+      );
+    }
+  }
+
+  /**
+   * Best-effort release of an uncaptured authorization on a booking that is
+   * being cancelled or expired unpaid. Failure is non-fatal: the auth
+   * self-expires within 7 days.
+   */
+  private static async voidOpenAuthorization(
+    payment: {
+      status: string;
+      transactionId: string | null;
+    } | null,
+    bookingId: string,
+  ) {
+    if (!payment || payment.status !== "PENDING" || !payment.transactionId) return;
+    try {
+      await stripe.paymentIntents.cancel(
+        payment.transactionId,
+        {},
+        { idempotencyKey: `void_${payment.transactionId}` },
+      );
+    } catch (error) {
+      logger.warn(
+        { error, bookingId, paymentIntentId: payment.transactionId },
+        "Failed to void authorization on release — it will expire on its own",
+      );
+    }
   }
 
   /**
@@ -626,6 +732,7 @@ export class BookingService {
         checkIn: true,
         checkOut: true,
         property: { select: { title: true, ownerId: true } },
+        payment: { select: { status: true, transactionId: true } },
       },
     });
 
@@ -641,6 +748,8 @@ export class BookingService {
       if (count === 0) continue;
 
       expired += 1;
+
+      await this.voidOpenAuthorization(booking.payment, booking.id);
 
       await prisma.hostCancellationRequest.updateMany({
         where: { bookingId: booking.id, status: "PENDING" },
@@ -949,7 +1058,8 @@ export class BookingService {
       prisma.booking.findMany({
         where: {
           propertyId,
-          status: { in: ["PENDING", "CONFIRMED"] },
+          // Calendars mirror availability: unpaid PENDING holds nothing.
+          status: "CONFIRMED",
           checkOut: { gt: new Date() },
         },
         select: { checkIn: true, checkOut: true },
@@ -978,10 +1088,14 @@ export class BookingService {
     tx: TransactionClient = prisma,
     excludeBookingId?: string,
   ): Promise<boolean> {
+    // Only CONFIRMED bookings hold inventory. PENDING is an unpaid intent:
+    // letting it block dates hands bots a free inventory-DoS (book, never
+    // pay, repeat). Overlapping pendings race to payment; the capture
+    // webhook confirms the first and voids the rest.
     const overlappingBookings = await tx.booking.count({
       where: {
         propertyId,
-        status: { in: ["PENDING", "CONFIRMED"] },
+        status: "CONFIRMED",
         checkIn: { lt: checkOut },
         checkOut: { gt: checkIn },
         ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),

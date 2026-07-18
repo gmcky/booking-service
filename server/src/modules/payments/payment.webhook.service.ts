@@ -7,6 +7,8 @@ import { stripe } from "../../shared/lib/stripe.js";
 import { env } from "../../config/env.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
+import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
+import { setTimeout as sleep } from "timers/promises";
 import type Stripe from "stripe";
 import {
   formatDate,
@@ -44,6 +46,12 @@ export class PaymentWebhookService {
     // Handlers run before dedup record. App crash mid-handler = safe retry.
     // Handlers must be idempotent; email jobs use jobId for deduplication.
     switch (stripeEvent.type) {
+      case "payment_intent.amount_capturable_updated":
+        await this.handlePaymentAuthorized(
+          stripeEvent.data.object as Stripe.PaymentIntent,
+          stripeEvent.id,
+        );
+        break;
       case "payment_intent.succeeded":
         await this.handlePaymentSuccess(
           stripeEvent.data.object as Stripe.PaymentIntent,
@@ -80,6 +88,193 @@ export class PaymentWebhookService {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Card authorized (manual capture): resolve the confirm race. The first
+   * booking to authorize for a date range wins — it is confirmed and its
+   * intent captured. A loser's authorization is voided (no charge, no
+   * processing fee) and the booking released. Serializable tx + retry
+   * mirrors BookingService.create, so two racing authorizations cannot
+   * both confirm: SSI aborts one, and its retry sees the winner.
+   */
+  private static async handlePaymentAuthorized(
+    paymentIntent: Stripe.PaymentIntent,
+    eventId: string,
+  ) {
+    const bookingId = paymentIntent?.metadata?.bookingId as string | undefined;
+    if (!bookingId) {
+      logger.error(
+        { paymentIntentId: paymentIntent?.id },
+        "Missing bookingId in authorized payment intent metadata",
+      );
+      return;
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        propertyId: true,
+        checkIn: true,
+        checkOut: true,
+        user: { select: { email: true, firstName: true } },
+        property: { select: { title: true } },
+      },
+    });
+
+    if (!booking) {
+      logger.warn(
+        { bookingId, paymentIntentId: paymentIntent.id },
+        "Authorized intent for unknown booking — voiding",
+      );
+      await this.voidAuthorization(paymentIntent.id, bookingId);
+      return;
+    }
+
+    const runRaceTx = () =>
+      prisma.$transaction(
+        async (tx) => {
+          const conflict = await tx.booking.count({
+            where: {
+              propertyId: booking.propertyId,
+              status: "CONFIRMED",
+              checkIn: { lt: booking.checkOut },
+              checkOut: { gt: booking.checkIn },
+              id: { not: booking.id },
+            },
+          });
+          if (conflict > 0) return "LOST" as const;
+
+          const confirmed = await tx.booking.updateMany({
+            where: { id: booking.id, status: "PENDING" },
+            data: { status: "CONFIRMED" },
+          });
+          if (confirmed.count === 1) return "WON" as const;
+
+          // Redelivered event for an already-confirmed booking is a win;
+          // a cancelled/expired booking is gone.
+          const current = await tx.booking.findUnique({
+            where: { id: booking.id },
+            select: { status: true },
+          });
+          return current?.status === "CONFIRMED" ? ("WON" as const) : ("GONE" as const);
+        },
+        { isolationLevel: "Serializable" },
+      );
+
+    let outcome!: Awaited<ReturnType<typeof runRaceTx>>;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        outcome = await runRaceTx();
+        break;
+      } catch (err) {
+        if (err instanceof PrismaClientKnownRequestError && err.code === "P2034" && attempt < 3) {
+          await sleep(50 * attempt);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (outcome === "WON") {
+      try {
+        await stripe.paymentIntents.capture(
+          paymentIntent.id,
+          {},
+          { idempotencyKey: `capture_${paymentIntent.id}` },
+        );
+      } catch (error) {
+        // Booking is confirmed but no funds were captured — roll back and
+        // release rather than hold inventory for free.
+        logger.error(
+          { error, bookingId, paymentIntentId: paymentIntent.id },
+          "CRITICAL: capture failed after confirm — releasing booking",
+        );
+        void sendOpsAlert({
+          title: "Capture failed after booking confirm",
+          message:
+            "Authorization could not be captured for a confirmed booking. Booking rolled back and released; verify the intent state in Stripe.",
+          context: { bookingId, paymentIntentId: paymentIntent.id },
+        });
+        await prisma.booking.updateMany({
+          where: { id: booking.id, status: "CONFIRMED" },
+          data: { status: "CANCELLED", cancelledBy: "SYSTEM", payoutStatus: "CANCELLED" },
+        });
+        await prisma.payment.updateMany({
+          where: { bookingId: booking.id, status: "PENDING" },
+          data: { status: "FAILED" },
+        });
+        await this.voidAuthorization(paymentIntent.id, booking.id);
+        return;
+      }
+
+      // Confirmation is the moment inventory locks now — search caches must
+      // drop stale availability.
+      await cacheInvalidateNamespace("properties:search");
+      logger.info(
+        { bookingId, paymentIntentId: paymentIntent.id },
+        "Booking won confirm race — captured",
+      );
+      return;
+    }
+
+    // LOST or GONE: release the authorization, never charge.
+    await this.voidAuthorization(paymentIntent.id, booking.id);
+    await prisma.payment.updateMany({
+      where: { bookingId: booking.id, status: "PENDING" },
+      data: { status: "FAILED" },
+    });
+
+    if (outcome === "LOST") {
+      await prisma.booking.updateMany({
+        where: { id: booking.id, status: "PENDING" },
+        data: { status: "CANCELLED", cancelledBy: "SYSTEM", payoutStatus: "CANCELLED" },
+      });
+      await emailQueue.add(
+        "booking-dates-taken-guest",
+        {
+          bookingId: booking.id,
+          guestEmail: booking.user.email,
+          guestFirstName: booking.user.firstName,
+          propertyTitle: booking.property.title,
+          checkIn: formatDate(booking.checkIn),
+          checkOut: formatDate(booking.checkOut),
+        },
+        { jobId: `dates-taken-${eventId}` },
+      );
+      logger.info(
+        { bookingId, paymentIntentId: paymentIntent.id },
+        "Booking lost confirm race — authorization voided, guest not charged",
+      );
+    } else {
+      // GONE: guest cancelled or the expiry sweep released it while the
+      // authorization was in flight; those paths already notified the guest.
+      logger.info(
+        { bookingId, paymentIntentId: paymentIntent.id },
+        "Authorization arrived for a released booking — voided",
+      );
+    }
+  }
+
+  /**
+   * Best-effort release of an uncaptured authorization. Idempotent via the
+   * intent-scoped key; on failure the auth self-expires within 7 days, so
+   * log loudly but do not fail the handler.
+   */
+  private static async voidAuthorization(paymentIntentId: string, bookingId: string) {
+    try {
+      await stripe.paymentIntents.cancel(
+        paymentIntentId,
+        {},
+        { idempotencyKey: `void_${paymentIntentId}` },
+      );
+    } catch (error) {
+      logger.warn(
+        { error, bookingId, paymentIntentId },
+        "Failed to void authorization — it will expire on its own within 7 days",
+      );
+    }
   }
 
   /**
