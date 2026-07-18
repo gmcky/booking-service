@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { propertyApi } from "@/lib/api/properties";
 import { bookingApi, type BookingWithProperty } from "@/lib/api/bookings";
+import { useAuthStore } from "@/lib/auth/store";
 import { getStripe } from "@/lib/stripe";
 import { formatPrice } from "@/lib/utils/money";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
@@ -48,20 +49,27 @@ function CheckoutInner() {
   const checkIn = params.get("checkIn") ?? "";
   const checkOut = params.get("checkOut") ?? "";
   const initialGuests = Number(params.get("guests") ?? "1") || 1;
+  // Deep link from the trips page: resume payment for an existing PENDING
+  // booking instead of creating a new one.
+  const resumeBookingId = params.get("bookingId") ?? "";
 
   const [guests, setGuests] = React.useState(initialGuests);
   const [booking, setBooking] = React.useState<BookingWithProperty | null>(null);
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
+  const [resumeError, setResumeError] = React.useState<string | null>(null);
 
   // Booking state is component-local, so back-nav or a remount would lose the
   // PENDING booking and a fresh create would 409 against it (own dates
   // overlap). Remember the booking id per trip and resume it instead.
   const resumeKey = `checkout:${propertyId}:${checkIn}:${checkOut}`;
 
+  // In resume mode the property id comes from the loaded booking.
+  const effectivePropertyId = propertyId || booking?.propertyId || "";
+
   const propertyQuery = useQuery({
-    queryKey: queryKeys.properties.detail(propertyId),
-    queryFn: () => propertyApi.byId(propertyId),
-    enabled: Boolean(propertyId),
+    queryKey: queryKeys.properties.detail(effectivePropertyId),
+    queryFn: () => propertyApi.byId(effectivePropertyId),
+    enabled: Boolean(effectivePropertyId),
   });
 
   const property = propertyQuery.data;
@@ -91,11 +99,17 @@ function CheckoutInner() {
     },
   });
 
+  const authStatus = useAuthStore((s) => s.status);
+
   const resumedRef = React.useRef(false);
   React.useEffect(() => {
     if (resumedRef.current) return;
+    // Wait for the session bootstrap before firing an authed call: a 401 here
+    // mid-refresh races token rotation and gets the whole session revoked.
+    if (authStatus !== "authed" && authStatus !== "anon") return;
     resumedRef.current = true;
-    const storedId = sessionStorage.getItem(resumeKey);
+    // Explicit deep link wins over the per-trip sessionStorage fallback.
+    const storedId = resumeBookingId || sessionStorage.getItem(resumeKey);
     if (!storedId) return;
     bookingApi
       .byId(storedId)
@@ -104,13 +118,25 @@ function CheckoutInner() {
           setBooking(b);
           setGuests(b.guests);
           intentMutation.mutate(b.id); // idempotent server-side, same clientSecret
+        } else if (resumeBookingId) {
+          setResumeError(
+            b.status === "CANCELLED"
+              ? "This booking was cancelled, so it can no longer be paid. Unpaid bookings are released at check-in, or after 24 hours."
+              : "This booking is already confirmed. No payment is due.",
+          );
         } else {
           sessionStorage.removeItem(resumeKey);
         }
       })
-      .catch(() => sessionStorage.removeItem(resumeKey));
+      .catch((err) => {
+        if (resumeBookingId) {
+          setResumeError(err instanceof Error ? err.message : "Booking not found.");
+        } else {
+          sessionStorage.removeItem(resumeKey);
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authStatus]);
 
   function onContinue() {
     if (booking) {
@@ -120,7 +146,7 @@ function CheckoutInner() {
     }
   }
 
-  if (!propertyId || !checkIn || !checkOut) {
+  if (!resumeBookingId && (!propertyId || !checkIn || !checkOut)) {
     return (
       <div className="mx-auto flex w-full max-w-[1080px] flex-col items-center gap-4 px-6 py-24 text-center">
         <p className="text-sm text-muted-foreground">Missing trip details.</p>
@@ -131,7 +157,26 @@ function CheckoutInner() {
     );
   }
 
-  const nights = nightsBetween(checkIn, checkOut);
+  if (resumeError) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1080px] flex-col items-center gap-4 px-6 py-24 text-center">
+        <p className="max-w-md text-sm text-muted-foreground text-pretty">{resumeError}</p>
+        <Button nativeButton={false} variant="outline" render={<Link href="/bookings" />}>
+          Back to trips
+        </Button>
+      </div>
+    );
+  }
+
+  // Resume mode renders from the booking; wait for it before drawing the grid.
+  if (resumeBookingId && !booking) {
+    return <CheckoutFallback />;
+  }
+
+  const effectiveCheckIn = checkIn || booking?.checkIn || "";
+  const effectiveCheckOut = checkOut || booking?.checkOut || "";
+
+  const nights = nightsBetween(effectiveCheckIn, effectiveCheckOut);
   const subtotal = property ? nights * Number(property.pricePerNight) : 0;
   const totalDisplay = booking ? formatPrice(booking.totalPrice) : formatPrice(subtotal);
 
@@ -165,7 +210,8 @@ function CheckoutInner() {
             <div>
               <div className="text-sm font-medium">Dates</div>
               <div className="mt-0.5 text-sm text-muted-foreground">
-                {formatRange(checkIn, checkOut)} · {nights} {nights === 1 ? "night" : "nights"}
+                {formatRange(effectiveCheckIn, effectiveCheckOut)} · {nights}{" "}
+                {nights === 1 ? "night" : "nights"}
               </div>
             </div>
           </div>
@@ -274,6 +320,9 @@ function CheckoutInner() {
               <p className="mt-3 text-center text-xs text-muted-foreground text-pretty">
                 You&apos;ll enter card details on the next step. Test mode. No real charges.
               </p>
+              <p className="mt-1.5 text-center text-xs text-muted-foreground text-pretty">
+                Unpaid bookings are held until check-in, up to 24 hours, then released.
+              </p>
             </>
           )}
         </Card>
@@ -298,7 +347,7 @@ function CheckoutInner() {
 
       <main className="mx-auto w-full max-w-[1080px] px-6 pt-7">
         <Link
-          href={`/properties/${propertyId}`}
+          href={effectivePropertyId ? `/properties/${effectivePropertyId}` : "/bookings"}
           className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-[15px]" />

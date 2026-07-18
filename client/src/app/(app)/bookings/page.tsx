@@ -130,12 +130,20 @@ export default function BookingsPage() {
   );
 }
 
+function needsPayment(b: BookingListItem) {
+  return b.status === "PENDING" && b.payment?.status !== "SUCCESS";
+}
+
 function statusBadge(b: BookingListItem) {
   switch (b.status) {
     case "CONFIRMED":
       return { variant: "default" as const, label: "Confirmed" };
     case "PENDING":
-      return { variant: "outline" as const, label: "Awaiting host" };
+      // Payment is what confirms a booking; a paid PENDING one is only
+      // waiting out webhook lag.
+      return needsPayment(b)
+        ? { variant: "outline" as const, label: "Payment required" }
+        : { variant: "outline" as const, label: "Confirming…" };
     case "COMPLETED":
       return { variant: "secondary" as const, label: "Completed" };
     case "CANCELLED":
@@ -213,6 +221,16 @@ function BookingRow({
         </div>
 
         <div className="flex flex-none flex-col items-end justify-center gap-2 max-sm:flex-row max-sm:justify-start">
+          {tab === "upcoming" && needsPayment(booking) ? (
+            <Button
+              nativeButton={false}
+              size="sm"
+              className="w-[150px] max-sm:order-first"
+              render={<Link href={`/checkout?bookingId=${booking.id}`} />}
+            >
+              Complete payment
+            </Button>
+          ) : null}
           <Button
             nativeButton={false}
             variant="outline"

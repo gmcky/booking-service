@@ -40,7 +40,7 @@ function statusBadge(status: BookingStatus) {
     case "CONFIRMED":
       return { variant: "default" as const, label: "Confirmed" };
     case "PENDING":
-      return { variant: "outline" as const, label: "Awaiting host" };
+      return { variant: "outline" as const, label: "Awaiting payment" };
     case "COMPLETED":
       return { variant: "secondary" as const, label: "Completed" };
     case "CANCELLED":
