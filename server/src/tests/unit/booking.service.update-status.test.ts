@@ -147,4 +147,76 @@ describe("BookingService.updateStatus", () => {
       BookingService.updateStatus("missing", "host-x", "USER", "COMPLETED"),
     ).rejects.toMatchObject({ statusCode: 404, message: "Booking not found" });
   });
+
+  it("rejects manual confirm of an unpaid booking", async () => {
+    const booking = {
+      id: "booking-7",
+      userId: "guest-7",
+      propertyId: "property-7",
+      status: "PENDING",
+      checkIn: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      checkOut: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      property: { ownerId: "host-7" },
+      payment: { status: "PENDING" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+    await expect(
+      BookingService.updateStatus("booking-7", "host-7", "USER", "CONFIRMED"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining("unpaid"),
+    });
+
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects manual confirm when the dates were confirmed elsewhere", async () => {
+    const booking = {
+      id: "booking-8",
+      userId: "guest-8",
+      propertyId: "property-8",
+      status: "PENDING",
+      checkIn: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      checkOut: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      property: { ownerId: "host-8" },
+      payment: { status: "SUCCESS" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+    // Overlapping CONFIRMED booking exists.
+    (mockPrisma.booking.count as any).mockResolvedValue(1);
+
+    await expect(
+      BookingService.updateStatus("booking-8", "host-8", "USER", "CONFIRMED"),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  it("allows manual confirm of a paid booking with free dates", async () => {
+    const booking = {
+      id: "booking-9",
+      userId: "guest-9",
+      propertyId: "property-9",
+      status: "PENDING",
+      checkIn: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      checkOut: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      property: { ownerId: "host-9" },
+      payment: { status: "SUCCESS" },
+    } as any;
+
+    mockPrisma.booking.findUnique.mockResolvedValue(booking);
+    (mockPrisma.booking.count as any).mockResolvedValue(0);
+    (mockPrisma.blockedDate.count as any).mockResolvedValue(0);
+    mockPrisma.booking.update.mockResolvedValue({ ...booking, status: "CONFIRMED" });
+
+    await BookingService.updateStatus("booking-9", "host-9", "USER", "CONFIRMED");
+
+    expect(mockPrisma.booking.update).toHaveBeenCalledWith({
+      where: { id: "booking-9" },
+      data: { status: "CONFIRMED" },
+    });
+  });
 });
