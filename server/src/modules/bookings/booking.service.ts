@@ -18,7 +18,12 @@ import {
   getStripePayloadObject,
   toInputJsonObject,
 } from "../payments/payment.helpers.js";
-import { MAX_STAY_NIGHTS } from "./booking.constants.js";
+import {
+  MAX_STAY_NIGHTS,
+  UNPAID_EXPIRY_HOURS,
+  UNPAID_EXPIRY_GRACE_MINUTES,
+  UNPAID_CHECKIN_GRACE_HOURS,
+} from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
@@ -85,6 +90,9 @@ export class BookingService {
               images: true,
             },
           },
+          // Payment state distinguishes "pay now" from "processing" on the
+          // trips list for PENDING bookings.
+          payment: { select: { status: true } },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -564,6 +572,96 @@ export class BookingService {
         },
       },
     };
+  }
+
+  /**
+   * Sweep unpaid PENDING bookings past their payment deadline and release
+   * their dates. Payment is due by check-in (same-day bookings get a short
+   * grace, since checkIn is stored as midnight and is already "past" at
+   * creation), with the TTL capping far-future holds and checkOut as the
+   * absolute stop. Availability queries only count PENDING/CONFIRMED, so
+   * the status flip alone frees the range. The payment race is closed
+   * twice: the sweep skips payment stubs touched within the grace window
+   * (guest may be mid-checkout), and the success webhook refuses to
+   * confirm a cancelled booking, refunding the late charge instead.
+   */
+  static async expireUnpaidBookings() {
+    const now = new Date();
+    const ttlCutoff = new Date(now.getTime() - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
+    const checkInGraceCutoff = new Date(
+      now.getTime() - UNPAID_CHECKIN_GRACE_HOURS * 60 * 60 * 1000,
+    );
+    const paymentGrace = new Date(now.getTime() - UNPAID_EXPIRY_GRACE_MINUTES * 60 * 1000);
+
+    const candidates = await prisma.booking.findMany({
+      where: {
+        status: "PENDING",
+        AND: [
+          {
+            OR: [
+              { payment: { is: null } },
+              {
+                payment: {
+                  status: { in: ["PENDING", "FAILED"] },
+                  updatedAt: { lte: paymentGrace },
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              // Hold TTL exhausted.
+              { createdAt: { lte: ttlCutoff } },
+              // Stay window already over.
+              { checkOut: { lte: now } },
+              // Check-in has passed and the same-day grace is spent.
+              { checkIn: { lte: now }, createdAt: { lte: checkInGraceCutoff } },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        userId: true,
+        checkIn: true,
+        checkOut: true,
+        property: { select: { title: true, ownerId: true } },
+      },
+    });
+
+    let expired = 0;
+
+    for (const booking of candidates) {
+      // Re-check status in the write: the guest may have paid or cancelled
+      // between the sweep query and this update.
+      const { count } = await prisma.booking.updateMany({
+        where: { id: booking.id, status: "PENDING" },
+        data: { status: "CANCELLED", cancelledBy: "SYSTEM", payoutStatus: "CANCELLED" },
+      });
+      if (count === 0) continue;
+
+      expired += 1;
+
+      await prisma.hostCancellationRequest.updateMany({
+        where: { bookingId: booking.id, status: "PENDING" },
+        data: { status: "VOIDED", resolvedAt: new Date() },
+      });
+
+      logger.info(
+        { bookingId: booking.id, userId: booking.userId },
+        "Unpaid booking expired and released",
+      );
+
+      this.enqueueCancellationEmails(booking, booking.userId).catch((err) =>
+        logger.error({ err, bookingId: booking.id }, "Failed to enqueue expiry emails"),
+      );
+    }
+
+    if (expired > 0) {
+      await cacheInvalidateNamespace("properties:search");
+    }
+
+    return { scanned: candidates.length, expired };
   }
 
   /**

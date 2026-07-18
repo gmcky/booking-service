@@ -146,7 +146,7 @@ export const swaggerOptions: Options = {
         },
         CancelActor: {
           type: "string",
-          enum: ["GUEST", "HOST", "ADMIN"],
+          enum: ["GUEST", "HOST", "ADMIN", "SYSTEM"],
         },
         HostCancellationStatus: {
           type: "string",
@@ -706,8 +706,16 @@ export const swaggerOptions: Options = {
                   },
                   required: ["id", "title", "city", "images"],
                 },
+                payment: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    status: { $ref: "#/components/schemas/PaymentStatus" },
+                  },
+                  required: ["status"],
+                },
               },
-              required: ["property"],
+              required: ["property", "payment"],
             },
           ],
         },

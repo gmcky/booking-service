@@ -21,11 +21,17 @@ import {
 } from "../shared/queues/cleanup.queue.js";
 import { DEMO_CLEANUP_REPEATABLE_JOB_ID } from "../shared/constants/demo-cleanup.js";
 import { HostCancellationService } from "../modules/bookings/host-cancel.service.js";
+import { BookingService } from "../modules/bookings/booking.service.js";
 
 // Hourly sweep for host cancellation requests left pending past the configured
 // window. The service reads the (admin-tunable) policy and no-ops when disabled.
 const AUTO_APPROVE_HOST_CANCEL_CRON = "0 * * * *";
 const AUTO_APPROVE_HOST_CANCEL_JOB_ID = "auto-approve-host-cancellations-repeatable";
+
+// Sweep for unpaid PENDING bookings past the 24h payment window; the service
+// re-checks status per row, so overlapping runs are harmless.
+const EXPIRE_UNPAID_BOOKINGS_CRON = "*/15 * * * *";
+const EXPIRE_UNPAID_BOOKINGS_JOB_ID = "expire-unpaid-bookings-repeatable";
 
 // ---------------------------------------------------------------------------
 // Path traversal guard
@@ -107,6 +113,11 @@ async function processCleanup(job: Job<CleanupJobData, void, CleanupJobName>): P
       logger.info(result, "Host cancellation auto-approval sweep complete");
       break;
     }
+    case "expire-unpaid-bookings": {
+      const result = await BookingService.expireUnpaidBookings();
+      logger.info(result, "Unpaid booking expiry sweep complete");
+      break;
+    }
     default: {
       const _exhaustive: never = job.name;
       logger.warn({ name: _exhaustive }, "Unknown cleanup job name — skipping");
@@ -154,6 +165,26 @@ async function syncDemoCleanupSchedule(): Promise<void> {
   );
 }
 
+// Idempotent on startup: ensures exactly one repeatable expiry job.
+async function syncExpireUnpaidBookingsSchedule(): Promise<void> {
+  const existing = await cleanupQueue.getRepeatableJobs();
+  const stale = existing.filter((j) => j.name === "expire-unpaid-bookings");
+  for (const job of stale) {
+    await cleanupQueue.removeRepeatableByKey(job.key);
+  }
+
+  await cleanupQueue.add(
+    "expire-unpaid-bookings",
+    {},
+    {
+      repeat: { pattern: EXPIRE_UNPAID_BOOKINGS_CRON },
+      jobId: EXPIRE_UNPAID_BOOKINGS_JOB_ID,
+    },
+  );
+
+  logger.info({ cron: EXPIRE_UNPAID_BOOKINGS_CRON }, "Unpaid booking expiry schedule registered");
+}
+
 // Idempotent on startup: ensures exactly one repeatable auto-approve job.
 async function syncHostCancelAutoApproveSchedule(): Promise<void> {
   const existing = await cleanupQueue.getRepeatableJobs();
@@ -195,5 +226,6 @@ worker.on("failed", (job, error) => {
 
 await syncDemoCleanupSchedule();
 await syncHostCancelAutoApproveSchedule();
+await syncExpireUnpaidBookingsSchedule();
 
 logger.info("Cleanup worker started");

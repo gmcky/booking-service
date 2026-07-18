@@ -3296,7 +3296,7 @@ export interface components {
         /** @enum {string} */
         ReviewReportStatus: "PENDING" | "RESOLVED" | "REJECTED";
         /** @enum {string} */
-        CancelActor: "GUEST" | "HOST" | "ADMIN";
+        CancelActor: "GUEST" | "HOST" | "ADMIN" | "SYSTEM";
         /** @enum {string} */
         HostCancellationStatus: "PENDING" | "APPROVED" | "REJECTED" | "VOIDED";
         AuthUser: {
@@ -3548,6 +3548,9 @@ export interface components {
                 city: string;
                 images: string[];
             };
+            payment: {
+                status: components["schemas"]["PaymentStatus"];
+            } | null;
         };
         /** @description Host booking list item. Diverges from a plain BookingWithProperty: property is the narrow {id,title,city,images} projection (same as BookingListItem), and the guest is exposed as `user`, not `guestInfo`. */
         HostBooking: components["schemas"]["Booking"] & {

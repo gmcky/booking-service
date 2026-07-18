@@ -54,6 +54,7 @@ function makeBooking(overrides: Partial<BookingListItem> = {}): BookingListItem 
     updatedAt: new Date().toISOString(),
     actualCheckOutAt: null,
     property: { id: "prop-1", title: "Pine Ridge Cabin", city: "Austin", images: [] },
+    payment: { status: "SUCCESS" },
     ...overrides,
   };
 }

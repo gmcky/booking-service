@@ -164,4 +164,44 @@ describe("BookingDetailView", () => {
     expect(screen.getByText("Pine Ridge Rd 123")).toBeInTheDocument();
     expect(screen.queryByText("+380501234567")).not.toBeInTheDocument();
   });
+
+  it("shows a complete-payment CTA linking to checkout for an unpaid PENDING booking", async () => {
+    const { bookingApi } = await import("@/lib/api/bookings");
+    (bookingApi.byId as ReturnType<typeof vi.fn>).mockResolvedValue(
+      makeBooking({ status: "PENDING", payment: null, hostContact: null }),
+    );
+
+    renderView();
+    await screen.findByText("Pine Ridge Cabin");
+
+    expect(screen.getByText("Payment required")).toBeInTheDocument();
+    const cta = screen.getByRole("button", { name: /Complete payment/ });
+    expect(cta).toHaveAttribute("href", "/checkout?bookingId=booking-1");
+  });
+
+  it("hides the complete-payment CTA once the booking is paid", async () => {
+    const { bookingApi } = await import("@/lib/api/bookings");
+    (bookingApi.byId as ReturnType<typeof vi.fn>).mockResolvedValue(
+      makeBooking({
+        status: "CONFIRMED",
+        payment: {
+          id: "payment-1",
+          amount: "500",
+          refundedAmount: "0",
+          currency: "USD",
+          status: "SUCCESS",
+          provider: "STRIPE",
+          transactionId: "pi_1",
+          bookingId: "booking-1",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      }),
+    );
+
+    renderView();
+    await screen.findByText("Pine Ridge Cabin");
+
+    expect(screen.queryByRole("button", { name: /Complete payment/ })).not.toBeInTheDocument();
+  });
 });

@@ -28,12 +28,20 @@ function initials(firstName: string, lastName: string): string {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 }
 
-function statusBadge(status: BookingStatus) {
-  switch (status) {
+function bookingNeedsPayment(b: Pick<BookingDetail, "status" | "payment">) {
+  return b.status === "PENDING" && b.payment?.status !== "SUCCESS";
+}
+
+function statusBadge(b: Pick<BookingDetail, "status" | "payment">) {
+  switch (b.status) {
     case "CONFIRMED":
       return { variant: "default" as const, label: "Confirmed" };
     case "PENDING":
-      return { variant: "outline" as const, label: "Awaiting host" };
+      // Payment is what confirms a booking; a paid PENDING one is only
+      // waiting out webhook lag.
+      return bookingNeedsPayment(b)
+        ? { variant: "outline" as const, label: "Payment required" }
+        : { variant: "outline" as const, label: "Confirming…" };
     case "COMPLETED":
       return { variant: "secondary" as const, label: "Completed" };
     case "CANCELLED":
@@ -141,7 +149,7 @@ function BookingDetailBody({
   onCancel: () => void;
   cancelling: boolean;
 }) {
-  const badge = statusBadge(booking.status);
+  const badge = statusBadge(booking);
   const isUpcoming = booking.status === "PENDING" || booking.status === "CONFIRMED";
   const preview =
     booking.status === "CONFIRMED"
@@ -314,6 +322,20 @@ function BookingDetailBody({
               />
             ) : null}
           </dl>
+          {bookingNeedsPayment(booking) ? (
+            <div className="mt-4 flex flex-col gap-2">
+              <Button
+                nativeButton={false}
+                className="w-full sm:w-auto"
+                render={<Link href={`/checkout?bookingId=${booking.id}`} />}
+              >
+                Complete payment · {formatPrice(booking.totalPrice)}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Unpaid bookings are held until check-in, up to 24 hours, then released.
+              </p>
+            </div>
+          ) : null}
         </section>
 
         <section className="mb-6 rounded-xl border border-border p-5">
