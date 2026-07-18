@@ -33,6 +33,7 @@ import { BookingService } from "../../modules/bookings/booking.service.js";
 import {
   UNPAID_EXPIRY_HOURS,
   UNPAID_EXPIRY_GRACE_MINUTES,
+  UNPAID_CHECKIN_GRACE_HOURS,
 } from "../../modules/bookings/booking.constants.js";
 
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
@@ -66,15 +67,32 @@ describe("BookingService.expireUnpaidBookings", () => {
     const where = (mockPrisma.booking.findMany as any).mock.calls[0][0].where;
     expect(where.status).toBe("PENDING");
 
-    const cutoff = (where.createdAt.lte as Date).getTime();
-    expect(cutoff).toBeGreaterThanOrEqual(before - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
-    expect(cutoff).toBeLessThanOrEqual(after - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
+    const [unpaid, deadline] = where.AND;
 
-    expect(where.OR[0]).toEqual({ payment: { is: null } });
-    expect(where.OR[1].payment.status).toEqual({ in: ["PENDING", "FAILED"] });
-    const grace = (where.OR[1].payment.updatedAt.lte as Date).getTime();
+    expect(unpaid.OR[0]).toEqual({ payment: { is: null } });
+    expect(unpaid.OR[1].payment.status).toEqual({ in: ["PENDING", "FAILED"] });
+    const grace = (unpaid.OR[1].payment.updatedAt.lte as Date).getTime();
     expect(grace).toBeGreaterThanOrEqual(before - UNPAID_EXPIRY_GRACE_MINUTES * 60 * 1000);
     expect(grace).toBeLessThanOrEqual(after - UNPAID_EXPIRY_GRACE_MINUTES * 60 * 1000);
+
+    // Deadline: TTL exhausted, OR stay window over, OR check-in passed with
+    // the same-day grace spent.
+    const ttl = (deadline.OR[0].createdAt.lte as Date).getTime();
+    expect(ttl).toBeGreaterThanOrEqual(before - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
+    expect(ttl).toBeLessThanOrEqual(after - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
+
+    const checkOutStop = (deadline.OR[1].checkOut.lte as Date).getTime();
+    expect(checkOutStop).toBeGreaterThanOrEqual(before);
+    expect(checkOutStop).toBeLessThanOrEqual(after);
+
+    const checkInPassed = (deadline.OR[2].checkIn.lte as Date).getTime();
+    expect(checkInPassed).toBeGreaterThanOrEqual(before);
+    expect(checkInPassed).toBeLessThanOrEqual(after);
+    const checkInGrace = (deadline.OR[2].createdAt.lte as Date).getTime();
+    expect(checkInGrace).toBeGreaterThanOrEqual(
+      before - UNPAID_CHECKIN_GRACE_HOURS * 60 * 60 * 1000,
+    );
+    expect(checkInGrace).toBeLessThanOrEqual(after - UNPAID_CHECKIN_GRACE_HOURS * 60 * 60 * 1000);
   });
 
   it("expires candidates, voids open host-cancel requests, and invalidates search cache", async () => {

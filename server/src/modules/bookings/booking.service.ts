@@ -22,6 +22,7 @@ import {
   MAX_STAY_NIGHTS,
   UNPAID_EXPIRY_HOURS,
   UNPAID_EXPIRY_GRACE_MINUTES,
+  UNPAID_CHECKIN_GRACE_HOURS,
 } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
@@ -574,28 +575,48 @@ export class BookingService {
   }
 
   /**
-   * Sweep unpaid PENDING bookings older than the expiry window and release
-   * their dates. Availability queries only count PENDING/CONFIRMED, so the
-   * status flip alone frees the range. The payment race is closed twice:
-   * the sweep skips payment stubs touched within the grace window (guest
-   * may be mid-checkout), and the success webhook refuses to confirm a
-   * cancelled booking, refunding the late charge instead.
+   * Sweep unpaid PENDING bookings past their payment deadline and release
+   * their dates. Payment is due by check-in (same-day bookings get a short
+   * grace, since checkIn is stored as midnight and is already "past" at
+   * creation), with the TTL capping far-future holds and checkOut as the
+   * absolute stop. Availability queries only count PENDING/CONFIRMED, so
+   * the status flip alone frees the range. The payment race is closed
+   * twice: the sweep skips payment stubs touched within the grace window
+   * (guest may be mid-checkout), and the success webhook refuses to
+   * confirm a cancelled booking, refunding the late charge instead.
    */
   static async expireUnpaidBookings() {
-    const cutoff = new Date(Date.now() - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
-    const grace = new Date(Date.now() - UNPAID_EXPIRY_GRACE_MINUTES * 60 * 1000);
+    const now = new Date();
+    const ttlCutoff = new Date(now.getTime() - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
+    const checkInGraceCutoff = new Date(
+      now.getTime() - UNPAID_CHECKIN_GRACE_HOURS * 60 * 60 * 1000,
+    );
+    const paymentGrace = new Date(now.getTime() - UNPAID_EXPIRY_GRACE_MINUTES * 60 * 1000);
 
     const candidates = await prisma.booking.findMany({
       where: {
         status: "PENDING",
-        createdAt: { lte: cutoff },
-        OR: [
-          { payment: { is: null } },
+        AND: [
           {
-            payment: {
-              status: { in: ["PENDING", "FAILED"] },
-              updatedAt: { lte: grace },
-            },
+            OR: [
+              { payment: { is: null } },
+              {
+                payment: {
+                  status: { in: ["PENDING", "FAILED"] },
+                  updatedAt: { lte: paymentGrace },
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              // Hold TTL exhausted.
+              { createdAt: { lte: ttlCutoff } },
+              // Stay window already over.
+              { checkOut: { lte: now } },
+              // Check-in has passed and the same-day grace is spent.
+              { checkIn: { lte: now }, createdAt: { lte: checkInGraceCutoff } },
+            ],
           },
         ],
       },
