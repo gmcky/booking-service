@@ -4,7 +4,8 @@ import { redisConnection } from "../lib/redis.js";
 export type CleanupJobName =
   | "unlink-property-images"
   | "purge-demo-data"
-  | "auto-approve-host-cancellations";
+  | "auto-approve-host-cancellations"
+  | "expire-unpaid-bookings";
 
 export interface UnlinkPropertyImagesJobData {
   paths: string[];
@@ -16,10 +17,14 @@ export type PurgeDemoDataJobData = Record<string, never>;
 // Empty payload — handler reads platform settings and live DB state.
 export type AutoApproveHostCancellationsJobData = Record<string, never>;
 
+// Empty payload — handler reads the expiry constants and live DB state.
+export type ExpireUnpaidBookingsJobData = Record<string, never>;
+
 export type CleanupJobData =
   | UnlinkPropertyImagesJobData
   | PurgeDemoDataJobData
-  | AutoApproveHostCancellationsJobData;
+  | AutoApproveHostCancellationsJobData
+  | ExpireUnpaidBookingsJobData;
 
 export const cleanupQueue = new Queue<CleanupJobData, void, CleanupJobName>("cleanup", {
   connection: redisConnection,

@@ -18,7 +18,11 @@ import {
   getStripePayloadObject,
   toInputJsonObject,
 } from "../payments/payment.helpers.js";
-import { MAX_STAY_NIGHTS } from "./booking.constants.js";
+import {
+  MAX_STAY_NIGHTS,
+  UNPAID_EXPIRY_HOURS,
+  UNPAID_EXPIRY_GRACE_MINUTES,
+} from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
 import { cacheInvalidateNamespace } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
@@ -85,6 +89,9 @@ export class BookingService {
               images: true,
             },
           },
+          // Payment state distinguishes "pay now" from "processing" on the
+          // trips list for PENDING bookings.
+          payment: { select: { status: true } },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -564,6 +571,76 @@ export class BookingService {
         },
       },
     };
+  }
+
+  /**
+   * Sweep unpaid PENDING bookings older than the expiry window and release
+   * their dates. Availability queries only count PENDING/CONFIRMED, so the
+   * status flip alone frees the range. The payment race is closed twice:
+   * the sweep skips payment stubs touched within the grace window (guest
+   * may be mid-checkout), and the success webhook refuses to confirm a
+   * cancelled booking, refunding the late charge instead.
+   */
+  static async expireUnpaidBookings() {
+    const cutoff = new Date(Date.now() - UNPAID_EXPIRY_HOURS * 60 * 60 * 1000);
+    const grace = new Date(Date.now() - UNPAID_EXPIRY_GRACE_MINUTES * 60 * 1000);
+
+    const candidates = await prisma.booking.findMany({
+      where: {
+        status: "PENDING",
+        createdAt: { lte: cutoff },
+        OR: [
+          { payment: { is: null } },
+          {
+            payment: {
+              status: { in: ["PENDING", "FAILED"] },
+              updatedAt: { lte: grace },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        userId: true,
+        checkIn: true,
+        checkOut: true,
+        property: { select: { title: true, ownerId: true } },
+      },
+    });
+
+    let expired = 0;
+
+    for (const booking of candidates) {
+      // Re-check status in the write: the guest may have paid or cancelled
+      // between the sweep query and this update.
+      const { count } = await prisma.booking.updateMany({
+        where: { id: booking.id, status: "PENDING" },
+        data: { status: "CANCELLED", cancelledBy: "SYSTEM", payoutStatus: "CANCELLED" },
+      });
+      if (count === 0) continue;
+
+      expired += 1;
+
+      await prisma.hostCancellationRequest.updateMany({
+        where: { bookingId: booking.id, status: "PENDING" },
+        data: { status: "VOIDED", resolvedAt: new Date() },
+      });
+
+      logger.info(
+        { bookingId: booking.id, userId: booking.userId },
+        "Unpaid booking expired and released",
+      );
+
+      this.enqueueCancellationEmails(booking, booking.userId).catch((err) =>
+        logger.error({ err, bookingId: booking.id }, "Failed to enqueue expiry emails"),
+      );
+    }
+
+    if (expired > 0) {
+      await cacheInvalidateNamespace("properties:search");
+    }
+
+    return { scanned: candidates.length, expired };
   }
 
   /**
