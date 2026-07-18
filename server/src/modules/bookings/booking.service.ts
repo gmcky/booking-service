@@ -27,6 +27,7 @@ import {
   REFUND_ABUSE_WINDOW_DAYS,
 } from "./booking.constants.js";
 import { invalidateUserStatsCache } from "../users/user.stats.cache.js";
+import { DEMO_USER_EMAIL } from "../../shared/constants/demo-cleanup.js";
 import { cacheInvalidateNamespace, cacheClient } from "../../shared/lib/cache.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import { setTimeout as sleep } from "timers/promises";
@@ -513,7 +514,7 @@ export class BookingService {
   static async cancel(id: string, userId: string, userRole: string) {
     const booking = await prisma.booking.findUnique({
       where: { id },
-      include: { property: true, payment: true },
+      include: { property: true, payment: true, user: { select: { email: true } } },
     });
 
     if (!booking) {
@@ -595,8 +596,15 @@ export class BookingService {
     await this.voidOpenAuthorization(booking.payment, booking.id);
 
     // Refund-velocity accounting: only guest-initiated cancellations that
-    // actually moved money back count toward the penalty box.
-    if (cancelActor === "GUEST" && refundPercent > 0 && booking.payment?.status === "SUCCESS") {
+    // actually moved money back count toward the penalty box. The shared
+    // public demo account is exempt — visitors playing with cancel would
+    // trip the limit and brick booking on the demo for everyone.
+    if (
+      cancelActor === "GUEST" &&
+      refundPercent > 0 &&
+      booking.payment?.status === "SUCCESS" &&
+      booking.user.email !== DEMO_USER_EMAIL
+    ) {
       await this.recordRefundedCancellation(userId);
     }
 

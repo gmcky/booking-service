@@ -73,6 +73,7 @@ describe("BookingService.cancel", () => {
         ownerId: "host-1",
         title: "Test Property",
       },
+      user: { email: "guest@test.com" },
       payment: {
         id: "payment-1",
         bookingId: "booking-1",
@@ -164,6 +165,7 @@ describe("BookingService.cancel", () => {
       status: "CONFIRMED",
       payoutStatus: "PENDING",
       property: { id: "property-1", ownerId: "host-1", title: "Test Property" },
+      user: { email: "guest@test.com" },
       payment: {
         id: "payment-retry",
         bookingId: "booking-retry",
@@ -210,6 +212,7 @@ describe("BookingService.cancel", () => {
       status: "CONFIRMED",
       payoutStatus: "PENDING",
       property: { id: "property-1", ownerId: "host-1", title: "Test Property" },
+      user: { email: "guest@test.com" },
       payment: {
         id: "payment-exhausted",
         bookingId: "booking-exhausted",
@@ -261,6 +264,7 @@ describe("BookingService.cancel", () => {
         ownerId: "host-2",
         title: "Another Property",
       },
+      user: { email: "guest@test.com" },
       payment: {
         id: "payment-2",
         bookingId: "booking-2",
@@ -332,6 +336,7 @@ describe("BookingService.cancel", () => {
       status: "CONFIRMED",
       payoutStatus: "PENDING",
       property: { id: "property-3", ownerId: "host-3", title: "Partial Property" },
+      user: { email: "guest@test.com" },
       payment: {
         id: "payment-3",
         bookingId: "booking-partial",
