@@ -11,7 +11,14 @@ vi.mock("../../shared/lib/stripe.js", () => ({
     webhooks: {
       constructEvent: vi.fn(),
     },
+    refunds: {
+      create: vi.fn(),
+    },
   },
+}));
+
+vi.mock("../../shared/lib/ops-alert.js", () => ({
+  sendOpsAlert: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../shared/queues/email.queue.js", () => ({
@@ -34,6 +41,7 @@ import { PaymentWebhookService } from "../../modules/payments/payment.webhook.se
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
 const mockStripe = stripe as unknown as {
   webhooks: { constructEvent: ReturnType<typeof vi.fn> };
+  refunds: { create: ReturnType<typeof vi.fn> };
 };
 const mockEmailQueue = emailQueue as unknown as {
   add: ReturnType<typeof vi.fn>;
@@ -83,7 +91,7 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
       metadata: null,
     });
     (mockPrisma.payment.update as any).mockResolvedValue({ id: "payment-race" });
-    (mockPrisma.booking.update as any).mockResolvedValue({ id: "booking-race" });
+    (mockPrisma.booking.updateMany as any).mockResolvedValue({ count: 1 });
     (mockPrisma.booking.findUnique as any).mockResolvedValue(null);
     (mockPrisma.processedStripeEvent.create as any).mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
@@ -95,7 +103,7 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     const result = await PaymentWebhookService.handleStripeWebhook("raw", "sig");
 
     expect(result).toEqual({ success: true });
-    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
+    expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: "CONFIRMED" } }),
     );
   });
@@ -116,7 +124,7 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
       metadata: null,
     });
     (mockPrisma.payment.update as any).mockResolvedValue({ id: "payment-1" });
-    (mockPrisma.booking.update as any).mockResolvedValue({ id: "booking-1" });
+    (mockPrisma.booking.updateMany as any).mockResolvedValue({ count: 1 });
     (mockPrisma.booking.findUnique as any).mockResolvedValue({
       id: "booking-1",
       checkIn: new Date(),
@@ -136,8 +144,11 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
         data: expect.objectContaining({ status: "SUCCESS" }),
       }),
     );
-    expect(mockPrisma.booking.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "CONFIRMED" } }),
+    expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "booking-1", status: { in: ["PENDING", "CONFIRMED"] } },
+        data: { status: "CONFIRMED" },
+      }),
     );
     expect(mockEmailQueue.add).toHaveBeenCalledWith("payment-success-guest", expect.any(Object), {
       jobId: `payment-success-guest-${eventId}`,
@@ -145,6 +156,44 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
     expect(mockEmailQueue.add).toHaveBeenCalledWith("payment-success-host", expect.any(Object), {
       jobId: `payment-success-host-${eventId}`,
     });
+  });
+
+  it("refunds a late payment instead of confirming a cancelled booking", async () => {
+    const event = makeStripeEvent("evt_late_pay", "payment_intent.succeeded", {
+      id: "pi_late",
+      metadata: { bookingId: "booking-expired" },
+      amount_received: 4800,
+      currency: "usd",
+    });
+    mockStripe.webhooks.constructEvent.mockReturnValue(event);
+    (mockPrisma.processedStripeEvent.findUnique as any).mockResolvedValue(null);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+    (mockPrisma.payment.findUnique as any).mockResolvedValue({
+      id: "payment-expired",
+      metadata: null,
+    });
+    (mockPrisma.payment.update as any).mockResolvedValue({ id: "payment-expired" });
+    // Booking was cancelled (e.g. unpaid-expiry sweep) before the event landed.
+    (mockPrisma.booking.updateMany as any).mockResolvedValue({ count: 0 });
+    (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_late_1" });
+    (mockPrisma.processedStripeEvent.create as any).mockResolvedValue({});
+
+    const result = await PaymentWebhookService.handleStripeWebhook("raw", "sig");
+
+    expect(result).toEqual({ success: true });
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      { payment_intent: "pi_late" },
+      { idempotencyKey: "late_payment_refund_pi_late" },
+    );
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: "payment-expired", status: "SUCCESS" },
+      data: { status: "REFUND_PROCESSING" },
+    });
+    // No confirmation emails for a booking that was never confirmed.
+    expect(mockEmailQueue.add).not.toHaveBeenCalled();
+    // Event is still recorded as processed.
+    expect(mockPrisma.processedStripeEvent.create).toHaveBeenCalled();
   });
 
   it("enqueues host email with correct jobId for charge.refunded", async () => {

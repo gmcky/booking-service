@@ -6,6 +6,7 @@ import { logger } from "../../shared/lib/logger.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { env } from "../../config/env.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
+import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
 import type Stripe from "stripe";
 import {
   formatDate,
@@ -99,6 +100,7 @@ export class PaymentWebhookService {
     const paymentIntentPayload = toInputJsonObject(paymentIntent);
 
     let updatedPaymentId: string | null = null;
+    let confirmedCount = 0;
 
     await prisma.$transaction(async (tx) => {
       const existingPayment = await tx.payment.findUnique({
@@ -149,11 +151,20 @@ export class PaymentWebhookService {
         updatedPaymentId = updatedPayment.id;
       }
 
-      await tx.booking.update({
-        where: { id: bookingId },
+      // Only a live booking may be confirmed. One cancelled while the guest
+      // was mid-payment (guest cancel, unpaid-expiry sweep) must not be
+      // resurrected; the late charge is refunded below instead.
+      const confirmed = await tx.booking.updateMany({
+        where: { id: bookingId, status: { in: ["PENDING", "CONFIRMED"] } },
         data: { status: "CONFIRMED" },
       });
+      confirmedCount = confirmed.count;
     });
+
+    if (confirmedCount === 0) {
+      await this.refundLatePayment(bookingId, paymentIntent, updatedPaymentId);
+      return;
+    }
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -216,6 +227,49 @@ export class PaymentWebhookService {
     }
 
     logger.info({ bookingId, paymentIntentId: paymentIntent.id }, "Payment succeeded");
+  }
+
+  /**
+   * A success event arrived for a booking that is no longer live (cancelled
+   * while the guest was mid-payment). Refund the charge in full and park the
+   * payment in REFUND_PROCESSING; the charge.refunded webhook finalizes it
+   * to REFUNDED. Idempotent via the intent-scoped refund key.
+   */
+  private static async refundLatePayment(
+    bookingId: string,
+    paymentIntent: Stripe.PaymentIntent,
+    paymentId: string | null,
+  ) {
+    logger.warn(
+      { bookingId, paymentIntentId: paymentIntent.id },
+      "Payment succeeded for a non-live booking — issuing full refund",
+    );
+
+    try {
+      await stripe.refunds.create(
+        { payment_intent: paymentIntent.id },
+        { idempotencyKey: `late_payment_refund_${paymentIntent.id}` },
+      );
+    } catch (error) {
+      logger.error(
+        { error, bookingId, paymentIntentId: paymentIntent.id },
+        "CRITICAL: refund for non-live booking failed — manual recovery required",
+      );
+      void sendOpsAlert({
+        title: "Late payment refund failed",
+        message:
+          "A payment succeeded for a cancelled booking and the automatic refund failed. Manual recovery required.",
+        context: { bookingId, paymentIntentId: paymentIntent.id },
+      });
+      return;
+    }
+
+    if (paymentId) {
+      await prisma.payment.updateMany({
+        where: { id: paymentId, status: "SUCCESS" },
+        data: { status: "REFUND_PROCESSING" },
+      });
+    }
   }
 
   /**
