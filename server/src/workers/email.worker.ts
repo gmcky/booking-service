@@ -32,6 +32,7 @@ import type {
   HostCancelApprovedGuestJob,
   HostCancelRejectedHostJob,
   HostDeclinedGuestJob,
+  BookingDatesTakenGuestJob,
   EmailChangeOtpJob,
   EmailChangedNotificationJob,
   PasswordChangedNotificationJob,
@@ -619,6 +620,39 @@ async function sendHostCancelRejectedHost(data: HostCancelRejectedHostJob): Prom
   });
 }
 
+async function sendBookingDatesTakenGuest(data: BookingDatesTakenGuestJob): Promise<void> {
+  await sendMail("booking-dates-taken-guest", {
+    from: env.EMAIL_FROM,
+    to: data.guestEmail,
+    subject: `Dates no longer available · ${data.propertyTitle}`,
+    text: [
+      `Hi ${data.guestFirstName},`,
+      "",
+      `Another guest completed payment for "${data.propertyTitle}" just before you, so your booking could not be confirmed.`,
+      "",
+      `Dates: ${data.checkIn} to ${data.checkOut}`,
+      "You have not been charged. The hold on your payment method will be released by your bank shortly.",
+      "",
+      "We're sorry about the timing. Your dates may still be available at other stays.",
+      "",
+      `Booking ID: ${data.bookingId}`,
+      "",
+      "– The Booking Service team",
+    ].join("\n"),
+    html: `
+      <p>Hi ${data.guestFirstName},</p>
+      <p>Another guest completed payment for <strong>${data.propertyTitle}</strong> just before you, so your booking could not be confirmed.</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#666">Dates</td><td>${data.checkIn} to ${data.checkOut}</td></tr>
+      </table>
+      <p>You have not been charged. The hold on your payment method will be released by your bank shortly.</p>
+      <p>We're sorry about the timing. Your dates may still be available at other stays.</p>
+      <p style="color:#888;font-size:12px">Booking ID: ${data.bookingId}</p>
+      <p>– The Booking Service team</p>
+    `,
+  });
+}
+
 async function sendHostDeclinedGuest(data: HostDeclinedGuestJob): Promise<void> {
   const refundLine =
     data.refundedAmount > 0
@@ -881,6 +915,9 @@ async function processEmail(job: Job<EmailJobData["data"], void, EmailJobName>):
       break;
     case "host-declined-guest":
       await sendHostDeclinedGuest(job.data as HostDeclinedGuestJob);
+      break;
+    case "booking-dates-taken-guest":
+      await sendBookingDatesTakenGuest(job.data as BookingDatesTakenGuestJob);
       break;
     case "email-change-otp":
       await sendEmailChangeOtp(job.data as EmailChangeOtpJob);
