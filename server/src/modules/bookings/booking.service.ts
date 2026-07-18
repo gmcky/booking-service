@@ -411,6 +411,7 @@ export class BookingService {
       where: { id },
       include: {
         property: { select: { ownerId: true } },
+        payment: { select: { status: true } },
       },
     });
 
@@ -428,6 +429,28 @@ export class BookingService {
     const allowed = ALLOWED_TRANSITIONS[booking.status];
     if (!allowed.includes(status)) {
       throw new AppError(400, `Cannot transition from ${booking.status} to ${status}`);
+    }
+
+    // Manual confirm cannot bypass money or inventory: an unpaid booking
+    // confirms only through the capture webhook, and with PENDING no longer
+    // blocking availability the dates must be re-checked here.
+    if (status === "CONFIRMED") {
+      if (booking.payment?.status !== "SUCCESS") {
+        throw new AppError(
+          400,
+          "Cannot confirm an unpaid booking. It confirms automatically once the guest pays.",
+        );
+      }
+      const free = await this.checkAvailability(
+        booking.propertyId,
+        booking.checkIn,
+        booking.checkOut,
+        prisma,
+        booking.id,
+      );
+      if (!free) {
+        throw new AppError(409, "Dates were confirmed for another booking in the meantime");
+      }
     }
 
     if (status === "COMPLETED" && booking.checkOut.getTime() > Date.now()) {
@@ -985,8 +1008,15 @@ export class BookingService {
       throw new AppError(403, "Hosts cannot reschedule guest bookings");
     }
 
-    if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") {
-      throw new AppError(400, "Can only reschedule active bookings");
+    // Reschedule is unpaid-only: totalPrice is recalculated here but the
+    // captured charge (or an already-created intent) is not — allowing a
+    // paid or mid-payment booking to change dates would desync money and
+    // stay. The capture webhook also rejects amount mismatches as backstop.
+    if (booking.status !== "PENDING" || booking.payment?.status === "SUCCESS") {
+      throw new AppError(
+        400,
+        "Only unpaid pending bookings can be rescheduled. Cancel and rebook to change a paid stay.",
+      );
     }
 
     const newCheckIn = data.checkIn ?? booking.checkIn;

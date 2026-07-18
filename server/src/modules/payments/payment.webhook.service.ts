@@ -118,6 +118,7 @@ export class PaymentWebhookService {
         propertyId: true,
         checkIn: true,
         checkOut: true,
+        totalPrice: true,
         user: { select: { email: true, firstName: true } },
         property: { select: { title: true } },
       },
@@ -129,6 +130,28 @@ export class PaymentWebhookService {
         "Authorized intent for unknown booking — voiding",
       );
       await this.voidAuthorization(paymentIntent.id, bookingId);
+      return;
+    }
+
+    // Authorization must match the booking's current price. A stale intent
+    // (booking rescheduled/repriced after intent creation) is voided; the
+    // booking stays PENDING so the guest can retry at the right amount.
+    const expectedAmount = Math.round(Number(booking.totalPrice) * 100);
+    if (paymentIntent.amount !== expectedAmount) {
+      logger.warn(
+        {
+          bookingId,
+          paymentIntentId: paymentIntent.id,
+          authorizedAmount: paymentIntent.amount,
+          expectedAmount,
+        },
+        "Authorized amount does not match booking price — voiding stale authorization",
+      );
+      await this.voidAuthorization(paymentIntent.id, booking.id);
+      await prisma.payment.updateMany({
+        where: { bookingId: booking.id, status: "PENDING" },
+        data: { status: "FAILED" },
+      });
       return;
     }
 

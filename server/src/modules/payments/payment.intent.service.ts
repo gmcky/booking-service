@@ -77,7 +77,9 @@ export class PaymentIntentService {
           },
         },
         {
-          idempotencyKey: `intent_${booking.id}`,
+          // Amount in the key: a rescheduled (repriced) booking must mint a
+          // fresh intent instead of replaying the stale-amount one.
+          idempotencyKey: `intent_${booking.id}_${amountInCents}`,
         },
       );
     } catch (error) {

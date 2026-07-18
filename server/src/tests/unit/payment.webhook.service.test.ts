@@ -180,13 +180,15 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
       propertyId: "property-1",
       checkIn: new Date("2026-08-10"),
       checkOut: new Date("2026-08-13"),
+      totalPrice: new Prisma.Decimal("300.00"),
       user: { email: "guest@test.com", firstName: "Guest" },
       property: { title: "Beach House" },
     };
 
-    function authEvent(eventId = "evt_auth") {
+    function authEvent(eventId = "evt_auth", amount = 30000) {
       const event = makeStripeEvent(eventId, "payment_intent.amount_capturable_updated", {
         id: "pi_auth",
+        amount,
         metadata: { bookingId: "booking-race" },
       });
       mockStripe.webhooks.constructEvent.mockReturnValue(event);
@@ -260,6 +262,27 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
 
       expect(mockStripe.paymentIntents.capture).not.toHaveBeenCalled();
       expect(mockStripe.paymentIntents.cancel).toHaveBeenCalled();
+      expect(mockEmailQueue.add).not.toHaveBeenCalled();
+    });
+
+    it("voids a stale-amount authorization and keeps the booking payable", async () => {
+      // Booking repriced after the intent was created: authorized 100.00,
+      // booking now costs 300.00.
+      authEvent("evt_stale", 10000);
+      (mockPrisma.booking.findUnique as any).mockResolvedValue(AUTH_BOOKING);
+      (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+      mockStripe.paymentIntents.cancel.mockResolvedValue({ id: "pi_auth" });
+
+      await PaymentWebhookService.handleStripeWebhook("raw", "sig");
+
+      expect(mockStripe.paymentIntents.capture).not.toHaveBeenCalled();
+      expect(mockStripe.paymentIntents.cancel).toHaveBeenCalled();
+      expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { bookingId: "booking-race", status: "PENDING" },
+        data: { status: "FAILED" },
+      });
+      // Booking is NOT released: guest can retry at the correct price.
+      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
       expect(mockEmailQueue.add).not.toHaveBeenCalled();
     });
 
