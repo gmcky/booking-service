@@ -70,6 +70,8 @@ For the API directly, everything below happens inside Swagger UI, no terminal re
 ## Design decisions
 
 - **Double-booking prevention.** Serializable transaction isolation on booking creation ensures concurrent requests for the same dates resolve correctly, with automatic retry on serialization conflicts.
+- **Optimistic inventory holds.** Only paid (confirmed) bookings block dates: an unpaid booking holds nothing, so abandoned checkouts and booking bots cannot lock a listing. Overlapping unpaid bookings race to payment; the winner is confirmed inside a serializable transaction, the loser's card authorization is voided (never charged, no processing fee). Unpaid bookings expire at check-in or after 24 hours, whichever comes first, and can be resumed from the trips page until then.
+- **Authorize-then-capture payments.** Cards are authorized at checkout and captured only when the booking wins its confirm race. Stale-amount authorizations (booking repriced mid-flight) are voided by the webhook rather than captured. A refund-velocity limit blocks accounts that cycle book-pay-cancel through the free-cancellation window.
 - **JWT rotation with reuse detection.** Refresh tokens are hashed and tracked by jti. Reuse of a token (e.g. from a stolen session) triggers full session invalidation for that user.
 - **Stripe payment flow.** PaymentIntent lifecycle with server-side amounts, webhook signature verification, and idempotent event processing via a processed-events table.
 - **Email verification as an abuse gate.** Real delivery via Resend. Unverified accounts can browse and search but cannot book, host, or review: every platform email is potential spam to someone else's address until that address is proven.
