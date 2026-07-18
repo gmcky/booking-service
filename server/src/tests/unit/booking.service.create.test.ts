@@ -17,6 +17,12 @@ vi.mock("../../shared/queues/email.queue.js", () => ({
 
 vi.mock("../../shared/lib/cache.js", () => ({
   cacheInvalidateNamespace: vi.fn().mockResolvedValue(undefined),
+  cacheClient: {
+    get: vi.fn().mockResolvedValue(null),
+    incr: vi.fn(),
+    expire: vi.fn(),
+    del: vi.fn(),
+  },
 }));
 
 vi.mock("../../modules/users/user.stats.cache.js", () => ({
@@ -28,6 +34,7 @@ vi.mock("timers/promises", () => ({
 }));
 
 import { prisma } from "../../shared/lib/prisma.js";
+import { cacheClient } from "../../shared/lib/cache.js";
 import { BookingService } from "../../modules/bookings/booking.service.js";
 
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
@@ -165,5 +172,59 @@ describe("BookingService.create", () => {
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3);
     expect(mockSleep).toHaveBeenCalledTimes(2);
+  });
+
+  it("blocks booking when the refund-velocity limit is reached", async () => {
+    (cacheClient.get as ReturnType<typeof vi.fn>).mockResolvedValue("3");
+
+    await expect(
+      BookingService.create({
+        propertyId: "property-1",
+        userId: "guest-abuser",
+        checkIn: FUTURE_CHECK_IN,
+        checkOut: FUTURE_CHECK_OUT,
+        guests: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 429 });
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("fails open when Redis is down for the refund-velocity check", async () => {
+    (cacheClient.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("redis down"));
+    setupAvailableProperty();
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+
+    const result = await BookingService.create({
+      propertyId: "property-1",
+      userId: "guest-1",
+      checkIn: FUTURE_CHECK_IN,
+      checkOut: FUTURE_CHECK_OUT,
+      guests: 2,
+    });
+
+    expect(result).toBeDefined();
+  });
+
+  it("rejects a duplicate unpaid booking for the same stay", async () => {
+    setupAvailableProperty();
+    // First count = availability (CONFIRMED overlaps), second = own PENDING dup.
+    (mockPrisma.booking.count as any).mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+
+    await expect(
+      BookingService.create({
+        propertyId: "property-1",
+        userId: "guest-1",
+        checkIn: FUTURE_CHECK_IN,
+        checkOut: FUTURE_CHECK_OUT,
+        guests: 2,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining("already have an unpaid booking"),
+    });
+
+    expect(mockPrisma.booking.create).not.toHaveBeenCalled();
   });
 });

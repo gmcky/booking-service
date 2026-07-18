@@ -132,7 +132,7 @@ describe("BookingService.checkAvailability", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: { not: "booking-to-exclude" },
-          status: { in: ["PENDING", "CONFIRMED"] },
+          status: "CONFIRMED",
         }),
       }),
     );
@@ -150,7 +150,7 @@ describe("BookingService.checkAvailability", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           propertyId: "property-1",
-          status: { in: ["PENDING", "CONFIRMED"] },
+          status: "CONFIRMED",
           checkOut: { gt: checkIn },
           checkIn: { lt: checkOut },
         }),

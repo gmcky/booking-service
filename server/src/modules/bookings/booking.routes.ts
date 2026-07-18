@@ -265,7 +265,8 @@ bookingRouter.post("/:id/host-decline", asyncHandler(bookingController.declineHo
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { description: 'Email not verified (code: EMAIL_NOT_VERIFIED)' }
- *       409: { description: Date range conflict }
+ *       409: { description: Date range conflict, or duplicate unpaid booking for the same stay }
+ *       429: { description: Refund-velocity limit reached (too many recently refunded cancellations) }
  */
 bookingRouter.post(
   "/",

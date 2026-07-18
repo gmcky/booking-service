@@ -13,3 +13,10 @@ export const UNPAID_CHECKIN_GRACE_HOURS = 3;
 // A payment stub touched within this window marks an active checkout
 // session; the sweep skips it even past the expiry cutoff.
 export const UNPAID_EXPIRY_GRACE_MINUTES = 60;
+
+// Refund-velocity penalty box: this many refunded guest cancellations
+// within the window blocks further booking for the rest of the window.
+// Free-cancellation policies are book-refund-repeat abuseable otherwise
+// (each cycle locks inventory and burns the processing fee).
+export const REFUND_ABUSE_MAX_CANCELLATIONS = 3;
+export const REFUND_ABUSE_WINDOW_DAYS = 30;

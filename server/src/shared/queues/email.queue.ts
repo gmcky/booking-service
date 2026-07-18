@@ -19,6 +19,7 @@ export type EmailJobName =
   | "host-cancel-approved-guest"
   | "host-cancel-rejected-host"
   | "host-declined-guest"
+  | "booking-dates-taken-guest"
   | "email-change-otp"
   | "email-changed-notification"
   | "password-changed-notification"
@@ -224,6 +225,15 @@ export interface HostDeclinedGuestJob {
   currency: string;
 }
 
+export interface BookingDatesTakenGuestJob {
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyTitle: string;
+  checkIn: string;
+  checkOut: string;
+}
+
 export interface EmailChangeOtpJob {
   /** The new email that the user wants to switch to */
   newEmail: string;
@@ -284,6 +294,7 @@ export type EmailJobData =
   | { name: "host-cancel-approved-guest"; data: HostCancelApprovedGuestJob }
   | { name: "host-cancel-rejected-host"; data: HostCancelRejectedHostJob }
   | { name: "host-declined-guest"; data: HostDeclinedGuestJob }
+  | { name: "booking-dates-taken-guest"; data: BookingDatesTakenGuestJob }
   | { name: "email-change-otp"; data: EmailChangeOtpJob }
   | { name: "email-changed-notification"; data: EmailChangedNotificationJob }
   | {

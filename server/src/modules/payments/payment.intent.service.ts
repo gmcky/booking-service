@@ -52,6 +52,10 @@ export class PaymentIntentService {
         {
           amount: amountInCents,
           currency: "usd",
+          // Authorize now, capture only after the booking wins the confirm
+          // race in the webhook. A losing authorization is voided — no money
+          // moves and no processing fee accrues, unlike charge-then-refund.
+          capture_method: "manual",
           metadata: {
             bookingId: booking.id,
             userId,
