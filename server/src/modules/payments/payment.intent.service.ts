@@ -33,6 +33,21 @@ export class PaymentIntentService {
       throw new AppError(400, "Booking is already paid");
     }
 
+    // Fail before card entry when the race is already lost. Advisory only —
+    // the capture webhook re-checks inside a serializable tx either way.
+    const confirmedOverlap = await prisma.booking.count({
+      where: {
+        propertyId: booking.propertyId,
+        status: "CONFIRMED",
+        checkIn: { lt: booking.checkOut },
+        checkOut: { gt: booking.checkIn },
+        id: { not: booking.id },
+      },
+    });
+    if (confirmedOverlap > 0) {
+      throw new AppError(409, "These dates were just booked by another guest");
+    }
+
     const amountInCents = Math.round(Number(booking.totalPrice) * 100);
     if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
       logger.error(
