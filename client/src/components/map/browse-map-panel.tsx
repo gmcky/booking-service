@@ -71,7 +71,10 @@ export function BrowseMapPanel({
 }: BrowseMapPanelProps) {
   const [map, setMap] = React.useState<maplibregl.Map | null>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFitKeyRef = React.useRef<string | null>(null);
+  // Seeded when the panel mounts with a restored camera: that camera is the
+  // user's own last viewport, so the "new search" refit below must not
+  // immediately pull it back to the full result set.
+  const lastFitKeyRef = React.useRef<string | null>(initialBounds ? fitBoundsKey : null);
 
   const selected = markers.find((m) => m.id === selectedId) ?? null;
 
@@ -119,7 +122,9 @@ export function BrowseMapPanel({
   const rating = selected ? formatRating(selected.averageRating) : null;
 
   return (
-    <div className="relative size-full overflow-hidden rounded-xl">
+    // Muted plate underneath: the canvas paints nothing until the first tiles
+    // arrive, which otherwise flashes the page background through.
+    <div className="relative size-full overflow-hidden rounded-xl bg-muted">
       <BaseMap
         bounds={initialBounds}
         onMapReady={setMap}
