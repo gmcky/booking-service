@@ -5,10 +5,17 @@ import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Loader2,
+  Map as MapIcon,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
-import { SearchPill, type DetectedLocation, type SearchPillHandle } from "@/components/search/search-pill";
+import { SearchPill, type SearchPillHandle } from "@/components/search/search-pill";
 import { QuickFilters } from "@/components/search/quick-filters";
 import { FiltersDialog } from "@/components/search/filters-dialog";
 import { Button } from "@/components/ui/button";
@@ -90,7 +97,7 @@ function hasBboxFilter(filters: PropertyQuery): boolean {
   );
 }
 
-export function BrowseView({ detected }: { detected?: DetectedLocation }) {
+export function BrowseView() {
   return (
     <React.Suspense
       fallback={
@@ -102,12 +109,12 @@ export function BrowseView({ detected }: { detected?: DetectedLocation }) {
         </div>
       }
     >
-      <BrowseResults detected={detected} />
+      <BrowseResults />
     </React.Suspense>
   );
 }
 
-function BrowseResults({ detected }: { detected?: DetectedLocation }) {
+function BrowseResults() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchPillRef = React.useRef<SearchPillHandle>(null);
@@ -117,7 +124,6 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   );
 
   const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const [geoDismissed, setGeoDismissed] = React.useState(false);
   // Collapsed by default; a bbox in the URL means a map session is being
   // restored (reload, shared link) — hiding the map then would leave the
   // user filtered to an area they can't see or change.
@@ -174,48 +180,13 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     router.replace(qs ? `/browse?${qs}` : "/browse", { scroll: false });
   }
 
-  React.useEffect(() => {
-    setGeoDismissed(sessionStorage.getItem("geo-dismissed") === "1");
-  }, []);
-
-  const locationsQuery = useQuery({
-    queryKey: queryKeys.properties.locations,
-    queryFn: propertyApi.locations,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const hasExplicitLocation = Boolean(filters.city || filters.country || filters.district);
-
-  // Detection only ever supplies a rendering-time default — it must never
-  // overwrite explicit URL params, and is never written back to the URL.
-  // Once the map has a bbox, the viewport is the location and detection
-  // stays out of it entirely.
-  const detectedMatch = React.useMemo(() => {
-    if (hasExplicitLocation || hasBbox || geoDismissed || !detected?.city) return undefined;
-    const target = detected.city.toLowerCase();
-    // Same-named cities in different countries: the detected country wins,
-    // city-only match is only a fallback when the country didn't resolve.
-    let fallback: { city: string; country: string } | undefined;
-    for (const country of locationsQuery.data ?? []) {
-      for (const city of country.cities) {
-        if (city.city.toLowerCase() !== target) continue;
-        if (detected.country && country.country === detected.country) {
-          return { city: city.city, country: country.country };
-        }
-        fallback ??= { city: city.city, country: country.country };
-      }
-    }
-    return detected.country ? undefined : fallback;
-  }, [hasExplicitLocation, hasBbox, geoDismissed, detected?.city, detected?.country, locationsQuery.data]);
-
-  const effectiveFilters = detectedMatch
-    ? { ...filters, city: detectedMatch.city, country: detectedMatch.country }
-    : filters;
-
+  // Browse deliberately does NOT default to the visitor's own city: someone
+  // planning a trip would have to undo it on every visit. The geo demo lives
+  // on home ("Stays near you") and behind the search pill's Nearby shortcut.
   const query = useInfiniteQuery({
-    queryKey: queryKeys.properties.browse(effectiveFilters),
+    queryKey: queryKeys.properties.browse(filters),
     queryFn: ({ pageParam }) =>
-      propertyApi.search({ ...effectiveFilters, page: pageParam, limit: PAGE_SIZE }),
+      propertyApi.search({ ...filters, page: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 1,
     getNextPageParam: (last) => {
       const page = last.pagination.page ?? 1;
@@ -229,12 +200,41 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     staleTime: BROWSE_STALE_TIME_MS,
   });
 
+  // The map panel is a lazy chunk (maplibre is heavy). Warming it once the
+  // page is idle means opening the map shows a map, not the pulse placeholder.
+  React.useEffect(() => {
+    const id = setTimeout(() => void import("@/components/map/browse-map-panel"), 1500);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Pages load as the sentinel below the grid comes into view. Re-observing
+  // after each page is what chains them: if the sentinel is still on screen
+  // once the new cards are in, the next page starts immediately.
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  // The mobile map is a full-screen overlay over a still-mounted list: without
+  // this gate a sentinel left on screen underneath keeps paging a list nobody
+  // is looking at.
+  const listVisible = !(isMobile && mapOpen);
+  React.useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !hasNextPage || isFetchingNextPage || !listVisible) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) fetchNextPage();
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, listVisible]);
+
   // The map draws every match in the filter set, not the loaded list pages —
   // otherwise pins for unloaded pages simply don't exist. The bbox is padded
   // and grid-snapped (paddedMarkerBounds) so small pans reuse the cached
   // marker set — only the list refetches.
   const markerFilters = React.useMemo(() => {
-    const { sort: _sort, page: _page, limit: _limit, ...rest } = effectiveFilters;
+    const { sort: _sort, page: _page, limit: _limit, ...rest } = filters;
     if (
       rest.minLat === undefined ||
       rest.maxLat === undefined ||
@@ -250,7 +250,7 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       maxLng: rest.maxLng,
     });
     return { ...rest, ...padded };
-  }, [effectiveFilters]);
+  }, [filters]);
   const markersQuery = useQuery({
     queryKey: queryKeys.properties.mapMarkers(markerFilters),
     queryFn: () => propertyApi.mapMarkers(markerFilters),
@@ -276,8 +276,8 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
   /** Empty while a bbox drives the search — the camera must never re-fit
    *  in response to its own pan. */
   const fitBoundsKey = React.useMemo(
-    () => (hasBbox ? "" : nonBboxKey(effectiveFilters)),
-    [hasBbox, effectiveFilters],
+    () => (hasBbox ? "" : nonBboxKey(filters)),
+    [hasBbox, filters],
   );
   const initialMapBounds = React.useMemo<[[number, number], [number, number]] | undefined>(
     () =>
@@ -322,9 +322,9 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
     (filters.amenities?.length ?? 0) +
     (filters.country || filters.city || filters.district ? 1 : 0);
 
-  const locationLabel = effectiveFilters.district
-    ? `${effectiveFilters.district}, ${effectiveFilters.city}`
-    : (effectiveFilters.city ?? (hasBbox ? "map area" : undefined));
+  const locationLabel = filters.district
+    ? `${filters.district}, ${filters.city}`
+    : (filters.city ?? (hasBbox ? "map area" : undefined));
 
   const fmtDay = (iso: string) =>
     new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -351,16 +351,19 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
       >
         <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
         <motion.div
-          layout
+          // Position only: a full `layout` animation resizes the column by
+          // scaling it (measured: scaleX 1.63 / scaleY 0.59 on open), which
+          // visibly stretches every card, photo and glyph for ~300ms.
+          layout="position"
           // Only animate layout when the map opens/closes. Without the
           // dependency framer re-animates on ANY size change, so appending a
-          // page of cards ("Show more stays") made the whole column jump.
+          // page of cards made the whole column jump.
           layoutDependency={mapMode}
           transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
           className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}
         >
         <div className="mb-4">
-          <SearchPill ref={searchPillRef} detected={detected} initialFilters={filters} collapsible />
+          <SearchPill ref={searchPillRef} initialFilters={filters} collapsible />
         </div>
 
         <div className="mb-5">
@@ -371,35 +374,6 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
             onOpenFilters={() => setFiltersOpen(true)}
           />
         </div>
-
-        {/* In split view the map itself communicates the detected location
-            (camera fits it) — the banner is list-only UI. */}
-        {detectedMatch && mapMode === "list" ? (
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm">
-            <span>
-              Showing stays in {detectedMatch.city} · based on your location
-            </span>
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => searchPillRef.current?.openWhere()}
-                className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
-              >
-                Change
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  sessionStorage.setItem("geo-dismissed", "1");
-                  setGeoDismissed(true);
-                }}
-                className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
-              >
-                Show all
-              </button>
-            </div>
-          </div>
-        ) : null}
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-lg font-semibold tracking-tight">
@@ -471,17 +445,13 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
                 />
               ))}
             </section>
+            <div ref={loadMoreRef} />
 
             <div className="flex justify-center py-9">
               {query.hasNextPage ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => query.fetchNextPage()}
-                  disabled={query.isFetchingNextPage}
-                >
-                  {query.isFetchingNextPage ? "Loading…" : "Show more stays"}
-                </Button>
+                query.isFetchingNextPage ? (
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                ) : null
               ) : (
                 <div className="flex flex-col items-center gap-1 text-center text-muted-foreground">
                   <div className="mb-2 h-px w-8 bg-border" />
@@ -489,6 +459,20 @@ function BrowseResults({ detected }: { detected?: DetectedLocation }) {
                     You&apos;ve reached the end
                   </div>
                   <div className="text-[13px]">Showing all {total} stays</div>
+                  {activeFilterCount > 0 ? (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setFiltersOpen(true)}>
+                        Change filters
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => applyFilters({ sort: filters.sort })}
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

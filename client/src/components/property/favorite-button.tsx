@@ -54,7 +54,7 @@ export function FavoriteButton({ propertyId, variant, className }: FavoriteButto
         <Heart
           className={cn(
             "size-5 transition-colors",
-            active ? "fill-primary stroke-primary" : "fill-black/40 stroke-white",
+            active ? "fill-favorite stroke-favorite" : "fill-black/40 stroke-white",
           )}
         />
       </button>
@@ -69,7 +69,7 @@ export function FavoriteButton({ propertyId, variant, className }: FavoriteButto
       aria-pressed={active}
       className={className}
     >
-      <Heart className={cn(active ? "fill-primary stroke-primary" : "")} />
+      <Heart className={cn(active ? "fill-favorite stroke-favorite" : "")} />
       {active ? "Saved" : "Save"}
     </Button>
   );

@@ -24,6 +24,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { GuestStepper, GuestToggle } from "@/components/search/guest-fields";
 import { propertyApi, type LocationCountry, type PropertyQuery } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
+import { useDetectedLocation } from "@/lib/geo/use-detected-location";
+import { boundsAround, resolveNearbyCity, type NearbyCity } from "@/lib/geo/nearby";
 import { isoToLocalDate, startOfToday, toISODate } from "@/lib/utils/dates";
 import { extendStay, flexibleWindow, type FlexibleDuration } from "@/lib/utils/flexible-dates";
 import { cn } from "@/lib/utils";
@@ -57,18 +59,11 @@ export interface LocationSelection {
   district?: string;
 }
 
-export interface DetectedLocation {
-  country?: string;
-  city?: string;
-}
-
 export interface SearchPillHandle {
   openWhere: () => void;
 }
 
 export interface SearchPillProps {
-  /** Geo-detected location (server-derived) used to surface a "Nearby" shortcut. */
-  detected?: DetectedLocation;
   /** Seed the pill's fields from the current URL filters (used on /browse). */
   initialFilters?: PropertyQuery;
   className?: string;
@@ -142,7 +137,7 @@ function filterLocations(locations: LocationCountry[], query: string): LocationC
 }
 
 export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
-  function SearchPill({ detected, initialFilters, className, collapsible, compact }, ref) {
+  function SearchPill({ initialFilters, className, collapsible, compact }, ref) {
     const router = useRouter();
 
     const rootRef = React.useRef<HTMLDivElement>(null);
@@ -423,6 +418,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       staleTime: 5 * 60 * 1000,
     });
 
+    const detected = useDetectedLocation();
     const locations = locationsQuery.data ?? [];
     const filteredLocations = React.useMemo(
       () => filterLocations(locations, whereQuery),
@@ -446,31 +442,71 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       advanceToWhen();
     }
 
-    // "Nearby" is only offered when the detected city resolves against the
-    // real locations tree — the country label from the ISO map may not match
-    // host-entered free text, and an unresolved pair would search into zero
-    // results. Detected country wins on same-named cities; city-only match
-    // is the fallback when the country didn't resolve.
-    const resolvedNearby = React.useMemo(() => {
-      if (!detected?.city) return undefined;
-      const target = detected.city.toLowerCase();
-      let fallback: { country: string; city: string } | undefined;
-      for (const country of locations) {
-        for (const city of country.cities) {
-          if (city.city.toLowerCase() !== target) continue;
-          if (detected.country && country.country === detected.country) {
-            return { country: country.country, city: city.city };
-          }
-          fallback ??= { country: country.country, city: city.city };
-        }
-      }
-      return detected.country ? undefined : fallback;
-    }, [detected?.city, detected?.country, locations]);
+    // Named-city shortcut: only usable when the detected city is one that
+    // actually has listings, otherwise the search would land on zero results.
+    const resolvedNearby: NearbyCity | undefined = React.useMemo(
+      () => resolveNearbyCity(locations, detected),
+      [locations, detected],
+    );
+    const [nearbyPending, setNearbyPending] = React.useState(false);
+    const [nearbyError, setNearbyError] = React.useState<string | null>(null);
+    const mountedRef = React.useRef(true);
+    React.useEffect(() => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+      };
+    }, []);
 
+    /**
+     * Nearby, in falling order of precision:
+     *   1. detected city that has listings → a normal city search;
+     *   2. coordinates from the edge headers → a box around the visitor;
+     *   3. the browser's geolocation prompt → same box.
+     * Only the third step can prompt, so the common case stays silent.
+     */
     function selectNearby() {
-      if (!resolvedNearby) return;
-      setSelection({ ...resolvedNearby, district: undefined });
-      advanceToWhen();
+      setNearbyError(null);
+      if (resolvedNearby) {
+        setSelection({ ...resolvedNearby, district: undefined });
+        advanceToWhen();
+        return;
+      }
+      if (detected?.lat !== undefined && detected?.lng !== undefined) {
+        searchAround(detected.lat, detected.lng);
+        return;
+      }
+      if (!navigator.geolocation) {
+        setNearbyError("Location unavailable");
+        return;
+      }
+      setNearbyPending(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          // The permission prompt outlives the pill: without this the answer
+          // would navigate a user who has since gone somewhere else.
+          if (!mountedRef.current) return;
+          setNearbyPending(false);
+          searchAround(position.coords.latitude, position.coords.longitude);
+        },
+        () => {
+          if (!mountedRef.current) return;
+          setNearbyPending(false);
+          setNearbyError("Location unavailable");
+        },
+        { timeout: 8000, maximumAge: 10 * 60 * 1000 },
+      );
+    }
+
+    /** Area search: the bbox replaces the named location, dates/guests stay. */
+    function searchAround(lat: number, lng: number) {
+      const bounds = boundsAround(lat, lng);
+      pushSearch({
+        minLat: String(bounds.minLat),
+        maxLat: String(bounds.maxLat),
+        minLng: String(bounds.minLng),
+        maxLng: String(bounds.maxLng),
+      });
     }
 
     const guestsTotal = adults + children;
@@ -486,11 +522,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       [flexMonthsSelected, flexDuration, today],
     );
 
-    function onSearch() {
-      const params = new URLSearchParams();
-      if (selection.country) params.set("country", selection.country);
-      if (selection.city) params.set("city", selection.city);
-      if (selection.district) params.set("district", selection.district);
+    /** Everything except the location — shared by the city and area searches. */
+    function pushSearch(location: Record<string, string>) {
+      const params = new URLSearchParams(location);
 
       const checkIn =
         whenTab === "flexible"
@@ -519,6 +553,14 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       setOpenSegment(null);
       setMobileStep(null);
       if (collapsible) setExpanded(false);
+    }
+
+    function onSearch() {
+      const location: Record<string, string> = {};
+      if (selection.country) location.country = selection.country;
+      if (selection.city) location.city = selection.city;
+      if (selection.district) location.district = selection.district;
+      pushSearch(location);
     }
 
     function clearAll() {
@@ -595,6 +637,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                           locations={filteredLocations}
                           selection={selection}
                           nearby={resolvedNearby}
+                          nearbyVisible={whereQuery.trim() === ""}
+                          nearbyPending={nearbyPending}
+                          nearbyError={nearbyError}
                           onNearby={selectNearby}
                           onCity={selectCity}
                           onDistrict={selectDistrict}
@@ -982,6 +1027,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
                   locations={filteredLocations}
                   selection={selection}
                   nearby={resolvedNearby}
+                  nearbyVisible={whereQuery.trim() === ""}
+                  nearbyPending={nearbyPending}
+                  nearbyError={nearbyError}
                   onNearby={selectNearby}
                   onCity={selectCity}
                   onDistrict={selectDistrict}
@@ -1104,6 +1152,9 @@ function DestinationList({
   locations,
   selection,
   nearby,
+  nearbyVisible,
+  nearbyPending,
+  nearbyError,
   onNearby,
   onCity,
   onDistrict,
@@ -1112,19 +1163,31 @@ function DestinationList({
   pending: boolean;
   locations: LocationCountry[];
   selection: LocationSelection;
-  nearby?: { country: string; city: string };
+  nearby?: NearbyCity;
+  /** Hidden once the user types — a typed query is an explicit destination. */
+  nearbyVisible: boolean;
+  nearbyPending: boolean;
+  nearbyError: string | null;
   onNearby: () => void;
   onCity: (country: string, city: string, districtCount: number) => void;
   onDistrict: (country: string, city: string, district: string) => void;
 }) {
+  // Always the first entry, with or without a resolved city: without one it
+  // falls back to searching the area around the visitor's coordinates.
+  const nearbyStatus = nearbyPending ? "Locating…" : (nearbyError ?? nearby?.city);
+  const nearbyHint = nearbyPending
+    ? "Locating…"
+    : (nearbyError ?? (nearby ? `Find what's around you · ${nearby.city}` : "Find what's around you"));
+
   return (
     <>
-      {nearby ? (
+      {nearbyVisible ? (
         <button
           type="button"
           onClick={onNearby}
+          disabled={nearbyPending}
           className={cn(
-            "flex w-full items-center gap-2 rounded-md px-2.5 text-left text-sm hover:bg-accent",
+            "flex w-full items-center gap-2 rounded-md px-2.5 text-left text-sm hover:bg-accent disabled:opacity-60",
             mobile ? "gap-3 rounded-xl px-1.5 py-2" : "py-1.5",
           )}
         >
@@ -1138,12 +1201,13 @@ function DestinationList({
           {mobile ? (
             <span className="flex min-w-0 flex-col">
               <span className="font-medium">Nearby</span>
-              <span className="text-xs text-muted-foreground">
-                Find what&apos;s around you · {nearby.city}
-              </span>
+              <span className="text-xs text-muted-foreground">{nearbyHint}</span>
             </span>
           ) : (
-            <span>Nearby · {nearby.city}</span>
+            <span className="min-w-0 truncate">
+              Nearby
+              {nearbyStatus ? <span className="text-muted-foreground"> · {nearbyStatus}</span> : null}
+            </span>
           )}
         </button>
       ) : null}
