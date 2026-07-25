@@ -119,6 +119,17 @@ export function QuickFilters({ filters, activeFilterCount, onApply, onOpenFilter
           <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background to-transparent" />
         ) : null}
       </div>
+
+      {activeFilterCount > 0 ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 rounded-full"
+          onClick={() => onApply({ sort: filters.sort })}
+        >
+          Clear filters
+        </Button>
+      ) : null}
     </div>
   );
 }
