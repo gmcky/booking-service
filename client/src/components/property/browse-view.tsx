@@ -5,7 +5,14 @@ import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Loader2,
+  Map as MapIcon,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
 import { SearchPill, type SearchPillHandle } from "@/components/search/search-pill";
@@ -192,6 +199,24 @@ function BrowseResults() {
     placeholderData: keepPreviousData,
     staleTime: BROWSE_STALE_TIME_MS,
   });
+
+  // Pages load as the sentinel below the grid comes into view. Re-observing
+  // after each page is what chains them: if the sentinel is still on screen
+  // once the new cards are in, the next page starts immediately.
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  React.useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !hasNextPage || isFetchingNextPage) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) fetchNextPage();
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // The map draws every match in the filter set, not the loaded list pages —
   // otherwise pins for unloaded pages simply don't exist. The bbox is padded
@@ -406,17 +431,13 @@ function BrowseResults() {
                 />
               ))}
             </section>
+            <div ref={loadMoreRef} />
 
             <div className="flex justify-center py-9">
               {query.hasNextPage ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => query.fetchNextPage()}
-                  disabled={query.isFetchingNextPage}
-                >
-                  {query.isFetchingNextPage ? "Loading…" : "Show more stays"}
-                </Button>
+                query.isFetchingNextPage ? (
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                ) : null
               ) : (
                 <div className="flex flex-col items-center gap-1 text-center text-muted-foreground">
                   <div className="mb-2 h-px w-8 bg-border" />
@@ -424,6 +445,20 @@ function BrowseResults() {
                     You&apos;ve reached the end
                   </div>
                   <div className="text-[13px]">Showing all {total} stays</div>
+                  {activeFilterCount > 0 ? (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setFiltersOpen(true)}>
+                        Change filters
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => applyFilters({ sort: filters.sort })}
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
