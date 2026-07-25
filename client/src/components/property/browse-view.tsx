@@ -200,6 +200,13 @@ function BrowseResults() {
     staleTime: BROWSE_STALE_TIME_MS,
   });
 
+  // The map panel is a lazy chunk (maplibre is heavy). Warming it once the
+  // page is idle means opening the map shows a map, not the pulse placeholder.
+  React.useEffect(() => {
+    const id = setTimeout(() => void import("@/components/map/browse-map-panel"), 1500);
+    return () => clearTimeout(id);
+  }, []);
+
   // Pages load as the sentinel below the grid comes into view. Re-observing
   // after each page is what chains them: if the sentinel is still on screen
   // once the new cards are in, the next page starts immediately.
@@ -340,10 +347,13 @@ function BrowseResults() {
       >
         <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
         <motion.div
-          layout
+          // Position only: a full `layout` animation resizes the column by
+          // scaling it (measured: scaleX 1.63 / scaleY 0.59 on open), which
+          // visibly stretches every card, photo and glyph for ~300ms.
+          layout="position"
           // Only animate layout when the map opens/closes. Without the
           // dependency framer re-animates on ANY size change, so appending a
-          // page of cards ("Show more stays") made the whole column jump.
+          // page of cards made the whole column jump.
           layoutDependency={mapMode}
           transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
           className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}
