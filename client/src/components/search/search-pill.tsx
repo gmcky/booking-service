@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
-import { addMonths, format, isSameMonth, startOfMonth } from "date-fns";
+import { addDays, addMonths, format, isSameMonth, startOfMonth } from "date-fns";
 import {
   MapPin,
   Search,
@@ -89,6 +89,17 @@ function clampAdults(adults: number, children: number, infants: boolean): number
 
 function clampChildren(children: number, adults: number): number {
   return Math.min(Math.max(0, children), Math.max(0, MAX_GUESTS - adults));
+}
+
+/**
+ * The calendar reports a single tapped day as `from === to`, and a stay is at
+ * least one night, so that day means "arrive, leave the next morning". Sending
+ * the raw pair instead would be an empty range, which the API rejects.
+ */
+function stayRange(range?: DateRange): { from: Date; to: Date } | undefined {
+  if (!range?.from) return undefined;
+  const to = range.to && range.to > range.from ? range.to : addDays(range.from, 1);
+  return { from: range.from, to };
 }
 
 /** "Jul 10 – 24" (same month) / "Jul 28 – Aug 3" (spanning months). */
@@ -526,14 +537,11 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     function pushSearch(location: Record<string, string>) {
       const params = new URLSearchParams(location);
 
+      const stay = stayRange(range);
       const checkIn =
-        whenTab === "flexible"
-          ? toISODate(flexWindow?.checkIn)
-          : toISODate(range?.from);
+        whenTab === "flexible" ? toISODate(flexWindow?.checkIn) : toISODate(stay?.from);
       const checkOut =
-        whenTab === "flexible"
-          ? toISODate(flexWindow?.checkOut)
-          : toISODate(range?.to);
+        whenTab === "flexible" ? toISODate(flexWindow?.checkOut) : toISODate(stay?.to);
       if (checkIn && checkOut) {
         params.set("checkIn", checkIn);
         params.set("checkOut", checkOut);
@@ -583,9 +591,12 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
         ? flexMonthsSelected.length > 0
           ? `${DURATION_LABEL[flexDuration]} in ${formatMonthsLabel(flexMonthsSelected)}`
           : undefined
-        : range?.from && range?.to
-          ? formatDatesLabel(range as { from: Date; to: Date })
-          : undefined;
+        : // Labelled from the stay, not the raw selection, so a single tapped
+          // day reads as the night it actually books.
+          (() => {
+            const stay = stayRange(range);
+            return stay ? formatDatesLabel(stay) : undefined;
+          })();
     const whoText = (() => {
       const parts: string[] = [];
       if (guestsTotal > 0) parts.push(`${guestsTotal} guest${guestsTotal === 1 ? "" : "s"}`);

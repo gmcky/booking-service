@@ -163,6 +163,15 @@ function BrowseResults() {
     params.set("maxLat", bounds.maxLat.toFixed(BBOX_PRECISION));
     params.set("minLng", bounds.minLng.toFixed(BBOX_PRECISION));
     params.set("maxLng", bounds.maxLng.toFixed(BBOX_PRECISION));
+    // Tagged with the search this pan produces, not the one it started from —
+    // panning drops the named location, so that's the search a reopen sees.
+    lastCameraRef.current = {
+      key: nonBboxKey({ ...filters, city: undefined, country: undefined, district: undefined }),
+      bounds: [
+        [bounds.minLng, bounds.minLat],
+        [bounds.maxLng, bounds.maxLat],
+      ],
+    };
     router.replace(`/browse?${params.toString()}`, { scroll: false });
   }
 
@@ -279,18 +288,27 @@ function BrowseResults() {
     () => (hasBbox ? "" : nonBboxKey(filters)),
     [hasBbox, filters],
   );
-  const initialMapBounds = React.useMemo<[[number, number], [number, number]] | undefined>(
-    () =>
-      hasBbox
-        ? [
+  /** Where the user last left the camera, tagged with the search it belonged
+   *  to. Closing the map drops the bbox from the URL, so without this a reopen
+   *  remounts the panel with nothing to restore and refits to every marker in
+   *  the set — the whole world for an unfiltered search. The tag is what keeps
+   *  a stale camera from hijacking a genuinely new search. */
+  const lastCameraRef = React.useRef<
+    { key: string; bounds: [[number, number], [number, number]] } | undefined
+  >(
+    hasBboxFilter(filters)
+      ? {
+          key: nonBboxKey(filters),
+          bounds: [
             [filters.minLng!, filters.minLat!],
             [filters.maxLng!, filters.maxLat!],
-          ]
-        : undefined,
-    // Mount-only camera restore; live values reach the map via user gestures.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+          ],
+        }
+      : undefined,
   );
+  const searchKey = nonBboxKey(filters);
+  const restoredCamera =
+    lastCameraRef.current?.key === searchKey ? lastCameraRef.current.bounds : undefined;
 
   function applyFilters(next: PropertyQuery) {
     const params = new URLSearchParams();
@@ -511,7 +529,7 @@ function BrowseResults() {
                   onSelectChange={setSelectedId}
                   onBoundsChange={updateBounds}
                   onCollapse={collapseMap}
-                  initialBounds={initialMapBounds}
+                  initialBounds={restoredCamera}
                   fitBoundsKey={fitBoundsKey}
                 />
               </motion.div>
@@ -575,9 +593,11 @@ function BrowseResults() {
       </main>
 
       {/* Toggle. On mobile the open map has its own back arrow, so this hides
-          while the overlay is up; on desktop it stays as the Show list/map switch. */}
+          while the overlay is up; on desktop it stays as the Show list/map
+          switch. Sits above the mobile tab bar (which is ~4rem plus the home
+          indicator) so it never covers the tab labels. */}
       <div
-        className={`fixed inset-x-0 bottom-6 z-50 justify-center ${
+        className={`fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-50 justify-center lg:bottom-6 ${
           mapOpen && isMobile ? "hidden" : "flex"
         }`}
       >
