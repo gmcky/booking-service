@@ -10,7 +10,8 @@ import type { PublicUserProfile } from "@/lib/api/users";
 // Cached for the same reason as the property page: metadata blocks the
 // response, so an uncached call makes every visit wait on the API before
 // anything at all can paint.
-const METADATA_REVALIDATE_SECONDS = 300;
+const METADATA_REVALIDATE_SECONDS = 60;
+
 export async function generateMetadata({
   params,
 }: {

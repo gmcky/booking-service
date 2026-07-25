@@ -11,7 +11,8 @@ import type { PropertyDetail } from "@/lib/api/properties";
 // Cached, because nothing renders until it resolves: metadata blocks the
 // response, so an uncached call means every visit waits on a round trip to
 // the API before the page's own skeleton can even appear.
-const METADATA_REVALIDATE_SECONDS = 300;
+const METADATA_REVALIDATE_SECONDS = 60;
+
 export async function generateMetadata({
   params,
 }: {
