@@ -7,6 +7,11 @@ import type { PropertyDetail } from "@/lib/api/properties";
 // Plain fetch, not propertyApi: the api client's middleware reads the
 // "use client" auth store on every request, which throws in this
 // server-only context. The endpoint is public, no auth needed.
+//
+// Cached, because nothing renders until it resolves: metadata blocks the
+// response, so an uncached call means every visit waits on a round trip to
+// the API before the page's own skeleton can even appear.
+const METADATA_REVALIDATE_SECONDS = 300;
 export async function generateMetadata({
   params,
 }: {
@@ -15,7 +20,9 @@ export async function generateMetadata({
   const { id } = await params;
   const fallback: Metadata = { title: "Property" };
   try {
-    const res = await fetch(`${BASE_URL}/properties/${encodeURIComponent(id)}`);
+    const res = await fetch(`${BASE_URL}/properties/${encodeURIComponent(id)}`, {
+      next: { revalidate: METADATA_REVALIDATE_SECONDS },
+    });
     if (!res.ok) return fallback;
     const property = (await res.json()) as PropertyDetail;
     const description = property.description.slice(0, 160);
