@@ -212,9 +212,13 @@ function BrowseResults() {
   // once the new cards are in, the next page starts immediately.
   const loadMoreRef = React.useRef<HTMLDivElement>(null);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  // The mobile map is a full-screen overlay over a still-mounted list: without
+  // this gate a sentinel left on screen underneath keeps paging a list nobody
+  // is looking at.
+  const listVisible = !(isMobile && mapOpen);
   React.useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el || !hasNextPage || isFetchingNextPage) return;
+    if (!el || !hasNextPage || isFetchingNextPage || !listVisible) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) fetchNextPage();
@@ -223,7 +227,7 @@ function BrowseResults() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, listVisible]);
 
   // The map draws every match in the filter set, not the loaded list pages —
   // otherwise pins for unloaded pages simply don't exist. The bbox is padded

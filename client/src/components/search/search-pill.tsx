@@ -450,6 +450,13 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     );
     const [nearbyPending, setNearbyPending] = React.useState(false);
     const [nearbyError, setNearbyError] = React.useState<string | null>(null);
+    const mountedRef = React.useRef(true);
+    React.useEffect(() => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+      };
+    }, []);
 
     /**
      * Nearby, in falling order of precision:
@@ -476,10 +483,14 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       setNearbyPending(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          // The permission prompt outlives the pill: without this the answer
+          // would navigate a user who has since gone somewhere else.
+          if (!mountedRef.current) return;
           setNearbyPending(false);
           searchAround(position.coords.latitude, position.coords.longitude);
         },
         () => {
+          if (!mountedRef.current) return;
           setNearbyPending(false);
           setNearbyError("Location unavailable");
         },
