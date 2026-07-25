@@ -12,7 +12,9 @@ import { resolveNearbyCity } from "@/lib/geo/nearby";
 
 const MIN_CITY_LISTINGS = 3; // only cities with enough inventory to fill a row
 const TOP_POOL = 8; // rotate the shown rows within the top N eligible cities
-const ROWS = 4; // at most this many city rows
+// Kept below the number of cities that usually qualify, otherwise every
+// eligible city is shown every day and the rotation below never rotates.
+const ROWS = 3;
 const PER_ROW = 8;
 const STALE = 5 * 60 * 1000;
 
