@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -7,14 +6,6 @@ import { ExploreCta } from "@/components/home/explore-cta";
 import { SearchPill } from "@/components/search/search-pill";
 import { PropertyGrid } from "@/components/property/property-grid";
 import { HomeCityRows } from "@/components/property/home-city-rows";
-import { detectLocation } from "@/lib/geo/detect-location";
-
-// Isolated so the `headers()` read (for the geo "near you" row) stays in its
-// own subtree rather than forcing intent onto the rest of the page.
-async function DetectedCityRows() {
-  const detected = detectLocation(await headers());
-  return <HomeCityRows detected={detected} />;
-}
 
 export default function HomePage() {
   return (
@@ -59,7 +50,7 @@ export default function HomePage() {
           <PropertyGrid query={{ limit: 8, sort: "newest" }} />
         </section>
 
-        <DetectedCityRows />
+        <HomeCityRows />
 
         <ExploreCta />
 

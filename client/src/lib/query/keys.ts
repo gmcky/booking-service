@@ -4,6 +4,7 @@ import type { FavoriteQuery } from "@/lib/api/favorites";
 import type { HostReviewQuery } from "@/lib/api/users";
 
 export const queryKeys = {
+  geo: ["geo"] as const,
   properties: {
     all: ["properties"] as const,
     list: (query: PropertyQuery) => ["properties", "list", query] as const,

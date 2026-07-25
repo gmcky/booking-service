@@ -7,8 +7,8 @@ import { propertyApi } from "@/lib/api/properties";
 import { queryKeys } from "@/lib/query/keys";
 import { PropertyCard } from "@/components/property/property-card";
 import { Carousel } from "@/components/ui/carousel";
-import type { DetectedLocation } from "@/lib/geo/detect-location";
-import type { LocationCountry } from "@/lib/api/properties";
+import { useDetectedLocation } from "@/lib/geo/use-detected-location";
+import { resolveNearbyCity } from "@/lib/geo/nearby";
 
 const MIN_CITY_LISTINGS = 3; // only cities with enough inventory to fill a row
 const TOP_POOL = 8; // rotate the shown rows within the top N eligible cities
@@ -40,27 +40,8 @@ function pickCities(cities: { city: string; count: number }[]): string[] {
   return picked;
 }
 
-// Resolve a detected city against the real locations tree — the ISO country
-// label may not match host-entered free text, so prefer a same-country match
-// and fall back to a city-only match. Mirrors the search pill's "Nearby".
-function resolveNearbyCity(
-  locations: LocationCountry[],
-  detected: DetectedLocation | undefined,
-): string | undefined {
-  if (!detected?.city) return undefined;
-  const target = detected.city.toLowerCase();
-  let fallback: string | undefined;
-  for (const country of locations) {
-    for (const c of country.cities) {
-      if (c.city.toLowerCase() !== target) continue;
-      if (detected.country && country.country === detected.country) return c.city;
-      fallback ??= c.city;
-    }
-  }
-  return detected.country ? undefined : fallback;
-}
-
-export function HomeCityRows({ detected }: { detected?: DetectedLocation }) {
+export function HomeCityRows() {
+  const detected = useDetectedLocation();
   const { data } = useQuery({
     queryKey: queryKeys.properties.locations,
     queryFn: () => propertyApi.locations(),
@@ -73,7 +54,7 @@ export function HomeCityRows({ detected }: { detected?: DetectedLocation }) {
     country.cities.map((c) => ({ city: c.city, count: c.count })),
   );
 
-  const nearby = resolveNearbyCity(data, detected);
+  const nearby = resolveNearbyCity(data, detected)?.city;
   // Don't repeat the near-you city in the inventory rows below it.
   const picked = pickCities(cities).filter((c) => c !== nearby);
   if (!nearby && picked.length === 0) return null;
