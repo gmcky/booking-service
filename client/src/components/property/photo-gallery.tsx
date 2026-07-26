@@ -5,6 +5,7 @@ import { LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
+import { useOverlayHistory } from "@/lib/hooks/use-overlay-history";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,6 +16,12 @@ import { cn } from "@/lib/utils";
 export function PhotoGallery({ images, title }: { images: string[]; title: string }) {
   const [open, setOpen] = React.useState(false);
   const shown = images.slice(0, 5);
+
+  // The gallery covers the listing, so Back should return to the listing.
+  useOverlayHistory(
+    open,
+    React.useCallback(() => setOpen(false), []),
+  );
 
   return (
     <div id="photos" className="relative mb-10 scroll-mt-32">
