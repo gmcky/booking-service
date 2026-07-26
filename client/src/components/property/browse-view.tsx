@@ -154,6 +154,20 @@ function BrowseResults() {
     };
   }, [isMobile, mapOpen, setMapOverlayOpen]);
 
+  /**
+   * The map rewrites its own search params in place.
+   *
+   * Not `router.replace`: this route is statically prerendered, and in a
+   * production build the router drops a navigation whose only difference is
+   * the query string — silently, so the map kept moving while the URL, and
+   * therefore the list, stayed behind. The history API is what Next documents
+   * for search-param updates, and it feeds `useSearchParams` the same way.
+   */
+  function replaceSearch(params: URLSearchParams) {
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `/browse?${qs}` : "/browse");
+  }
+
   /** Bbox URL update — once the user moves the map, the viewport IS the
    *  location: named-location params are dropped (Airbnb's "map area"). */
   function updateBounds(bounds: MapBounds) {
@@ -174,7 +188,7 @@ function BrowseResults() {
         [bounds.maxLng, bounds.maxLat],
       ],
     };
-    router.replace(`/browse?${params.toString()}`, { scroll: false });
+    replaceSearch(params);
   }
 
   /** The named search the map's area was laid over. Panning replaces it with a
@@ -210,8 +224,7 @@ function BrowseResults() {
     if (named?.city) params.set("city", named.city);
     if (named?.country) params.set("country", named.country);
     if (named?.district) params.set("district", named.district);
-    const qs = params.toString();
-    router.replace(qs ? `/browse?${qs}` : "/browse", { scroll: false });
+    replaceSearch(params);
   }
 
   // Full-screen on mobile, so Back belongs to the map, not to the page under it.
