@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { useOverlayHistory } from "@/lib/hooks/use-overlay-history";
 import { lockBodyScroll } from "@/lib/utils/scroll-lock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,6 +172,12 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       if (!mobileOverlayOpen) return;
       return lockBodyScroll();
     }, [mobileOverlayOpen]);
+
+    // Back dismisses the search flow rather than the page it was opened from.
+    const releaseOverlayHistory = useOverlayHistory(
+      mobileOverlayOpen,
+      React.useCallback(() => setMobileStep(null), []),
+    );
 
     // The Where/When/Who panels render inside ONE shared popup box that
     // morphs (position + size) between segments instead of closing and
@@ -557,6 +564,9 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       if (infants) params.set("infantsAllowed", "true");
 
       const qs = params.toString();
+      // The overlay is closing by navigating, so its history entry is handed
+      // over rather than popped: popping would undo this push.
+      releaseOverlayHistory();
       router.push(qs ? `/browse?${qs}` : "/browse");
       setOpenSegment(null);
       setMobileStep(null);
