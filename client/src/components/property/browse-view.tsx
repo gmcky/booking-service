@@ -29,6 +29,7 @@ import {
 import { queryKeys } from "@/lib/query/keys";
 import { useDeferredLoading } from "@/lib/hooks/use-deferred-loading";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { useOverlayHistory } from "@/lib/hooks/use-overlay-history";
 import { useUiStore } from "@/lib/stores/ui-store";
 import { lockBodyScroll } from "@/lib/utils/scroll-lock";
 import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
@@ -188,6 +189,9 @@ function BrowseResults() {
     const qs = params.toString();
     router.replace(qs ? `/browse?${qs}` : "/browse", { scroll: false });
   }
+
+  // Full-screen on mobile, so Back belongs to the map, not to the page under it.
+  useOverlayHistory(isMobile && mapOpen, collapseMap);
 
   // Browse deliberately does NOT default to the visitor's own city: someone
   // planning a trip would have to undo it on every visit. The geo demo lives
