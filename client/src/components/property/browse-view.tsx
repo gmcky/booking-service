@@ -177,16 +177,39 @@ function BrowseResults() {
     router.replace(`/browse?${params.toString()}`, { scroll: false });
   }
 
-  /** Closing the map returns to the plain list search — the bbox belongs to
-   *  the map, so it leaves with it. */
+  /** The named search the map's area was laid over. Panning replaces it with a
+   *  bbox, so closing the map has to hand it back — otherwise a visitor who
+   *  searched Kyiv, glanced at the map and closed it lands on every listing
+   *  worldwide with nothing on screen explaining why. Cleared once the visitor
+   *  is genuinely searching nowhere in particular. */
+  const supersededLocationRef = React.useRef<
+    { city?: string; country?: string; district?: string } | undefined
+  >(undefined);
+  React.useEffect(() => {
+    if (filters.city || filters.country || filters.district) {
+      supersededLocationRef.current = {
+        city: filters.city,
+        country: filters.country,
+        district: filters.district,
+      };
+    } else if (!hasBbox) {
+      supersededLocationRef.current = undefined;
+    }
+  }, [filters.city, filters.country, filters.district, hasBbox]);
+
+  /** Closing the map takes its area with it and restores the named search. */
   function collapseMap() {
     setMapMode("list");
+    const named = supersededLocationRef.current;
     if (!hasBbox) return;
     const params = new URLSearchParams(searchParams.toString());
     params.delete("minLat");
     params.delete("maxLat");
     params.delete("minLng");
     params.delete("maxLng");
+    if (named?.city) params.set("city", named.city);
+    if (named?.country) params.set("country", named.country);
+    if (named?.district) params.set("district", named.district);
     const qs = params.toString();
     router.replace(qs ? `/browse?${qs}` : "/browse", { scroll: false });
   }
@@ -312,8 +335,28 @@ function BrowseResults() {
       : undefined,
   );
   const searchKey = nonBboxKey(filters);
+  // A named search owns the camera: the map has to show the place that was
+  // searched, so a remembered viewport is only restored when nothing is named.
+  const hasNamedLocation = Boolean(filters.city || filters.country || filters.district);
   const restoredCamera =
-    lastCameraRef.current?.key === searchKey ? lastCameraRef.current.bounds : undefined;
+    !hasNamedLocation && lastCameraRef.current?.key === searchKey
+      ? lastCameraRef.current.bounds
+      : undefined;
+
+  // Restoring the viewport also has to restore the search it framed. Without
+  // this the map reopens on the area the visitor left, while the list beside
+  // it still answers "everywhere" — the two disagree on screen.
+  React.useEffect(() => {
+    if (mapMode !== "split" || hasBbox || !restoredCamera) return;
+    updateBounds({
+      minLng: restoredCamera[0][0],
+      minLat: restoredCamera[0][1],
+      maxLng: restoredCamera[1][0],
+      maxLat: restoredCamera[1][1],
+    });
+    // Only when the map opens; later bounds arrive from the map's own moves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapMode]);
 
   function applyFilters(next: PropertyQuery) {
     const params = new URLSearchParams();
