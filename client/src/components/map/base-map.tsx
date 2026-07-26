@@ -146,5 +146,16 @@ export function BaseMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // maplibre only tracks the window, but this container resizes without one:
+    // a mobile URL bar collapsing, the browse overlay animating in. The canvas
+    // then keeps its old height and leaves a blank strip under the map.
+    const observer = new ResizeObserver(() => mapRef.current?.resize());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return <div ref={containerRef} className={cn("size-full", className)} />;
 }

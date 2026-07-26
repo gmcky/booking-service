@@ -8,6 +8,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-qu
 import {
   ArrowLeft,
   ChevronDown,
+  List,
   Loader2,
   Map as MapIcon,
   Search,
@@ -514,7 +515,10 @@ function BrowseResults() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.28, ease: "easeOut" }}
-              className="fixed inset-0 z-40 overflow-hidden bg-background lg:inset-auto lg:z-auto lg:bg-transparent lg:sticky lg:top-22 lg:h-[calc(100vh-7rem)] lg:max-w-[45%] lg:flex-1"
+              // Height in dvh, not inset-0: a fixed element sizes to the layout
+              // viewport, which stays short while a mobile URL bar hides, and
+              // the difference shows up as a blank strip under the map.
+              className="fixed inset-x-0 top-0 z-40 h-[100dvh] overflow-hidden bg-background lg:inset-auto lg:z-auto lg:h-[calc(100vh-7rem)] lg:max-w-[45%] lg:flex-1 lg:bg-transparent lg:sticky lg:top-22"
             >
               <motion.div
                 className="size-full"
@@ -582,12 +586,25 @@ function BrowseResults() {
                 </div>
               </div>
 
-              {/* Bottom result count — hidden while a listing card is open. */}
+              {/* The way back to the list, carrying the result count. Hidden
+                  while a listing card is open, which takes the same spot. */}
               {selectedId ? null : (
-                <div className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center lg:hidden">
-                  <div className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg">
-                    {showSkeleton || searching ? "Searching…" : `${total} ${total === 1 ? "home" : "homes"}`}
-                  </div>
+                <div className="absolute inset-x-0 bottom-5 z-10 flex justify-center lg:hidden">
+                  <button
+                    type="button"
+                    onClick={collapseMap}
+                    className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-lg active:scale-95"
+                  >
+                    <List className="size-4" />
+                    Show list
+                    {showSkeleton || searching ? (
+                      <span className="text-background/70">· Searching…</span>
+                    ) : (
+                      <span className="text-background/70">
+                        · {total} {total === 1 ? "home" : "homes"}
+                      </span>
+                    )}
+                  </button>
                 </div>
               )}
             </motion.div>
