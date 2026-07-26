@@ -346,6 +346,38 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       district: initialFilters?.district,
     });
 
+    /**
+     * A bbox in the URL means the map's viewport is the location: panning the
+     * map drops the named place. Until the user picks a new destination the
+     * pill speaks for the map, and a search submitted untouched carries the
+     * viewport forward instead of silently reviving the old city.
+     */
+    const [destinationPicked, setDestinationPicked] = React.useState(false);
+
+    // The URL is the truth between searches: panning the map or closing it
+    // rewrites the location without the pill's involvement, and a pill still
+    // showing the destination that got replaced is worse than showing none.
+    const urlCountry = initialFilters?.country;
+    const urlCity = initialFilters?.city;
+    const urlDistrict = initialFilters?.district;
+    React.useEffect(() => {
+      setSelection({ country: urlCountry, city: urlCity, district: urlDistrict });
+      setDestinationPicked(false);
+    }, [urlCountry, urlCity, urlDistrict]);
+    const mapBounds =
+      initialFilters?.minLat !== undefined &&
+      initialFilters.maxLat !== undefined &&
+      initialFilters.minLng !== undefined &&
+      initialFilters.maxLng !== undefined
+        ? {
+            minLat: String(initialFilters.minLat),
+            maxLat: String(initialFilters.maxLat),
+            minLng: String(initialFilters.minLng),
+            maxLng: String(initialFilters.maxLng),
+          }
+        : undefined;
+    const mapAreaActive = Boolean(mapBounds) && !destinationPicked;
+
     // Recomputed each time the When panel opens so a tab left open across
     // midnight can't keep treating yesterday as a selectable "today".
     const whenOpen = openSegment === "when" || mobileStep === "when";
@@ -452,11 +484,13 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     function selectCity(country: string, city: string, districtCount: number) {
       setSelection({ country, city, district: undefined });
+      setDestinationPicked(true);
       if (districtCount === 0) advanceToWhen();
     }
 
     function selectDistrict(country: string, city: string, district: string) {
       setSelection({ country, city, district });
+      setDestinationPicked(true);
       advanceToWhen();
     }
 
@@ -487,6 +521,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       setNearbyError(null);
       if (resolvedNearby) {
         setSelection({ ...resolvedNearby, district: undefined });
+        setDestinationPicked(true);
         advanceToWhen();
         return;
       }
@@ -574,6 +609,12 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
     }
 
     function onSearch() {
+      // Untouched while the map drives the search: keep the viewport rather
+      // than reviving the destination it replaced.
+      if (mapAreaActive && mapBounds) {
+        pushSearch(mapBounds);
+        return;
+      }
       const location: Record<string, string> = {};
       if (selection.country) location.country = selection.country;
       if (selection.city) location.city = selection.city;
@@ -583,6 +624,8 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     function clearAll() {
       setSelection({});
+      // Clearing is an explicit "anywhere", so the map's area goes too.
+      setDestinationPicked(true);
       setWhereQuery("");
       setBase(undefined);
       setChipDays(0);
@@ -595,7 +638,11 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       setPets(false);
     }
 
-    const whereText = whereLabel(selection);
+    // While the map's viewport drives the search, the destination the user
+    // originally typed is no longer what's being searched — saying "Buenos
+    // Aires" over a result set the map is filtering is simply wrong. The label
+    // only reverts once they pick somewhere new, which also drops the bbox.
+    const whereText = mapAreaActive ? "Map area" : whereLabel(selection);
     const whenText =
       whenTab === "flexible"
         ? flexMonthsSelected.length > 0
