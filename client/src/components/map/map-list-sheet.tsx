@@ -7,6 +7,7 @@ import {
   useDragControls,
   useMotionValue,
   useReducedMotion,
+  useTransform,
 } from "motion/react";
 import { Loader2 } from "lucide-react";
 
@@ -21,6 +22,8 @@ const HEIGHT_RATIO = 0.9;
 const HALF_RATIO = 0.6;
 /** Grabber plus the count row — what "closed" still shows. */
 const PEEK_PX = 104;
+/** Breathing room under the last card, on top of the hidden-strip padding. */
+const LIST_BOTTOM_PX = 40;
 
 const SNAP_ORDER: SheetSnap[] = ["peek", "half", "full"];
 
@@ -131,6 +134,12 @@ export function MapListSheet({
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [selectedId, scrollRef]);
 
+  // The sheet is a fixed 90% tall and rides on a translate, so at every snap
+  // but full its bottom sits below the viewport. Without matching padding the
+  // list scrolls its last card into that hidden strip: the scroll reaches the
+  // end while the title and price are still off screen.
+  const listPadding = useTransform(y, (offset) => offset + LIST_BOTTOM_PX);
+
   // A drag that ends over the handle still produces a trailing click, and the
   // click handler can't tell it from a tap — without this the sheet would
   // settle where the finger left it and then cycle one snap further. Framer
@@ -206,18 +215,19 @@ export function MapListSheet({
         </div>
       </button>
 
-      <div
+      <motion.div
         ref={scrollRef}
+        style={{ paddingBottom: listPadding }}
         // Peek is a handle, not a list: scrolling content nobody can see would
         // only fire the paging sentinel behind the visitor's back.
         // pt-1 keeps the selected card's ring off the scroller's top edge,
         // which was clipping it into a half-drawn border.
-        className={`min-h-0 flex-1 overscroll-contain px-4 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ${
+        className={`min-h-0 flex-1 overscroll-contain px-4 pt-1 ${
           snap === "peek" ? "overflow-hidden" : "overflow-y-auto"
         }`}
       >
         {children}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
