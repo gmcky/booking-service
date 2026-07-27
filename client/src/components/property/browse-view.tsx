@@ -90,6 +90,23 @@ function nonBboxKey(filters: PropertyQuery): string {
   return JSON.stringify(rest);
 }
 
+type NamedLocation = { city?: string; country?: string; district?: string };
+
+function namedOf(filters: PropertyQuery): NamedLocation {
+  return { city: filters.city, country: filters.country, district: filters.district };
+}
+
+function sameNamed(a: NamedLocation | undefined, b: NamedLocation | undefined): boolean {
+  return a?.city === b?.city && a?.country === b?.country && a?.district === b?.district;
+}
+
+/** Search identity of a map session: bbox AND named location stripped, because
+ *  panning replaces the one with the other. The named location is remembered
+ *  separately (see lastCameraRef) rather than folded into the key. */
+function mapSessionKey(filters: PropertyQuery): string {
+  return nonBboxKey({ ...filters, city: undefined, country: undefined, district: undefined });
+}
+
 function hasBboxFilter(filters: PropertyQuery): boolean {
   return (
     filters.minLat !== undefined &&
@@ -165,8 +182,22 @@ function BrowseResults() {
    */
   function replaceSearch(params: URLSearchParams) {
     const qs = params.toString();
+    mapWriteRef.current = qs;
     window.history.replaceState(null, "", qs ? `/browse?${qs}` : "/browse");
   }
+
+  /**
+   * The remembered camera belongs to a map session, so it only survives search
+   * params the map itself wrote. Anything else — the search pill, the filters
+   * dialog, a shared link — is a new search, and reopening the map on the
+   * previous search's viewport would quietly answer a question nobody asked.
+   */
+  const mapWriteRef = React.useRef<string | null>(searchParams.toString());
+  React.useEffect(() => {
+    if (mapWriteRef.current === searchParams.toString()) return;
+    mapWriteRef.current = null;
+    lastCameraRef.current = undefined;
+  }, [searchParams]);
 
   /** Bbox URL update — once the user moves the map, the viewport IS the
    *  location: named-location params are dropped (Airbnb's "map area"). */
@@ -179,10 +210,12 @@ function BrowseResults() {
     params.set("maxLat", bounds.maxLat.toFixed(BBOX_PRECISION));
     params.set("minLng", bounds.minLng.toFixed(BBOX_PRECISION));
     params.set("maxLng", bounds.maxLng.toFixed(BBOX_PRECISION));
-    // Tagged with the search this pan produces, not the one it started from —
-    // panning drops the named location, so that's the search a reopen sees.
+    // Tagged with the named search this area was laid over, not with the params
+    // the pan leaves behind: closing the map hands that name back, so a reopen
+    // has to recognise its own session under it.
     lastCameraRef.current = {
-      key: nonBboxKey({ ...filters, city: undefined, country: undefined, district: undefined }),
+      key: mapSessionKey(filters),
+      named: supersededLocationRef.current ?? namedOf(filters),
       bounds: [
         [bounds.minLng, bounds.minLat],
         [bounds.maxLng, bounds.maxLat],
@@ -335,11 +368,17 @@ function BrowseResults() {
    *  the set — the whole world for an unfiltered search. The tag is what keeps
    *  a stale camera from hijacking a genuinely new search. */
   const lastCameraRef = React.useRef<
-    { key: string; bounds: [[number, number], [number, number]] } | undefined
+    | {
+        key: string;
+        named: NamedLocation | undefined;
+        bounds: [[number, number], [number, number]];
+      }
+    | undefined
   >(
     hasBboxFilter(filters)
       ? {
-          key: nonBboxKey(filters),
+          key: mapSessionKey(filters),
+          named: namedOf(filters),
           bounds: [
             [filters.minLng!, filters.minLat!],
             [filters.maxLng!, filters.maxLat!],
@@ -347,13 +386,18 @@ function BrowseResults() {
         }
       : undefined,
   );
-  const searchKey = nonBboxKey(filters);
-  // A named search owns the camera: the map has to show the place that was
-  // searched, so a remembered viewport is only restored when nothing is named.
-  const hasNamedLocation = Boolean(filters.city || filters.country || filters.district);
+  // A named search owns the camera only until the visitor moves the map over
+  // it. After that the area they picked IS their answer to that search, and
+  // closing the map (which hands the name back so the list isn't worldwide)
+  // must not throw it away — reopening returns to where they left off, not to
+  // the city they typed three pans ago. A camera tagged with a different name,
+  // or dropped by a genuinely new search, never applies.
+  const cameraMemory = lastCameraRef.current;
   const restoredCamera =
-    !hasNamedLocation && lastCameraRef.current?.key === searchKey
-      ? lastCameraRef.current.bounds
+    cameraMemory &&
+    cameraMemory.key === mapSessionKey(filters) &&
+    sameNamed(cameraMemory.named, namedOf(filters))
+      ? cameraMemory.bounds
       : undefined;
 
   // Restoring the viewport also has to restore the search it framed. Without
