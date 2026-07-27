@@ -55,6 +55,14 @@ export interface BaseMapProps {
    * hint UI, so an embedded map never hijacks page scroll.
    */
   scrollZoomOnClick?: boolean;
+  /**
+   * Maplibre's own cooperative gestures: one finger scrolls the page straight
+   * past the map, two fingers pan and zoom it, and the wheel needs Ctrl. For a
+   * map embedded in a scrolling page this beats scrollZoomOnClick, which still
+   * lets a one-finger drag steal the scroll on a phone. Fullscreen switches it
+   * off, so the expanded map behaves like any other.
+   */
+  cooperativeGestures?: boolean;
   className?: string;
 }
 
@@ -74,6 +82,7 @@ export function BaseMap({
   navigationControl = true,
   fullscreenControl = false,
   scrollZoomOnClick = false,
+  cooperativeGestures = false,
   className,
 }: BaseMapProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -100,6 +109,7 @@ export function BaseMap({
       center: bounds ? undefined : (center ?? [0, 20]),
       zoom: bounds ? undefined : (center ? zoom : 1.5),
       attributionControl: { compact: true },
+      cooperativeGestures,
       // Pan and zoom only. Nothing here reads a rotated or tilted map — the
       // pins are upright labels and the results follow a north-up bounding
       // box — so a two-finger twist during a pinch only leaves the map askew

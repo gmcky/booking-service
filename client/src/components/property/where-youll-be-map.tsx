@@ -31,9 +31,12 @@ export function WhereYoullBeMap({
       center={[longitude, latitude]}
       zoom={13}
       onMapReady={handleMapReady}
-      scrollZoomOnClick
+      cooperativeGestures
       fullscreenControl
-      className="h-[420px] w-full overflow-hidden rounded-xl"
+      // The zoom buttons go on phones: two fingers already zoom, and nobody
+      // reaches for a 29px +/- on a map they can pinch. Fullscreen stays,
+      // since that is the way to a map that behaves normally.
+      className="h-[420px] w-full overflow-hidden rounded-xl max-md:[&_.maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in)]:hidden"
     />
   );
 }
