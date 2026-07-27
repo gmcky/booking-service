@@ -91,6 +91,44 @@ describe("apiClient 401 handling", () => {
     expect(useAuthStore.getState().accessToken).toBe("new");
   });
 
+  it("shares one refresh with the session bootstrap", async () => {
+    // A cold page load restores the session while a protected query on the
+    // same page hits a 401 and wants a refresh too. Refresh tokens rotate, so
+    // a second call carrying the token the first one replaced reads as reuse
+    // and the server revokes every session the visitor has — they get thrown
+    // out of their own account, mid-checkout in the case that found this.
+    let refreshCalls = 0;
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = toRequest(input, init);
+      const url = new URL(req.url);
+      if (url.pathname.includes("/auth/refresh")) {
+        refreshCalls += 1;
+        return jsonResponse({ accessToken: "fresh" }, 200);
+      }
+      return req.headers.get("Authorization") === "Bearer fresh"
+        ? jsonResponse({ id: "1" }, 200)
+        : jsonResponse({ message: "unauthorized" }, 401);
+    });
+
+    vi.resetModules();
+    vi.stubGlobal("fetch", mockFetch as unknown as typeof fetch);
+    const [clientModule, storeModule] = await Promise.all([
+      import("@/lib/api/client"),
+      import("@/lib/auth/store"),
+    ]);
+    storeModule.useAuthStore.getState().clear();
+
+    const [bootstrapToken, query] = await Promise.all([
+      clientModule.refreshSession(),
+      clientModule.apiClient.GET("/users/me"),
+    ]);
+
+    expect(refreshCalls).toBe(1);
+    expect(bootstrapToken).toBe("fresh");
+    expect(query.response.status).toBe(200);
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
   it("does not attempt a refresh on a 401 from an auth route", async () => {
     const mockFetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       jsonResponse({ message: "bad credentials" }, 401),
@@ -128,7 +166,9 @@ describe("apiClient 401 handling", () => {
     expect(response.status).toBe(401);
     expect(useAuthStore.getState().accessToken).toBeNull();
     expect(useAuthStore.getState().status).toBe("anon");
-    expect(assignMock).toHaveBeenCalledWith("/login");
+    // With the page carried along, so signing in lands back where the guest
+    // was rather than on the home page.
+    expect(assignMock).toHaveBeenCalledWith(expect.stringMatching(/^\/login(\?returnTo=|$)/));
   });
 
   it("attaches the Bearer token and does not refresh on a happy-path 200", async () => {

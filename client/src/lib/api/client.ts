@@ -18,6 +18,24 @@ export const apiClient = createClient<paths>({
  */
 let refreshPromise: Promise<string | null> | null = null;
 
+/**
+ * The only way anything in the app may refresh a session.
+ *
+ * Refresh tokens rotate, and a second request carrying the token the first one
+ * just replaced reads as reuse — the server revokes every session for that
+ * user, which is exactly what it should do to a stolen token. Two refreshes of
+ * our own therefore log the visitor out of their own account. That is what
+ * happened when a cold page load restored the session while a protected query
+ * on the same page hit a 401 and started its own refresh: it cost a guest
+ * their session mid-checkout, right after a redirect payment.
+ */
+export function refreshSession(): Promise<string | null> {
+  refreshPromise ??= refreshAccessToken().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
@@ -59,15 +77,19 @@ apiClient.use({
     // 401 from an auth route means bad credentials, not an expired session.
     if (response.status !== 401 || isAuthRoute(request)) return response;
 
-    refreshPromise ??= refreshAccessToken().finally(() => {
-      refreshPromise = null;
-    });
-    const token = await refreshPromise;
+    const token = await refreshSession();
 
     if (!token) {
       useAuthStore.getState().clear();
       if (typeof window !== "undefined") {
-        window.location.assign("/login");
+        // Carry the page along: a guest bounced from the confirmation screen
+        // after paying should land back on it once they sign in, not on the
+        // home page wondering what happened to their money.
+        const returnTo = window.location.pathname + window.location.search;
+        const isLogin = window.location.pathname.startsWith("/login");
+        window.location.assign(
+          isLogin ? "/login" : `/login?returnTo=${encodeURIComponent(returnTo)}`,
+        );
       }
       return response;
     }
