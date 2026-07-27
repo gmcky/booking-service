@@ -98,18 +98,18 @@ describe("mobile map list sheet", () => {
     expect(await within(sheet).findByText("Canal House")).toBeInTheDocument();
   });
 
-  it("expands and collapses from the handle", async () => {
+  it("opens and closes from the handle in one tap each", async () => {
     renderBrowse();
     await userEvent.click(await screen.findByRole("button", { name: "Show map" }));
 
+    // Two states on tap: open or closed. The taller snap exists, but it's a
+    // drag away — cycling three states through one control meant two taps to
+    // get anywhere and a guess about where you'd land.
     await userEvent.click(await screen.findByRole("button", { name: "Expand list" }));
-    const expanded = await screen.findByRole("button", { name: "Expand list" });
-    expect(expanded).toHaveAttribute("aria-expanded", "true");
+    const opened = await screen.findByRole("button", { name: "Collapse list" });
+    expect(opened).toHaveAttribute("aria-expanded", "true");
 
-    // Half → full, then full → peek: one control cycles the three snaps.
-    await userEvent.click(expanded);
-    const full = await screen.findByRole("button", { name: "Collapse list" });
-    await userEvent.click(full);
+    await userEvent.click(opened);
     expect(await screen.findByRole("button", { name: "Expand list" })).toHaveAttribute(
       "aria-expanded",
       "false",

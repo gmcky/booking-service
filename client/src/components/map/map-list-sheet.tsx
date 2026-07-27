@@ -30,11 +30,16 @@ export interface MapListSheetProps {
   snap: SheetSnap;
   onSnapChange: (snap: SheetSnap) => void;
   /**
-   * Scrolled into view whenever it changes: tapping a pin selects a listing,
-   * and the sheet is where that listing is read. Matched against the
-   * `data-property-id` attribute the caller puts on each card.
+   * The listing a pin tap selected. The caller renders it as the first card,
+   * so all the sheet does here is return its own scroller to the top.
+   *
+   * It used to call `scrollIntoView` on the matching card instead, which is
+   * the bug this replaced: that scrolls *every* scrollable ancestor, and the
+   * sheet hangs out of the bottom of the map overlay while it's translated
+   * down, so the overlay itself got scrolled and dragged the whole sheet up
+   * with it. The list looked like it had jumped to a different listing.
    */
-  scrollToId?: string | null;
+  selectedId?: string | null;
   /**
    * The sheet's scroll container, handed back so the caller's paging sentinel
    * can observe against it instead of against the viewport (the page behind
@@ -62,7 +67,7 @@ export function MapListSheet({
   searching,
   snap,
   onSnapChange,
-  scrollToId,
+  selectedId,
   scrollRef,
   children,
 }: MapListSheetProps) {
@@ -119,13 +124,10 @@ export function MapListSheet({
   }, [snap, height, offsets, transition, y]);
 
   React.useEffect(() => {
-    if (!scrollToId) return;
-    const card = scrollRef.current?.querySelector<HTMLElement>(
-      `[data-property-id="${CSS.escape(scrollToId)}"]`,
-    );
-    if (!card) return;
-    card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
-  }, [scrollToId, scrollRef, reduceMotion]);
+    if (!selectedId) return;
+    // Direct assignment, never scrollIntoView — see the prop's note.
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [selectedId, scrollRef]);
 
   // A drag that ends over the handle still produces a trailing click, and the
   // click handler can't tell it from a tap — without this the sheet would
@@ -185,9 +187,13 @@ export function MapListSheet({
             draggedRef.current = false;
             return;
           }
-          onSnapChange(snap === "full" ? "peek" : snap === "half" ? "full" : "half");
+          // Two states on tap, on purpose: open or closed. Cycling three
+          // states through one control meant two taps to get anywhere and a
+          // guess about which one you'd land on. Full is still there — it's
+          // reached by dragging, which is the gesture that asks for "more".
+          onSnapChange(snap === "peek" ? "half" : "peek");
         }}
-        aria-label={snap === "full" ? "Collapse list" : "Expand list"}
+        aria-label={snap === "peek" ? "Expand list" : "Collapse list"}
         aria-expanded={snap !== "peek"}
         className="shrink-0 cursor-grab px-4 pt-2.5 pb-3 active:cursor-grabbing"
       >

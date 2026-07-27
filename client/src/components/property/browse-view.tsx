@@ -390,13 +390,21 @@ function BrowseResults() {
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
   const total = query.data?.pages[0]?.pagination.total ?? 0;
-  /** The map draws every match, the sheet only holds the pages loaded so far,
-   *  so a tapped pin can point at a listing the list hasn't reached. It rides
-   *  at the top of the sheet instead, built from the marker itself. */
-  const pinnedMarker =
-    selectedId && !items.some((item) => item.id === selectedId)
-      ? ((markersQuery.data ?? []).find((marker) => marker.id === selectedId) ?? null)
-      : null;
+  /**
+   * A tapped pin always becomes the sheet's first card, whether or not the
+   * list has paged that far — the map draws every match, the list holds only
+   * what's loaded, so hunting for the card in place could land on nothing.
+   * Falling back to the marker means the card exists either way.
+   */
+  const selectedListing: PinnedListing | null = selectedId
+    ? (items.find((item) => item.id === selectedId) ??
+      (markersQuery.data ?? []).find((marker) => marker.id === selectedId) ??
+      null)
+    : null;
+  /** Shown below the pinned card, so the selection isn't on screen twice. */
+  const sheetItems = selectedListing
+    ? items.filter((item) => item.id !== selectedListing.id)
+    : items;
   // Skeleton only when there's nothing to render yet (first load). Any
   // refetch that has placeholder cards keeps them fully visible — the
   // loading cue lives in a spinner decoupled from the content, so a pan
@@ -749,7 +757,7 @@ function BrowseResults() {
                   searching={showSkeleton || searching}
                   snap={sheetSnap}
                   onSnapChange={setSheetSnap}
-                  scrollToId={selectedId}
+                  selectedId={selectedId}
                   scrollRef={sheetScrollRef}
                 >
                   {query.isError && items.length === 0 ? (
@@ -761,20 +769,20 @@ function BrowseResults() {
                     </div>
                   ) : showSkeleton ? (
                     <SheetSkeleton />
-                  ) : items.length === 0 && !pinnedMarker ? (
+                  ) : items.length === 0 && !selectedListing ? (
                     <p className="py-12 text-center text-sm text-muted-foreground">
                       No stays in this area. Try moving the map or widening your filters.
                     </p>
                   ) : (
                     <div className="flex flex-col gap-4">
-                      {pinnedMarker ? (
-                        <PinnedMarkerCard
-                          marker={pinnedMarker}
+                      {selectedListing ? (
+                        <SelectedListingCard
+                          listing={selectedListing}
                           onClose={() => setSelectedId(null)}
                           onNavigate={releaseOverlayHistory}
                         />
                       ) : null}
-                      {items.map((property) => (
+                      {sheetItems.map((property) => (
                         <div key={property.id} data-property-id={property.id}>
                           <PropertyCard
                             property={property}
@@ -857,21 +865,28 @@ function SheetSkeleton() {
   );
 }
 
-/** A pin whose listing hasn't been paged in yet: the marker carries enough to
- *  render a card, so the sheet stays the one place listings are read. */
-function PinnedMarkerCard({
-  marker,
+/** The fields the pinned card needs — satisfied by a loaded search result and
+ *  by a bare map marker alike, which is what lets the selection always render. */
+type PinnedListing = Pick<
+  PropertyMapMarker,
+  "id" | "title" | "images" | "pricePerNight" | "averageRating"
+>;
+
+/** The listing a pin tap selected, pinned above the list. Compact on purpose:
+ *  it answers "which one did I just tap" without pushing the list off screen. */
+function SelectedListingCard({
+  listing,
   onClose,
   onNavigate,
 }: {
-  marker: PropertyMapMarker;
+  listing: PinnedListing;
   onClose: () => void;
   onNavigate: () => void;
 }) {
-  const rating = formatRating(marker.averageRating);
+  const rating = formatRating(listing.averageRating);
   return (
     <Card
-      data-property-id={marker.id}
+      data-property-id={listing.id}
       className="relative gap-0 overflow-hidden border-ring p-0 ring-2 ring-ring"
     >
       <button
@@ -882,24 +897,25 @@ function PinnedMarkerCard({
       >
         <X className="size-3.5" />
       </button>
-      <Link href={`/properties/${marker.id}`} onClick={onNavigate} className="flex">
+      <Link href={`/properties/${listing.id}`} onClick={onNavigate} className="flex">
         <div
           className="relative flex aspect-square w-28 shrink-0 items-center justify-center"
           style={{ backgroundImage: PHOTO_STRIPES }}
         >
-          {marker.images[0] ? (
+          {listing.images[0] ? (
             <Image
-              src={photoUrl(marker.images[0])}
-              alt={marker.title}
+              src={photoUrl(listing.images[0])}
+              alt={listing.title}
               fill
               sizes="112px"
               className="object-cover"
             />
           ) : null}
         </div>
-        <div className="min-w-0 flex-1 p-3">
+        {/* Right padding clears the close button, which sits over this row. */}
+        <div className="min-w-0 flex-1 py-3 pr-10 pl-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-semibold">{marker.title}</span>
+            <span className="truncate text-sm font-semibold">{listing.title}</span>
             {rating ? (
               <span className="inline-flex shrink-0 items-center gap-1 text-xs">
                 <Star className="size-3 fill-current" />
@@ -908,7 +924,7 @@ function PinnedMarkerCard({
             ) : null}
           </div>
           <div className="mt-1.5 text-sm">
-            <strong className="font-semibold">{formatPrice(marker.pricePerNight)}</strong>{" "}
+            <strong className="font-semibold">{formatPrice(listing.pricePerNight)}</strong>{" "}
             <span className="text-muted-foreground">night</span>
           </div>
         </div>
