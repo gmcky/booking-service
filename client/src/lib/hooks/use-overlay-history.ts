@@ -39,10 +39,33 @@ export function useOverlayHistory(open: boolean, onClose: () => void): () => voi
     return () => {
       window.removeEventListener("popstate", onPopState);
       // Closed by the UI rather than by Back, so drop the entry we added.
-      if (ownedRef.current) {
-        ownedRef.current = false;
-        window.history.back();
-      }
+      if (!ownedRef.current) return;
+      ownedRef.current = false;
+
+      // Whatever the overlay wrote into the query string while it was open
+      // belongs to the page, not to the entry being dropped. Going back alone
+      // would restore the URL as it stood when the overlay opened — the browse
+      // map rewrites its area on every pan, so closing it rewound the list to
+      // an area the visitor had already left.
+      const url = window.location.href;
+      const state = window.history.state;
+      const restore = () => {
+        window.removeEventListener("popstate", restore);
+        // A tick later, not inside the handler: the router processes the same
+        // popstate and rebuilds its own view of the URL from the entry being
+        // restored, so a replaceState issued during the event is overwritten
+        // and the page keeps rendering the search it just left.
+        setTimeout(() => {
+          window.history.replaceState(state, "", url);
+          // Tell the router to re-read the address bar: it has just rebuilt its
+          // own view of the URL from the popped entry, and a bare replaceState
+          // leaves the two disagreeing — the address says one search, the page
+          // renders another.
+          window.dispatchEvent(new PopStateEvent("popstate", { state }));
+        }, 0);
+      };
+      window.addEventListener("popstate", restore);
+      window.history.back();
     };
   }, [open]);
 
