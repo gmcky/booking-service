@@ -1002,6 +1002,9 @@ function SelectedListingCard({
               alt={listing.title}
               fill
               sizes="(max-width: 640px) 100vw, 360px"
+              // Eager: this card appears in response to a tap, and a photo
+              // that fades in a second later reads as a second thing arriving.
+              priority
               className="object-cover"
             />
           ) : null}

@@ -29,11 +29,10 @@ const MONTH_NAMES = [
 ];
 
 /**
- * Opens a date-picker popover trigger and clicks the target date. Assumes
- * the target falls within the currently-displayed month (true for the
- * small day offsets this spec uses in the common case) — doesn't navigate
- * months, since the calendar caption isn't exposed as an accessible heading
- * to detect the displayed month from.
+ * Opens a date-picker popover trigger and clicks the target date, paging
+ * forward if it falls outside the month on screen. The spec books two weeks
+ * out, so for the last fortnight of any month the target is in the next one —
+ * which is why this used to fail only near month end.
  */
 async function pickDate(page: Page, target: Date) {
   await page.getByText("Add date").first().click();
@@ -43,7 +42,12 @@ async function pickDate(page: Page, target: Date) {
     `${MONTH_NAMES[target.getMonth()]} ${target.getDate()}(st|nd|rd|th), ${target.getFullYear()}`,
     "i",
   );
-  await page.getByRole("button", { name: dayLabel }).click();
+  const day = page.getByRole("button", { name: dayLabel }).first();
+  for (let hop = 0; hop < 12 && !(await day.count()); hop++) {
+    await page.getByRole("button", { name: /go to the next month/i }).first().click();
+    await page.waitForTimeout(250);
+  }
+  await day.click();
   await page.waitForTimeout(300);
 }
 
