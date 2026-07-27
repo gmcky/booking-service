@@ -170,9 +170,13 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
 
     // Crossing the breakpoint with the overlay open (rotation, resize)
     // hands off to the desktop popover rather than stranding a hidden overlay.
+    // The other direction collapses the pill: the expanded panel is a desktop
+    // layout, and at phone widths it renders as a stretched oval nobody
+    // designed — the stepped flow is the phone's version of it.
     React.useEffect(() => {
       if (!isMobile) setMobileStep(null);
-    }, [isMobile]);
+      else if (collapsible) setExpanded(false);
+    }, [isMobile, collapsible]);
 
     const mobileOverlayOpen = mobileStep !== null;
     React.useEffect(() => {
@@ -672,6 +676,39 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       return parts.length > 0 ? parts.join(" · ") : undefined;
     })();
 
+    /**
+     * What the results currently answer, read from the URL rather than from the
+     * pill's own draft. The collapsed bar is a statement about the list behind
+     * it: a destination picked in the stepped flow and never submitted used to
+     * leave the bar reading "Sydney" over a page of Kyiv listings.
+     */
+    const activeWhereText = (() => {
+      const named = whereLabel({
+        country: initialFilters?.country,
+        city: initialFilters?.city,
+        district: initialFilters?.district,
+      });
+      if (named) return named;
+      return mapBounds ? "Map area" : undefined;
+    })();
+    const activeWhenText = (() => {
+      if (!initialFilters?.checkIn || !initialFilters.checkOut) return undefined;
+      return formatDatesLabel({
+        from: new Date(initialFilters.checkIn),
+        to: new Date(initialFilters.checkOut),
+      });
+    })();
+    const activeWhoText = (() => {
+      const parts: string[] = [];
+      const guests = initialFilters?.maxGuests ?? 0;
+      if (guests > 0) parts.push(`${guests} guest${guests === 1 ? "" : "s"}`);
+      const rules: string[] = [];
+      if (initialFilters?.petsAllowed) rules.push("pets");
+      if (initialFilters?.infantsAllowed) rules.push("infants");
+      if (rules.length > 0) parts.push(rules.join(" · "));
+      return parts.length > 0 ? parts.join(" · ") : undefined;
+    })();
+
     // Full-screen stepped search flow (phones). Portaled so it escapes any
     // ancestor stacking/transform context; same state as the desktop pill,
     // just different chrome. The destination input deliberately has no
@@ -859,7 +896,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
         : null;
 
     if (collapsible && !expanded && compact) {
-      const summary = [whereText, whenText, whoText].filter(Boolean).join(" · ");
+      const summary = [activeWhereText, activeWhenText, activeWhoText].filter(Boolean).join(" · ");
       return (
         <div ref={rootRef}>
           {mobileOverlay}
@@ -901,8 +938,8 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
               onClick={() => expandAndOpen("where")}
               className="min-w-0 flex-1 truncate rounded-full px-4 py-2 text-sm font-medium hover:bg-muted"
             >
-              <span className={whereText ? "text-foreground" : "text-muted-foreground"}>
-                {whereText ?? "Anywhere"}
+              <span className={activeWhereText ? "text-foreground" : "text-muted-foreground"}>
+                {activeWhereText ?? "Anywhere"}
               </span>
             </button>
             <div className="h-5 w-px shrink-0 bg-border" />
@@ -911,8 +948,8 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
               onClick={() => expandAndOpen("when")}
               className="min-w-0 flex-1 truncate rounded-full px-4 py-2 text-sm font-medium hover:bg-muted"
             >
-              <span className={whenText ? "text-foreground" : "text-muted-foreground"}>
-                {whenText ?? "Anytime"}
+              <span className={activeWhenText ? "text-foreground" : "text-muted-foreground"}>
+                {activeWhenText ?? "Anytime"}
               </span>
             </button>
             <div className="h-5 w-px shrink-0 bg-border" />
@@ -921,15 +958,20 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
               onClick={() => expandAndOpen("who")}
               className="min-w-0 flex-1 truncate rounded-full px-4 py-2 text-sm font-medium hover:bg-muted"
             >
-              <span className={whoText ? "text-foreground" : "text-muted-foreground"}>
-                {whoText ?? "Add guests"}
+              <span className={activeWhoText ? "text-foreground" : "text-muted-foreground"}>
+                {activeWhoText ?? "Add guests"}
               </span>
             </button>
+            {/* Desktop only. On a phone this button expanded the pill into the
+                desktop panel, which is a layout that was never designed for 390px
+                — and it looked like a submit while submitting nothing, so a
+                destination picked in the stepped flow appeared to be searched
+                when it was not. Phones reach the flow by tapping a segment. */}
             <button
               type="button"
               aria-label="Search"
               onClick={() => setExpanded(true)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/80"
+              className="hidden size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/80 md:flex"
             >
               <Search className="size-4" />
             </button>
