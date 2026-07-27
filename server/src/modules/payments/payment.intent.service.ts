@@ -71,6 +71,15 @@ export class PaymentIntentService {
           // race in the webhook. A losing authorization is voided — no money
           // moves and no processing fee accrues, unlike charge-then-refund.
           capture_method: "manual",
+          // Only what this flow has actually been exercised with. Left to the
+          // dashboard's defaults, Stripe also offered Klarna, Affirm, Link and
+          // Amazon Pay here — methods whose asynchronous states nothing in the
+          // confirm-race path has ever seen. Cash App Pay showed what an
+          // unexercised method costs: it delivered its authorization webhook
+          // twice and three paid stays were cancelled and refunded before the
+          // cause was found. Widening this list means walking a real payment
+          // through the method first.
+          payment_method_types: ["card", "cashapp"],
           metadata: {
             bookingId: booking.id,
             userId,
