@@ -15,8 +15,10 @@ export type SheetSnap = "peek" | "half" | "full";
 /** Sheet height as a share of the map overlay. A strip of map stays visible
  *  even at full, so the sheet never reads as a page of its own. */
 const HEIGHT_RATIO = 0.9;
-/** Share of the overlay the sheet covers at the half snap. */
-const HALF_RATIO = 0.55;
+/** Share of the overlay the sheet covers at the half snap. Sized so the
+ *  selected listing card fits with a strip of the next card still showing —
+ *  that strip is what says the list continues under it. */
+const HALF_RATIO = 0.6;
 /** Grabber plus the count row — what "closed" still shows. */
 const PEEK_PX = 104;
 
@@ -208,7 +210,9 @@ export function MapListSheet({
         ref={scrollRef}
         // Peek is a handle, not a list: scrolling content nobody can see would
         // only fire the paging sentinel behind the visitor's back.
-        className={`min-h-0 flex-1 overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ${
+        // pt-1 keeps the selected card's ring off the scroller's top edge,
+        // which was clipping it into a half-drawn border.
+        className={`min-h-0 flex-1 overscroll-contain px-4 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ${
           snap === "peek" ? "overflow-hidden" : "overflow-y-auto"
         }`}
       >

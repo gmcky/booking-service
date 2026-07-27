@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
+import { FavoriteButton } from "@/components/property/favorite-button";
 import { SearchPill, type SearchPillHandle } from "@/components/search/search-pill";
 import { QuickFilters } from "@/components/search/quick-filters";
 import { FiltersDialog } from "@/components/search/filters-dialog";
@@ -394,17 +395,27 @@ function BrowseResults() {
    * A tapped pin always becomes the sheet's first card, whether or not the
    * list has paged that far — the map draws every match, the list holds only
    * what's loaded, so hunting for the card in place could land on nothing.
-   * Falling back to the marker means the card exists either way.
    */
+  const selectedItem = selectedId
+    ? (items.find((item) => item.id === selectedId) ?? null)
+    : null;
+  /** Markers carry no city or description, and the selected card is the most
+   *  prominent thing in the sheet — it shouldn't be a thinner version of the
+   *  cards below it just because its page hasn't loaded. One cached request. */
+  const selectedDetail = useQuery({
+    queryKey: queryKeys.properties.detail(selectedId ?? ""),
+    queryFn: () => propertyApi.byId(selectedId!),
+    enabled: Boolean(selectedId) && !selectedItem && isMobile && mapOpen,
+    staleTime: BROWSE_STALE_TIME_MS,
+  });
   const selectedListing: PinnedListing | null = selectedId
-    ? (items.find((item) => item.id === selectedId) ??
+    ? (selectedItem ??
+      selectedDetail.data ??
       (markersQuery.data ?? []).find((marker) => marker.id === selectedId) ??
       null)
     : null;
-  /** Shown below the pinned card, so the selection isn't on screen twice. */
-  const sheetItems = selectedListing
-    ? items.filter((item) => item.id !== selectedListing.id)
-    : items;
+  /** Shown below the selected card, so the selection isn't on screen twice. */
+  const sheetItems = selectedId ? items.filter((item) => item.id !== selectedId) : items;
   // Skeleton only when there's nothing to render yet (first load). Any
   // refetch that has placeholder cards keeps them fully visible — the
   // loading cue lives in a spinner decoupled from the content, so a pan
@@ -865,15 +876,26 @@ function SheetSkeleton() {
   );
 }
 
-/** The fields the pinned card needs — satisfied by a loaded search result and
- *  by a bare map marker alike, which is what lets the selection always render. */
+/**
+ * The fields the selected card needs. A loaded search result carries all of
+ * them; a bare map marker carries everything but `city` and `description`,
+ * which is why an unloaded selection fetches its listing (see the detail query
+ * in BrowseResults) instead of rendering a thinner card than the ones below it.
+ */
 type PinnedListing = Pick<
   PropertyMapMarker,
   "id" | "title" | "images" | "pricePerNight" | "averageRating"
->;
+> & { city?: string; description?: string };
 
-/** The listing a pin tap selected, pinned above the list. Compact on purpose:
- *  it answers "which one did I just tap" without pushing the list off screen. */
+/**
+ * The listing a pin tap selected, sitting above the list.
+ *
+ * It reads like the cards under it on purpose: it was compact at first, and
+ * that inverted the hierarchy — the one thing the visitor had just chosen was
+ * the smallest thing on screen. The photo is shorter than a list card's (16/10
+ * against 4/3) so a strip of the next card still shows at the half snap, which
+ * is what says there's a list underneath rather than a dead end.
+ */
 function SelectedListingCard({
   listing,
   onClose,
@@ -889,41 +911,52 @@ function SelectedListingCard({
       data-property-id={listing.id}
       className="relative gap-0 overflow-hidden border-ring p-0 ring-2 ring-ring"
     >
+      {/* Close sits opposite the heart, which the card keeps from the list. */}
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute top-2 right-2 z-10 flex size-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm"
+        className="absolute top-2.5 left-2.5 z-20 flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm active:scale-90"
       >
-        <X className="size-3.5" />
+        <X className="size-4" />
       </button>
-      <Link href={`/properties/${listing.id}`} onClick={onNavigate} className="flex">
+      <Link href={`/properties/${listing.id}`} onClick={onNavigate} className="block">
         <div
-          className="relative flex aspect-square w-28 shrink-0 items-center justify-center"
+          className="relative flex aspect-[16/10] items-center justify-center"
           style={{ backgroundImage: PHOTO_STRIPES }}
         >
+          <FavoriteButton propertyId={listing.id} variant="overlay" />
           {listing.images[0] ? (
             <Image
               src={photoUrl(listing.images[0])}
               alt={listing.title}
               fill
-              sizes="112px"
+              sizes="(max-width: 640px) 100vw, 360px"
               className="object-cover"
             />
           ) : null}
         </div>
-        {/* Right padding clears the close button, which sits over this row. */}
-        <div className="min-w-0 flex-1 py-3 pr-10 pl-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-semibold">{listing.title}</span>
+        <div className="px-4 pt-3 pb-4">
+          <div className="flex items-start justify-between gap-2">
+            <span className="line-clamp-2 text-[15px] leading-snug font-semibold">
+              {listing.title}
+            </span>
             {rating ? (
-              <span className="inline-flex shrink-0 items-center gap-1 text-xs">
-                <Star className="size-3 fill-current" />
+              <span className="inline-flex shrink-0 items-center gap-1 text-[13px] leading-snug">
+                <Star className="size-3.5 fill-current" />
                 {rating}
               </span>
             ) : null}
           </div>
-          <div className="mt-1.5 text-sm">
+          {listing.city ? (
+            <div className="mt-0.5 text-sm text-muted-foreground">{listing.city}</div>
+          ) : null}
+          {listing.description ? (
+            <p className="mt-2 line-clamp-2 text-[13px] text-muted-foreground">
+              {listing.description}
+            </p>
+          ) : null}
+          <div className="mt-2.5 text-sm">
             <strong className="font-semibold">{formatPrice(listing.pricePerNight)}</strong>{" "}
             <span className="text-muted-foreground">night</span>
           </div>
