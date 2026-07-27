@@ -30,6 +30,9 @@ interface MarkerEntry {
 const PILL_HEIGHT = 32;
 const PILL_CHAR_WIDTH = 8;
 const PILL_PADDING = 24;
+/** A collapsed marker's dot, plus a little breathing room around it. */
+const DOT_SIZE = 12;
+const DOT_MARGIN = 4;
 
 /**
  * Imperatively manages maplibregl.Marker price pills against a live map
@@ -70,33 +73,50 @@ export function PriceMarkers({
       ([a], [b]) => priorityOf(b, selectedId, hoveredId) - priorityOf(a, selectedId, hoveredId),
     );
 
-    const placed: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    type Rect = { x1: number; y1: number; x2: number; y2: number };
+    const placed: Rect[] = [];
+    const free = (r: Rect) =>
+      !placed.some((p) => r.x1 < p.x2 && r.x2 > p.x1 && r.y1 < p.y2 && r.y2 > p.y1);
+    const boxAt = (x: number, y: number, w: number, h: number): Rect => ({
+      x1: x - w / 2,
+      y1: y - h / 2,
+      x2: x + w / 2,
+      y2: y + h / 2,
+    });
+
     for (const [id, { marker, label }] of entries) {
       const { x, y } = map.project(marker.getLngLat());
-      const w = label.length * PILL_CHAR_WIDTH + PILL_PADDING;
-      const rect = {
-        x1: x - w / 2,
-        y1: y - PILL_HEIGHT / 2,
-        x2: x + w / 2,
-        y2: y + PILL_HEIGHT / 2,
-      };
-      const collides = placed.some(
-        (r) => rect.x1 < r.x2 && rect.x2 > r.x1 && rect.y1 < r.y2 && rect.y2 > r.y1,
-      );
-
       const selected = id === selectedId;
       const hovered = id === hoveredId;
       const pill = pillOf(marker);
-      if (collides) {
-        pill.className = dotClassName({ selected, hovered });
-        pill.textContent = "";
-      } else {
+      const element = marker.getElement();
+
+      const pillRect = boxAt(x, y, label.length * PILL_CHAR_WIDTH + PILL_PADDING, PILL_HEIGHT);
+      const dotRect = boxAt(x, y, DOT_SIZE + DOT_MARGIN * 2, DOT_SIZE + DOT_MARGIN * 2);
+
+      // Three tiers, and every visible marker claims the pixels it occupies.
+      // Dots used to claim nothing, so a dot could sit inside a neighbouring
+      // pill: you tapped a dot you could plainly see, the pill on top of it
+      // answered, and the sheet opened a listing you didn't pick. Flipping the
+      // z-order only moved the problem onto the pills. A marker with no room
+      // of its own is hidden instead — zooming in is what pulls markers apart,
+      // and it brings them straight back.
+      if (free(pillRect)) {
+        placed.push(pillRect);
+        element.style.display = "";
         pill.className = pillClassName({ selected, hovered });
         if (pill.textContent !== label) pill.textContent = label;
-        // Dots don't claim space — they may crowd, pills may not.
-        placed.push(rect);
+        element.style.zIndex = selected || hovered ? "30" : "10";
+      } else if (free(dotRect)) {
+        placed.push(dotRect);
+        element.style.display = "";
+        pill.className = dotClassName({ selected, hovered });
+        pill.textContent = "";
+        element.style.zIndex = selected || hovered ? "30" : "20";
+      } else {
+        // Selected and hovered sort first, so they never land here.
+        element.style.display = "none";
       }
-      marker.getElement().style.zIndex = selected || hovered ? "30" : collides ? "0" : "10";
     }
   };
 
