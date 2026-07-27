@@ -14,10 +14,12 @@ import type {
 } from "./user.types.js";
 
 const REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+// Must match the attributes the cookie was set with (auth.controller), or the
+// browser keeps the old one and a deleted account stays signed in.
 const REFRESH_TOKEN_CLEAR_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === "production",
-  sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+  sameSite: "lax",
   path: `/api/${env.API_VERSION}/auth`,
 };
 

@@ -6,10 +6,20 @@ import { parseExpiry } from "../../shared/utils/time.js";
 import type { VerifyEmailInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.types.js";
 
 const REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+/**
+ * Lax rather than Strict. A redirect payment method (Cash App Pay, a bank
+ * redirect, a 3DS challenge) brings the guest back through a cross-site
+ * navigation, and the session has to survive that on every browser, not just
+ * the ones measured to be lenient about it.
+ *
+ * The CSRF posture is unchanged where it counts: refresh is a POST, and Lax
+ * withholds the cookie from cross-site POSTs exactly as Strict does. What it
+ * adds is the top-level GET navigation back into our own site.
+ */
 const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === "production",
-  sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
+  sameSite: "lax",
   path: `/api/${env.API_VERSION}/auth`,
   maxAge: parseExpiry(env.JWT_REFRESH_EXPIRES_IN),
 };
