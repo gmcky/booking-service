@@ -17,6 +17,7 @@ vi.mock("../../shared/lib/stripe.js", () => ({
     paymentIntents: {
       capture: vi.fn(),
       cancel: vi.fn(),
+      retrieve: vi.fn(),
     },
   },
 }));
@@ -57,7 +58,11 @@ const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
 const mockStripe = stripe as unknown as {
   webhooks: { constructEvent: ReturnType<typeof vi.fn> };
   refunds: { create: ReturnType<typeof vi.fn> };
-  paymentIntents: { capture: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> };
+  paymentIntents: {
+    capture: ReturnType<typeof vi.fn>;
+    cancel: ReturnType<typeof vi.fn>;
+    retrieve: ReturnType<typeof vi.fn>;
+  };
 };
 const mockEmailQueue = emailQueue as unknown as {
   add: ReturnType<typeof vi.fn>;
@@ -213,6 +218,81 @@ describe("PaymentWebhookService.handleStripeWebhook", () => {
       );
       expect(mockStripe.paymentIntents.cancel).not.toHaveBeenCalled();
       expect(mockEmailQueue.add).not.toHaveBeenCalled();
+    });
+
+    it("keeps the booking when the capture call loses to a duplicate event", async () => {
+      // Stripe delivers amount_capturable_updated more than once for the same
+      // authorization (seen twice, a second apart, with Cash App Pay). One
+      // handler captures, the other's capture call errors — and rolling back
+      // there cancelled a paid booking and refunded the guest.
+      authEvent("evt_dup");
+      (mockPrisma.booking.findUnique as any).mockResolvedValue(AUTH_BOOKING);
+      (mockPrisma.booking.count as any).mockResolvedValue(0);
+      (mockPrisma.booking.updateMany as any).mockResolvedValue({ count: 1 });
+      mockStripe.paymentIntents.capture.mockRejectedValue(
+        new Error("PaymentIntent has already been captured"),
+      );
+      mockStripe.paymentIntents.retrieve.mockResolvedValue({
+        id: "pi_auth",
+        status: "succeeded",
+        amount_received: 30000,
+      });
+
+      await PaymentWebhookService.handleStripeWebhook("raw", "sig");
+
+      expect(mockStripe.paymentIntents.cancel).not.toHaveBeenCalled();
+      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "CANCELLED" }),
+        }),
+      );
+      expect(mockSendOpsAlert).not.toHaveBeenCalled();
+    });
+
+    it("retries the capture once when the authorization is still open", async () => {
+      authEvent("evt_retry");
+      (mockPrisma.booking.findUnique as any).mockResolvedValue(AUTH_BOOKING);
+      (mockPrisma.booking.count as any).mockResolvedValue(0);
+      (mockPrisma.booking.updateMany as any).mockResolvedValue({ count: 1 });
+      // First call loses to a concurrent duplicate, second one goes through.
+      mockStripe.paymentIntents.capture
+        .mockRejectedValueOnce(new Error("idempotent request in progress"))
+        .mockResolvedValueOnce({ id: "pi_auth" });
+      mockStripe.paymentIntents.retrieve.mockResolvedValue({
+        id: "pi_auth",
+        status: "requires_capture",
+        amount_received: 0,
+      });
+
+      await PaymentWebhookService.handleStripeWebhook("raw", "sig");
+
+      expect(mockStripe.paymentIntents.capture).toHaveBeenCalledTimes(2);
+      expect(mockStripe.paymentIntents.cancel).not.toHaveBeenCalled();
+      expect(mockSendOpsAlert).not.toHaveBeenCalled();
+    });
+
+    it("still releases the booking when the money really was not captured", async () => {
+      authEvent("evt_capture_failed");
+      (mockPrisma.booking.findUnique as any).mockResolvedValue(AUTH_BOOKING);
+      (mockPrisma.booking.count as any).mockResolvedValue(0);
+      (mockPrisma.booking.updateMany as any).mockResolvedValue({ count: 1 });
+      (mockPrisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
+      mockStripe.paymentIntents.capture.mockRejectedValue(new Error("card declined"));
+      mockStripe.paymentIntents.retrieve.mockResolvedValue({
+        id: "pi_auth",
+        status: "requires_capture",
+        amount_received: 0,
+      });
+      mockStripe.paymentIntents.cancel.mockResolvedValue({ id: "pi_auth" });
+
+      await PaymentWebhookService.handleStripeWebhook("raw", "sig");
+
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: "booking-race", status: "CONFIRMED" },
+        data: { status: "CANCELLED", cancelledBy: "SYSTEM", payoutStatus: "CANCELLED" },
+      });
+      expect(mockStripe.paymentIntents.cancel).toHaveBeenCalled();
+      expect(mockSendOpsAlert).toHaveBeenCalled();
     });
 
     it("voids the authorization and releases the booking when the race is lost", async () => {

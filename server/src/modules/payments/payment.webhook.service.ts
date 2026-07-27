@@ -201,13 +201,20 @@ export class PaymentWebhookService {
     }
 
     if (outcome === "WON") {
-      try {
-        await stripe.paymentIntents.capture(
-          paymentIntent.id,
-          {},
-          { idempotencyKey: `capture_${paymentIntent.id}` },
+      const captureError = await this.captureAuthorization(paymentIntent.id, bookingId);
+      if (!captureError) {
+        // Confirmation is the moment inventory locks now — search caches must
+        // drop stale availability.
+        await cacheInvalidateNamespace("properties:search");
+        logger.info(
+          { bookingId, paymentIntentId: paymentIntent.id },
+          "Booking won confirm race — captured",
         );
-      } catch (error) {
+        return;
+      }
+
+      {
+        const error = captureError;
         // Booking is confirmed but no funds were captured — roll back and
         // release rather than hold inventory for free.
         logger.error(
@@ -231,15 +238,6 @@ export class PaymentWebhookService {
         await this.voidAuthorization(paymentIntent.id, booking.id);
         return;
       }
-
-      // Confirmation is the moment inventory locks now — search caches must
-      // drop stale availability.
-      await cacheInvalidateNamespace("properties:search");
-      logger.info(
-        { bookingId, paymentIntentId: paymentIntent.id },
-        "Booking won confirm race — captured",
-      );
-      return;
     }
 
     // LOST or GONE: release the authorization, never charge.
@@ -277,6 +275,72 @@ export class PaymentWebhookService {
         { bookingId, paymentIntentId: paymentIntent.id },
         "Authorization arrived for a released booking — voided",
       );
+    }
+  }
+
+  /**
+   * Capture the authorization, and answer one question: is the money in?
+   * Returns the error only when it definitively is not, because the caller
+   * responds to that by cancelling a booking the guest believes they hold.
+   *
+   * Stripe delivers `amount_capturable_updated` more than once for the same
+   * authorization — twice, a second apart, in the Cash App Pay flow that
+   * exposed this. Two handlers then race the same capture: one wins, the
+   * other's call comes back "already captured" or as an idempotency conflict
+   * while the winner is still in flight. Treating either as a failed capture
+   * cancelled a paid booking and refunded a guest who had done nothing wrong,
+   * so the intent itself is consulted before believing the error, and a call
+   * that lost to a concurrent one is retried once.
+   */
+  private static async captureAuthorization(
+    paymentIntentId: string,
+    bookingId: string,
+  ): Promise<unknown | null> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await stripe.paymentIntents.capture(
+          paymentIntentId,
+          {},
+          { idempotencyKey: `capture_${paymentIntentId}` },
+        );
+        return null;
+      } catch (error) {
+        if (await this.isCaptured(paymentIntentId)) {
+          logger.info(
+            { bookingId, paymentIntentId },
+            "Capture call failed but the intent is captured — treating as won",
+          );
+          return null;
+        }
+        if (attempt === 2) return error;
+        // The authorization is still live: most likely a duplicate delivery
+        // captured it a moment ago and Stripe hasn't settled the state yet.
+        logger.warn(
+          { error, bookingId, paymentIntentId },
+          "Capture failed with the authorization still open — retrying once",
+        );
+        await sleep(500);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Did the money actually move? Asked after a failed capture call, where the
+   * error may only mean "someone else captured this a moment ago". Treated as
+   * "not captured" if Stripe itself can't be reached: the rollback that
+   * follows voids the authorization, which is the safe direction.
+   */
+  private static async isCaptured(paymentIntentId: string): Promise<boolean> {
+    try {
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      return intent.status === "succeeded" || (intent.amount_received ?? 0) > 0;
+    } catch (error) {
+      logger.error(
+        { error, paymentIntentId },
+        "Could not read the intent back after a failed capture",
+      );
+      return false;
     }
   }
 
