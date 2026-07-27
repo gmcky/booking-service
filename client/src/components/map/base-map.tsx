@@ -100,7 +100,16 @@ export function BaseMap({
       center: bounds ? undefined : (center ?? [0, 20]),
       zoom: bounds ? undefined : (center ? zoom : 1.5),
       attributionControl: { compact: true },
+      // Pan and zoom only. Nothing here reads a rotated or tilted map — the
+      // pins are upright labels and the results follow a north-up bounding
+      // box — so a two-finger twist during a pinch only leaves the map askew
+      // with no obvious way back.
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
     });
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
     mapRef.current = map;
 
     if (bounds) {

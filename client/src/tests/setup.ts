@@ -48,6 +48,10 @@ class MockScrollZoom {
 
 class MockMap {
   scrollZoom = new MockScrollZoom();
+  // Gesture handlers the map switches off at construction (rotation is
+  // disabled app-wide — pan and zoom only).
+  touchZoomRotate = { disableRotation: vi.fn(), enable: vi.fn(), disable: vi.fn() };
+  keyboard = { disableRotation: vi.fn(), enable: vi.fn(), disable: vi.fn() };
   private listeners = new Map<string, Set<Listener>>();
 
   constructor(_options: unknown) {}
