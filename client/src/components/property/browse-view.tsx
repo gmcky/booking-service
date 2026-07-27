@@ -116,6 +116,22 @@ function mapSessionKey(filters: PropertyQuery): string {
   return nonBboxKey({ ...filters, city: undefined, country: undefined, district: undefined });
 }
 
+/** Camera plus the named search it replaced — see currentMapSession(). */
+interface MapSession {
+  supersededLocation?: NamedLocation;
+  camera?: {
+    key: string;
+    named: NamedLocation | undefined;
+    bounds: [[number, number], [number, number]];
+  };
+}
+
+function readMapSession(): MapSession {
+  if (typeof window === "undefined") return {};
+  const state = window.history.state as { mapSession?: MapSession } | null;
+  return state?.mapSession ?? {};
+}
+
 function hasBboxFilter(filters: PropertyQuery): boolean {
   return (
     filters.minLat !== undefined &&
@@ -149,6 +165,10 @@ function BrowseResults() {
     () => parseFilters(new URLSearchParams(searchParams.toString())),
     [searchParams],
   );
+
+  // Read once per mount: coming back from a listing restores this entry, and
+  // with it whatever map session was in flight.
+  const [restoredMapSession] = React.useState(readMapSession);
 
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   // Collapsed by default; a bbox in the URL means a map session is being
@@ -191,7 +211,37 @@ function BrowseResults() {
    */
   function replaceSearch(params: URLSearchParams) {
     const qs = params.toString();
+    // The URL write keeps the shape the router understands: a state object of
+    // our own here stops useSearchParams from following the change at all, and
+    // the list silently stops tracking the map. The session rides along in a
+    // second, URL-less call.
     window.history.replaceState(null, "", qs ? `/browse?${qs}` : "/browse");
+    persistMapSession();
+  }
+
+  /**
+   * The map session lives on the history entry, not just in refs.
+   *
+   * Opening a listing from the map and coming back remounts this page, and a
+   * ref-only memory is gone by then: closing the map afterwards could no longer
+   * hand back the city the area had replaced, so a search for Sydney came back
+   * as "map area" with no way to recover it. History state belongs to the
+   * entry, so Back restores it along with the URL, and it stays out of the
+   * query string where a shared link would carry it to strangers.
+   */
+  function currentMapSession(): MapSession {
+    return {
+      supersededLocation: supersededLocationRef.current,
+      camera: lastCameraRef.current,
+    };
+  }
+
+  /** Keeps the entry's copy in step when the refs change without a URL write. */
+  function persistMapSession() {
+    window.history.replaceState(
+      { ...window.history.state, mapSession: currentMapSession() },
+      "",
+    );
   }
 
   /**
@@ -240,9 +290,9 @@ function BrowseResults() {
    *  searched Kyiv, glanced at the map and closed it lands on every listing
    *  worldwide with nothing on screen explaining why. Cleared once the visitor
    *  is genuinely searching nowhere in particular. */
-  const supersededLocationRef = React.useRef<
-    { city?: string; country?: string; district?: string } | undefined
-  >(undefined);
+  const supersededLocationRef = React.useRef<NamedLocation | undefined>(
+    restoredMapSession.supersededLocation,
+  );
   React.useEffect(() => {
     if (filters.city || filters.country || filters.district) {
       supersededLocationRef.current = {
@@ -253,6 +303,9 @@ function BrowseResults() {
     } else if (!hasBbox) {
       supersededLocationRef.current = undefined;
     }
+    persistMapSession();
+    // persistMapSession only reads refs, so it never needs to be a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.city, filters.country, filters.district, hasBbox]);
 
   /** Closing the map takes its area with it and restores the named search. */
@@ -439,24 +492,21 @@ function BrowseResults() {
    *  remounts the panel with nothing to restore and refits to every marker in
    *  the set — the whole world for an unfiltered search. The tag is what keeps
    *  a stale camera from hijacking a genuinely new search. */
-  const lastCameraRef = React.useRef<
-    | {
-        key: string;
-        named: NamedLocation | undefined;
-        bounds: [[number, number], [number, number]];
-      }
-    | undefined
-  >(
-    hasBboxFilter(filters)
-      ? {
-          key: mapSessionKey(filters),
-          named: namedOf(filters),
-          bounds: [
-            [filters.minLng!, filters.minLat!],
-            [filters.maxLng!, filters.maxLat!],
-          ],
-        }
-      : undefined,
+  const lastCameraRef = React.useRef<MapSession["camera"]>(
+    // The entry's own copy wins: it survived the trip to a listing and back,
+    // and it carries the named search the area replaced. Falling back to the
+    // URL covers a fresh load into a bbox (reload, shared link).
+    restoredMapSession.camera ??
+      (hasBboxFilter(filters)
+        ? {
+            key: mapSessionKey(filters),
+            named: namedOf(filters),
+            bounds: [
+              [filters.minLng!, filters.minLat!],
+              [filters.maxLng!, filters.maxLat!],
+            ],
+          }
+        : undefined),
   );
   // A named search owns the camera only until the visitor moves the map over
   // it. After that the area they picked IS their answer to that search, and
@@ -465,10 +515,18 @@ function BrowseResults() {
   // the city they typed three pans ago. A camera tagged with a different name,
   // or dropped by a genuinely new search, never applies.
   const cameraMemory = lastCameraRef.current;
-  const restoredCamera =
-    cameraMemory &&
-    cameraMemory.key === mapSessionKey(filters) &&
-    sameNamed(cameraMemory.named, namedOf(filters))
+  const restoredCamera: [[number, number], [number, number]] | undefined = hasBbox
+    ? // While a bbox drives the search it IS the camera, name tag or not. The
+      // memory's tag says which named search the area was laid over, so
+      // checking it here would refuse to restore the visitor's own area right
+      // after they returned from a listing — the map opened on the whole world.
+      [
+        [filters.minLng!, filters.minLat!],
+        [filters.maxLng!, filters.maxLat!],
+      ]
+    : cameraMemory &&
+        cameraMemory.key === mapSessionKey(filters) &&
+        sameNamed(cameraMemory.named, namedOf(filters))
       ? cameraMemory.bounds
       : undefined;
 
@@ -546,8 +604,8 @@ function BrowseResults() {
       <main
         className={
           mapMode === "split"
-            ? "mx-auto w-full max-w-[1600px] px-6 pt-6 lg:pb-24"
-            : "mx-auto w-full max-w-[1180px] px-6 pt-6 lg:pb-24"
+            ? "mx-auto w-full max-w-[1600px] px-6 pt-6 pb-28 lg:pb-24"
+            : "mx-auto w-full max-w-[1180px] px-6 pt-6 pb-28 lg:pb-24"
         }
       >
         <div className={mapMode === "split" ? "flex gap-8 lg:items-start" : undefined}>
