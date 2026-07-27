@@ -8,6 +8,10 @@ const pushMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, replace: vi.fn() }),
+  // This suite renders the home-page pill, which navigates to /browse for real
+  // (searching from /browse itself only changes the query string, so the pill
+  // writes history directly there — see the pushSearch note).
+  usePathname: () => "/",
 }));
 
 vi.mock("@/lib/api/properties", () => ({

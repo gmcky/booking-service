@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -143,7 +143,6 @@ export function BrowseView() {
 }
 
 function BrowseResults() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const searchPillRef = React.useRef<SearchPillHandle>(null);
   const filters = React.useMemo(
@@ -507,7 +506,12 @@ function BrowseResults() {
       params.set("checkOut", next.checkOut);
     }
     const qs = params.toString();
-    router.push(qs ? `/browse?${qs}` : "/browse");
+    // Same story as the map's own writes: this route is prerendered, and a
+    // production build drops a router navigation whose only difference is the
+    // query string. Sorting and filtering did nothing at all on the deployed
+    // site while working perfectly in dev. Pushed rather than replaced, so
+    // Back still walks through the searches the visitor made.
+    window.history.pushState(null, "", qs ? `/browse?${qs}` : "/browse");
   }
 
   const activeFilterCount =

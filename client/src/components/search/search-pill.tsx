@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
 import { addDays, addMonths, format, isSameMonth, startOfMonth } from "date-fns";
@@ -158,6 +158,7 @@ function filterLocations(locations: LocationCountry[], query: string): LocationC
 export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
   function SearchPill({ initialFilters, className, collapsible, compact, onNewSearch }, ref) {
     const router = useRouter();
+    const pathname = usePathname();
 
     const rootRef = React.useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = React.useState(!collapsible);
@@ -610,11 +611,21 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       if (infants) params.set("infantsAllowed", "true");
 
       const qs = params.toString();
+      const href = qs ? `/browse?${qs}` : "/browse";
       // The overlay is closing by navigating, so its history entry is handed
       // over rather than popped: popping would undo this push.
       releaseOverlayHistory();
       onNewSearch?.();
-      router.push(qs ? `/browse?${qs}` : "/browse");
+      if (pathname === "/browse") {
+        // Searching from the results page changes only the query string, and
+        // /browse is prerendered — in a production build the router drops such
+        // a navigation silently, so the search simply never happened (it works
+        // in dev, which is what hid it). The history API is what Next documents
+        // for search-param updates, and useSearchParams reads it the same way.
+        window.history.pushState(null, "", href);
+      } else {
+        router.push(href);
+      }
       setOpenSegment(null);
       setMobileStep(null);
       if (collapsible) setExpanded(false);
