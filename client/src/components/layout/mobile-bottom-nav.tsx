@@ -19,9 +19,10 @@ const AUTHED: Item[] = [
   { href: "/profile", label: "Profile", icon: CircleUser },
 ];
 
+// No Wishlists while signed out: saving anything bounces to /login anyway, so
+// the tab is a dead end dressed as a destination.
 const ANON: Item[] = [
   { href: "/browse", label: "Explore", icon: Search },
-  { href: "/favorites", label: "Wishlists", icon: Heart },
   { href: "/login", label: "Log in", icon: CircleUser },
 ];
 
