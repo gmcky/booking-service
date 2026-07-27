@@ -80,6 +80,13 @@ export interface SearchPillProps {
    * bar (mobile home) rather than the three-segment strip.
    */
   compact?: boolean;
+  /**
+   * Fires just before the pill navigates to a new search. The browse page uses
+   * it to forget the map camera it was remembering: a submitted search owns
+   * the viewport, while a history navigation between existing searches does
+   * not — which is the distinction a URL comparison could never make.
+   */
+  onNewSearch?: () => void;
 }
 
 function clampAdults(adults: number, children: number, infants: boolean): number {
@@ -149,7 +156,7 @@ function filterLocations(locations: LocationCountry[], query: string): LocationC
 }
 
 export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
-  function SearchPill({ initialFilters, className, collapsible, compact }, ref) {
+  function SearchPill({ initialFilters, className, collapsible, compact, onNewSearch }, ref) {
     const router = useRouter();
 
     const rootRef = React.useRef<HTMLDivElement>(null);
@@ -602,6 +609,7 @@ export const SearchPill = React.forwardRef<SearchPillHandle, SearchPillProps>(
       // The overlay is closing by navigating, so its history entry is handed
       // over rather than popped: popping would undo this push.
       releaseOverlayHistory();
+      onNewSearch?.();
       router.push(qs ? `/browse?${qs}` : "/browse");
       setOpenSegment(null);
       setMobileStep(null);

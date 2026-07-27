@@ -192,22 +192,24 @@ function BrowseResults() {
    */
   function replaceSearch(params: URLSearchParams) {
     const qs = params.toString();
-    mapWriteRef.current = qs;
     window.history.replaceState(null, "", qs ? `/browse?${qs}` : "/browse");
   }
 
   /**
-   * The remembered camera belongs to a map session, so it only survives search
-   * params the map itself wrote. Anything else — the search pill, the filters
-   * dialog, a shared link — is a new search, and reopening the map on the
-   * previous search's viewport would quietly answer a question nobody asked.
+   * A submitted search owns the viewport, so the remembered camera goes with
+   * it — otherwise searching a new city and opening the map would land on the
+   * area left over from the last one.
+   *
+   * Called from the two places a new search actually starts (this page's
+   * filters and the search pill), not from watching the URL: closing the map
+   * with the system Back pops the overlay's history entry, which rewinds the
+   * query string to the pre-map search. A URL watcher reads that as somebody
+   * else's navigation and throws away the very camera the visitor just spent
+   * the map session choosing.
    */
-  const mapWriteRef = React.useRef<string | null>(searchParams.toString());
-  React.useEffect(() => {
-    if (mapWriteRef.current === searchParams.toString()) return;
-    mapWriteRef.current = null;
+  function forgetCamera() {
     lastCameraRef.current = undefined;
-  }, [searchParams]);
+  }
 
   /** Bbox URL update — once the user moves the map, the viewport IS the
    *  location: named-location params are dropped (Airbnb's "map area"). */
@@ -487,6 +489,7 @@ function BrowseResults() {
   }, [mapMode]);
 
   function applyFilters(next: PropertyQuery) {
+    forgetCamera();
     const params = new URLSearchParams();
     if (next.city) params.set("city", next.city);
     if (next.country) params.set("country", next.country);
@@ -557,7 +560,12 @@ function BrowseResults() {
           className={mapMode === "split" ? "min-w-0 flex-1 lg:max-w-[55%]" : "min-w-0 flex-1"}
         >
         <div className="mb-4">
-          <SearchPill ref={searchPillRef} initialFilters={filters} collapsible />
+          <SearchPill
+            ref={searchPillRef}
+            initialFilters={filters}
+            collapsible
+            onNewSearch={forgetCamera}
+          />
         </div>
 
         <div className="mb-5">
