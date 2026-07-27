@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Star } from "lucide-react";
 import type { Property } from "@/lib/api/properties";
 import { formatPrice, formatRating } from "@/lib/utils/money";
@@ -21,6 +22,7 @@ export function PropertyCard({
   highlighted = false,
   onHoverChange,
   onNavigate,
+  priority = false,
 }: {
   property: PropertyCardData;
   /** Ring highlight driven by hovering the matching pin on the browse map. */
@@ -32,6 +34,9 @@ export function PropertyCard({
    * hand that entry over before the navigation happens.
    */
   onNavigate?: () => void;
+  /** Set on the first row of a grid: those cards hold the page LCP, and the
+   *  default lazy loading costs a round trip before anything paints. */
+  priority?: boolean;
 }) {
   const rating = formatRating(property.averageRating);
 
@@ -52,11 +57,15 @@ export function PropertyCard({
       >
         <FavoriteButton propertyId={property.id} variant="overlay" />
         {property.images[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={photoUrl(property.images[0])}
             alt={property.title}
-            className="size-full object-cover transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            fill
+            // Cards are full-width on phones, two-up on tablets and roughly
+            // 320px in the desktop grid.
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
+            priority={priority}
+            className="object-cover transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : (
           <span className="font-mono text-[11px] text-muted-foreground">

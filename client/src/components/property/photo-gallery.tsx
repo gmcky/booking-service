@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -61,7 +62,7 @@ function PhotoGrid({ images, title }: { images: string[]; title: string }) {
   if (count === 1) {
     return (
       <div className="grid h-[420px] grid-cols-1 gap-2 overflow-hidden rounded-xl">
-        <PhotoTile src={images[0]} title={title} />
+        <PhotoTile src={images[0]} title={title} priority />
       </div>
     );
   }
@@ -79,7 +80,7 @@ function PhotoGrid({ images, title }: { images: string[]; title: string }) {
   if (count === 3) {
     return (
       <div className="grid h-[420px] grid-cols-2 grid-rows-2 gap-2 overflow-hidden rounded-xl">
-        <PhotoTile src={images[0]} title={title} className="row-span-2" />
+        <PhotoTile src={images[0]} title={title} className="row-span-2" priority />
         <PhotoTile src={images[1]} title={title} />
         <PhotoTile src={images[2]} title={title} />
       </div>
@@ -90,7 +91,7 @@ function PhotoGrid({ images, title }: { images: string[]; title: string }) {
   // remaining photos just leave the trailing cell empty).
   return (
     <div className="grid h-[420px] grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-xl">
-      <PhotoTile src={images[0]} title={title} className="col-span-2 row-span-2" />
+      <PhotoTile src={images[0]} title={title} className="col-span-2 row-span-2" priority />
       {images.slice(1, 5).map((src, i) => (
         <PhotoTile key={i} src={src} title={title} />
       ))}
@@ -102,22 +103,32 @@ function PhotoTile({
   src,
   title,
   className,
+  priority = false,
 }: {
   src: string | null;
   title: string;
   className?: string;
+  /** Set on the first tile: it's the LCP element of the listing page. */
+  priority?: boolean;
 }) {
   return (
     <div
-      className={cn("group flex items-center justify-center overflow-hidden", className)}
+      className={cn(
+        "group relative flex items-center justify-center overflow-hidden",
+        className,
+      )}
       style={{ backgroundImage: PHOTO_STRIPES }}
     >
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={photoUrl(src)}
           alt={title}
-          className="size-full object-cover transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          fill
+          // Widest case is the large tile in the 4-5 photo layout: half of the
+          // 1120px content column.
+          sizes="(max-width: 640px) 100vw, 560px"
+          priority={priority}
+          className="object-cover transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
         />
       ) : (
         <span className="font-mono text-[11px] text-muted-foreground">no photo</span>
@@ -169,10 +180,16 @@ function FullGallery({ images, title }: { images: string[]; title: string }) {
             className="flex items-center justify-center overflow-hidden rounded-lg"
             style={{ backgroundImage: PHOTO_STRIPES }}
           >
+            {/* Plain img on purpose: these render at their own aspect ratio,
+                and next/image needs either a sized box (which would crop the
+                photo the visitor opened this view to see in full) or width and
+                height we don't have. Lazy loading is the part that mattered. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photoUrl(src)}
               alt={`${title} photo ${i + 1}`}
+              loading="lazy"
+              decoding="async"
               className="w-full object-cover"
             />
           </div>

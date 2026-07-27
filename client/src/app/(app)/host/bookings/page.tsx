@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Calendar, Users, ChevronDown, Check, Loader2 } from "lucide-react";
@@ -207,15 +208,22 @@ function BookingRow({
     <Card className="p-3.5 transition-[border-color,box-shadow] hover:border-ring hover:shadow-sm">
       <div className="flex items-stretch gap-[18px] max-sm:flex-col">
         <div
-          className="flex h-[140px] w-[168px] flex-none items-center justify-center rounded-lg max-sm:h-40 max-sm:w-full"
+          className="relative flex h-[140px] w-[168px] flex-none items-center justify-center rounded-lg max-sm:h-40 max-sm:w-full"
           style={{ backgroundImage: PHOTO_STRIPES }}
         >
           {booking.property.images[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
+
               src={photoUrl(booking.property.images[0])}
+
               alt={booking.property.title}
-              className="size-full rounded-lg object-cover"
+
+              fill
+
+              sizes="(max-width: 640px) 100vw, 168px"
+
+              className="rounded-lg object-cover"
+
             />
           ) : (
             <span className="font-mono text-[11px] text-muted-foreground">no photo</span>

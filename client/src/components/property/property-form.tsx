@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, Upload, AlertCircle, Loader2, X } from "lucide-react";
@@ -595,11 +596,16 @@ export function PropertyForm({
                   {initial!.images.map((src) => (
                     <div
                       key={src}
-                      className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg"
+                      className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg"
                       style={{ backgroundImage: PHOTO_STRIPES }}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photoUrl(src)} alt="" className="size-full object-cover" />
+                      <Image
+                        src={photoUrl(src)}
+                        alt=""
+                        fill
+                        sizes="160px"
+                        className="object-cover"
+                      />
                     </div>
                   ))}
                 </div>
@@ -614,6 +620,9 @@ export function PropertyForm({
                 <div className="mb-3 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2.5">
                   {uploaded.map((photo) => (
                     <div key={photo.path} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
+                      {/* Blob URL from the file the host just picked: the
+                          image optimizer can only fetch http(s), so this one
+                          stays a plain img until the upload has a real URL. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={photo.previewUrl} alt="" className="size-full object-cover" />
                       <button

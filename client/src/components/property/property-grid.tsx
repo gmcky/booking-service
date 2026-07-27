@@ -56,8 +56,8 @@ export function PropertyGrid({
   if (reduce) {
     return (
       <div className={GRID_CLASS}>
-        {data.data.map((property) => (
-          <PropertyCard key={property.id} property={property} />
+        {data.data.map((property, i) => (
+          <PropertyCard key={property.id} property={property} priority={i < 4} />
         ))}
       </div>
     );
@@ -65,9 +65,9 @@ export function PropertyGrid({
 
   return (
     <motion.div className={GRID_CLASS} variants={container} initial="hidden" animate="show">
-      {data.data.map((property) => (
+      {data.data.map((property, i) => (
         <motion.div key={property.id} variants={item}>
-          <PropertyCard property={property} />
+          <PropertyCard property={property} priority={i < 4} />
         </motion.div>
       ))}
     </motion.div>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Users, Phone, Mail, User } from "lucide-react";
@@ -193,15 +194,22 @@ function HostBookingDetailBody({
         <Card className="mb-6 p-3.5">
           <Link href={`/properties/${booking.property.id}`} className="flex items-stretch gap-4">
             <div
-              className="flex h-[104px] w-[130px] flex-none items-center justify-center rounded-lg"
+              className="relative flex h-[104px] w-[130px] flex-none items-center justify-center rounded-lg"
               style={{ backgroundImage: PHOTO_STRIPES }}
             >
               {booking.property.images[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
+
                   src={photoUrl(booking.property.images[0])}
+
                   alt={booking.property.title}
-                  className="size-full rounded-lg object-cover"
+
+                  fill
+
+                  sizes="130px"
+
+                  className="rounded-lg object-cover"
+
                 />
               ) : (
                 <span className="font-mono text-[11px] text-muted-foreground">no photo</span>

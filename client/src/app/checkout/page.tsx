@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -260,15 +261,22 @@ function CheckoutInner() {
         <Card className="p-5">
           <div className="flex gap-3.5 border-b border-border pb-[18px]">
             <div
-              className="flex size-20 shrink-0 items-center justify-center rounded-lg"
+              className="relative flex size-20 shrink-0 items-center justify-center rounded-lg"
               style={{ backgroundImage: PHOTO_STRIPES }}
             >
               {property?.images[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
+
                   src={photoUrl(property.images[0])}
+
                   alt={property.title}
-                  className="size-full rounded-lg object-cover"
+
+                  fill
+
+                  sizes="80px"
+
+                  className="rounded-lg object-cover"
+
                 />
               ) : (
                 <span className="font-mono text-[10px] text-muted-foreground">photo</span>

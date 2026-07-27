@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, MapPin, Tag, Home, Loader2 } from "lucide-react";
@@ -132,8 +133,13 @@ function ListingCard({
         style={{ backgroundImage: PHOTO_STRIPES }}
       >
         {property.images[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photoUrl(property.images[0])} alt={property.title} className="size-full object-cover" />
+          <Image
+            src={photoUrl(property.images[0])}
+            alt={property.title}
+            fill
+            sizes="(max-width: 640px) 100vw, 360px"
+            className="object-cover"
+          />
         ) : (
           <span className="font-mono text-[11px] text-muted-foreground">no photo</span>
         )}

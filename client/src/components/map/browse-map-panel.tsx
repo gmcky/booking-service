@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronsRight, Loader2, Star, X } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import { BaseMap, type MapBounds } from "@/components/map/base-map";
@@ -185,11 +186,12 @@ export function BrowseMapPanel({
               style={{ backgroundImage: PHOTO_STRIPES }}
             >
               {selected.images[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={photoUrl(selected.images[0])}
                   alt={selected.title}
-                  className="size-full object-cover"
+                  fill
+                  sizes="256px"
+                  className="object-cover"
                 />
               ) : null}
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -132,15 +133,22 @@ function ConfirmationInner() {
           <div className="overflow-hidden rounded-lg border border-border text-left">
             <div className="flex gap-3.5 border-b border-border p-3.5">
               <div
-                className="flex size-16 shrink-0 items-center justify-center rounded-md"
+                className="relative flex size-16 shrink-0 items-center justify-center rounded-md"
                 style={{ backgroundImage: PHOTO_STRIPES }}
               >
                 {booking.property.images[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
+
                     src={photoUrl(booking.property.images[0])}
+
                     alt={booking.property.title}
-                    className="size-full rounded-md object-cover"
+
+                    fill
+
+                    sizes="64px"
+
+                    className="rounded-md object-cover"
+
                   />
                 ) : (
                   <span className="font-mono text-[9px] text-muted-foreground">photo</span>

@@ -3,6 +3,7 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -610,10 +611,11 @@ function BrowseResults() {
                 swaps only the ones that actually changed and a map pan never
                 flashes the grid. The map spinner is the only loading cue. */}
             <section className="grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-6">
-              {items.map((property) => (
+              {items.map((property, i) => (
                 <PropertyCard
                   key={property.id}
                   property={property}
+                  priority={i < 4}
                   highlighted={hoveredId === property.id || selectedId === property.id}
                   onHoverChange={(hovering) => setHoveredId(hovering ? property.id : null)}
                 />
@@ -886,11 +888,12 @@ function PinnedMarkerCard({
           style={{ backgroundImage: PHOTO_STRIPES }}
         >
           {marker.images[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={photoUrl(marker.images[0])}
               alt={marker.title}
-              className="size-full object-cover"
+              fill
+              sizes="112px"
+              className="object-cover"
             />
           ) : null}
         </div>
