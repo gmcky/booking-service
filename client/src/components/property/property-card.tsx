@@ -20,11 +20,18 @@ export function PropertyCard({
   property,
   highlighted = false,
   onHoverChange,
+  onNavigate,
 }: {
   property: PropertyCardData;
   /** Ring highlight driven by hovering the matching pin on the browse map. */
   highlighted?: boolean;
   onHoverChange?: (hovering: boolean) => void;
+  /**
+   * Fires when the card is actually followed (the favourite button stops the
+   * event, so it doesn't count). Overlays that own a history entry use it to
+   * hand that entry over before the navigation happens.
+   */
+  onNavigate?: () => void;
 }) {
   const rating = formatRating(property.averageRating);
 
@@ -33,6 +40,7 @@ export function PropertyCard({
       href={`/properties/${property.id}`}
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
+      onClick={() => onNavigate?.()}
       className={cn(
         "group block overflow-hidden rounded-xl border border-border bg-card transition duration-300 ease-in-out hover:-translate-y-1 hover:border-ring hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         highlighted && "border-ring shadow-sm ring-2 ring-ring",

@@ -167,9 +167,10 @@ export function BrowseMapPanel({
       </div>
 
       {selected ? (
-        // Mobile: a full-width horizontal card docked at the bottom. Desktop: a
-        // compact vertical card in the corner.
-        <Card className="absolute inset-x-3 bottom-3 z-10 gap-0 overflow-hidden p-0 shadow-lg lg:inset-x-auto lg:left-3 lg:w-64">
+        // Desktop only: a compact card in the corner. On mobile the same tap
+        // scrolls the list sheet to that listing's card, so a floating card
+        // would be a second copy fighting the sheet for the bottom of the map.
+        <Card className="absolute bottom-3 left-3 z-10 hidden w-64 gap-0 overflow-hidden p-0 shadow-lg lg:block">
           <button
             type="button"
             aria-label="Close"
@@ -178,9 +179,9 @@ export function BrowseMapPanel({
           >
             <X className="size-3.5" />
           </button>
-          <Link href={`/properties/${selected.id}`} className="flex lg:block">
+          <Link href={`/properties/${selected.id}`} className="block">
             <div
-              className="relative flex aspect-square w-28 shrink-0 items-center justify-center lg:aspect-[4/3] lg:w-full"
+              className="relative flex aspect-[4/3] w-full items-center justify-center"
               style={{ backgroundImage: PHOTO_STRIPES }}
             >
               {selected.images[0] ? (

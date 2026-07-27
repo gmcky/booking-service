@@ -2,17 +2,19 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ChevronDown,
-  List,
   Loader2,
   Map as MapIcon,
   Search,
   SlidersHorizontal,
+  Star,
+  X,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PropertyCard } from "@/components/property/property-card";
@@ -20,9 +22,12 @@ import { SearchPill, type SearchPillHandle } from "@/components/search/search-pi
 import { QuickFilters } from "@/components/search/quick-filters";
 import { FiltersDialog } from "@/components/search/filters-dialog";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import type { MapBounds } from "@/components/map/base-map";
+import { MapListSheet, type SheetSnap } from "@/components/map/map-list-sheet";
 import {
   propertyApi,
+  type PropertyMapMarker,
   type PropertyQuery,
   type PropertySort,
   type PropertyType,
@@ -34,6 +39,8 @@ import { useOverlayHistory } from "@/lib/hooks/use-overlay-history";
 import { useUiStore } from "@/lib/stores/ui-store";
 import { lockBodyScroll } from "@/lib/utils/scroll-lock";
 import { paddedMarkerBounds } from "@/lib/utils/map-bounds";
+import { formatPrice, formatRating } from "@/lib/utils/money";
+import { PHOTO_STRIPES, photoUrl } from "@/lib/utils/photo";
 
 const BrowseMapPanel = dynamic(
   () => import("@/components/map/browse-map-panel").then((m) => m.BrowseMapPanel),
@@ -151,6 +158,7 @@ function BrowseResults() {
   );
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [sheetSnap, setSheetSnap] = React.useState<SheetSnap>("peek");
 
   const hasBbox = hasBboxFilter(filters);
   const isMobile = useMediaQuery("(max-width: 1023px)");
@@ -261,7 +269,23 @@ function BrowseResults() {
   }
 
   // Full-screen on mobile, so Back belongs to the map, not to the page under it.
-  useOverlayHistory(isMobile && mapOpen, collapseMap);
+  // The release handle matters here: the sheet's cards navigate away while the
+  // overlay is still mounted, and without it the unmount would pop the entry
+  // the overlay owns and undo the navigation that just happened.
+  const releaseOverlayHistory = useOverlayHistory(isMobile && mapOpen, collapseMap);
+
+  // The sheet starts closed on every map session, and a pin tap opens it far
+  // enough to read the card it scrolls to. Reset on the breakpoint too: the
+  // sheet mounts when a resize crosses into mobile with the map already open,
+  // and it must not come up at whatever snap an earlier session left behind.
+  React.useEffect(() => {
+    setSheetSnap("peek");
+  }, [mapOpen, isMobile]);
+
+  function handleSelectChange(id: string | null) {
+    setSelectedId(id);
+    if (id && isMobile) setSheetSnap((snap) => (snap === "peek" ? "half" : snap));
+  }
 
   // Browse deliberately does NOT default to the visitor's own city: someone
   // planning a trip would have to undo it on every visit. The geo demo lives
@@ -312,6 +336,26 @@ function BrowseResults() {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage, listVisible]);
 
+  // Same chain inside the sheet, observed against the sheet's own scroller —
+  // the page behind the map is scroll-locked, so a viewport-rooted sentinel
+  // would never come into view and the list would stop at page one.
+  const sheetScrollRef = React.useRef<HTMLDivElement>(null);
+  const sheetLoadMoreRef = React.useRef<HTMLDivElement>(null);
+  const sheetVisible = isMobile && mapOpen;
+  React.useEffect(() => {
+    const el = sheetLoadMoreRef.current;
+    const root = sheetScrollRef.current;
+    if (!el || !root || !hasNextPage || isFetchingNextPage || !sheetVisible) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) fetchNextPage();
+      },
+      { root, rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, sheetVisible]);
+
   // The map draws every match in the filter set, not the loaded list pages —
   // otherwise pins for unloaded pages simply don't exist. The bbox is padded
   // and grid-snapped (paddedMarkerBounds) so small pans reuse the cached
@@ -345,6 +389,13 @@ function BrowseResults() {
 
   const items = query.data?.pages.flatMap((p) => p.data) ?? [];
   const total = query.data?.pages[0]?.pagination.total ?? 0;
+  /** The map draws every match, the sheet only holds the pages loaded so far,
+   *  so a tapped pin can point at a listing the list hasn't reached. It rides
+   *  at the top of the sheet instead, built from the marker itself. */
+  const pinnedMarker =
+    selectedId && !items.some((item) => item.id === selectedId)
+      ? ((markersQuery.data ?? []).find((marker) => marker.id === selectedId) ?? null)
+      : null;
   // Skeleton only when there's nothing to render yet (first load). Any
   // refetch that has placeholder cards keeps them fully visible — the
   // loading cue lives in a spinner decoupled from the content, so a pan
@@ -634,7 +685,7 @@ function BrowseResults() {
                   hoveredId={hoveredId}
                   onHoverChange={setHoveredId}
                   selectedId={selectedId}
-                  onSelectChange={setSelectedId}
+                  onSelectChange={handleSelectChange}
                   onBoundsChange={updateBounds}
                   onCollapse={collapseMap}
                   initialBounds={restoredCamera}
@@ -686,27 +737,64 @@ function BrowseResults() {
                 </div>
               </div>
 
-              {/* The way back to the list, carrying the result count. Hidden
-                  while a listing card is open, which takes the same spot. */}
-              {selectedId ? null : (
-                <div className="absolute inset-x-0 bottom-5 z-10 flex justify-center lg:hidden">
-                  <button
-                    type="button"
-                    onClick={collapseMap}
-                    className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-lg active:scale-95"
-                  >
-                    <List className="size-4" />
-                    Show list
-                    {showSkeleton || searching ? (
-                      <span className="text-background/70">· Searching…</span>
-                    ) : (
-                      <span className="text-background/70">
-                        · {total} {total === 1 ? "home" : "homes"}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
+              {/* The list itself, over the map. It replaces both the old
+                  "Show list · N homes" button (the count now rides on the
+                  handle) and the floating single-listing card: a tapped pin
+                  scrolls the sheet to its card instead. */}
+              {isMobile ? (
+                <MapListSheet
+                  count={total}
+                  searching={showSkeleton || searching}
+                  snap={sheetSnap}
+                  onSnapChange={setSheetSnap}
+                  scrollToId={selectedId}
+                  scrollRef={sheetScrollRef}
+                >
+                  {query.isError && items.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-12 text-center">
+                      <p className="text-sm text-destructive">{(query.error as Error).message}</p>
+                      <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+                        Try again
+                      </Button>
+                    </div>
+                  ) : showSkeleton ? (
+                    <SheetSkeleton />
+                  ) : items.length === 0 && !pinnedMarker ? (
+                    <p className="py-12 text-center text-sm text-muted-foreground">
+                      No stays in this area. Try moving the map or widening your filters.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {pinnedMarker ? (
+                        <PinnedMarkerCard
+                          marker={pinnedMarker}
+                          onClose={() => setSelectedId(null)}
+                          onNavigate={releaseOverlayHistory}
+                        />
+                      ) : null}
+                      {items.map((property) => (
+                        <div key={property.id} data-property-id={property.id}>
+                          <PropertyCard
+                            property={property}
+                            highlighted={selectedId === property.id}
+                            onNavigate={releaseOverlayHistory}
+                          />
+                        </div>
+                      ))}
+                      <div ref={sheetLoadMoreRef} />
+                      {query.isFetchingNextPage ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : !query.hasNextPage && items.length > 0 ? (
+                        <p className="py-4 text-center text-[13px] text-muted-foreground">
+                          Showing all {total} stays
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </MapListSheet>
+              ) : null}
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -748,6 +836,81 @@ function ResultsSkeleton() {
         </div>
       ))}
     </section>
+  );
+}
+
+function SheetSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="overflow-hidden rounded-xl border border-border">
+          <div className="aspect-[4/3] animate-pulse bg-muted" />
+          <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
+            <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
+            <div className="h-2.5 w-2/5 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A pin whose listing hasn't been paged in yet: the marker carries enough to
+ *  render a card, so the sheet stays the one place listings are read. */
+function PinnedMarkerCard({
+  marker,
+  onClose,
+  onNavigate,
+}: {
+  marker: PropertyMapMarker;
+  onClose: () => void;
+  onNavigate: () => void;
+}) {
+  const rating = formatRating(marker.averageRating);
+  return (
+    <Card
+      data-property-id={marker.id}
+      className="relative gap-0 overflow-hidden border-ring p-0 ring-2 ring-ring"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute top-2 right-2 z-10 flex size-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm"
+      >
+        <X className="size-3.5" />
+      </button>
+      <Link href={`/properties/${marker.id}`} onClick={onNavigate} className="flex">
+        <div
+          className="relative flex aspect-square w-28 shrink-0 items-center justify-center"
+          style={{ backgroundImage: PHOTO_STRIPES }}
+        >
+          {marker.images[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photoUrl(marker.images[0])}
+              alt={marker.title}
+              className="size-full object-cover"
+            />
+          ) : null}
+        </div>
+        <div className="min-w-0 flex-1 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm font-semibold">{marker.title}</span>
+            {rating ? (
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs">
+                <Star className="size-3 fill-current" />
+                {rating}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1.5 text-sm">
+            <strong className="font-semibold">{formatPrice(marker.pricePerNight)}</strong>{" "}
+            <span className="text-muted-foreground">night</span>
+          </div>
+        </div>
+      </Link>
+    </Card>
   );
 }
 
