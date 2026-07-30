@@ -12,7 +12,7 @@ type Item = { href: string; label: string; icon: React.ElementType };
 
 // No "Messages" — there's no messaging feature — so Host takes a top-level tab.
 const AUTHED: Item[] = [
-  { href: "/browse", label: "Explore", icon: Search },
+  { href: "/", label: "Explore", icon: Search },
   { href: "/favorites", label: "Wishlists", icon: Heart },
   { href: "/bookings", label: "Trips", icon: Luggage },
   { href: "/host/properties", label: "Host", icon: House },
@@ -22,12 +22,13 @@ const AUTHED: Item[] = [
 // No Wishlists while signed out: saving anything bounces to /login anyway, so
 // the tab is a dead end dressed as a destination.
 const ANON: Item[] = [
-  { href: "/browse", label: "Explore", icon: Search },
+  { href: "/", label: "Explore", icon: Search },
   { href: "/login", label: "Log in", icon: CircleUser },
 ];
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/browse") return pathname === "/browse" || pathname === "/";
+  // Explore points at home, but search results live on /browse — one tab, both.
+  if (href === "/") return pathname === "/" || pathname.startsWith("/browse");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
