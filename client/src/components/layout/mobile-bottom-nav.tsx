@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Heart, Luggage, House, CircleUser } from "lucide-react";
+import { Search, Heart, Luggage, House, KeyRound, CircleUser } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/lib/auth/store";
 import { useUiStore } from "@/lib/stores/ui-store";
@@ -10,25 +10,27 @@ import { cn } from "@/lib/utils";
 
 type Item = { href: string; label: string; icon: React.ElementType };
 
+// The first tab flips with the route: on the home page it opens search, and
+// everywhere else it is the way back home (there is no header below `lg`).
+const EXPLORE: Item = { href: "/browse", label: "Explore", icon: Search };
+const HOME: Item = { href: "/", label: "Home", icon: House };
+
 // No "Messages" — there's no messaging feature — so Host takes a top-level tab.
 const AUTHED: Item[] = [
-  { href: "/", label: "Explore", icon: Search },
   { href: "/favorites", label: "Wishlists", icon: Heart },
   { href: "/bookings", label: "Trips", icon: Luggage },
-  { href: "/host/properties", label: "Host", icon: House },
+  { href: "/host/properties", label: "Host", icon: KeyRound },
   { href: "/profile", label: "Profile", icon: CircleUser },
 ];
 
 // No Wishlists while signed out: saving anything bounces to /login anyway, so
 // the tab is a dead end dressed as a destination.
-const ANON: Item[] = [
-  { href: "/", label: "Explore", icon: Search },
-  { href: "/login", label: "Log in", icon: CircleUser },
-];
+const ANON: Item[] = [{ href: "/login", label: "Log in", icon: CircleUser }];
 
 function isActive(pathname: string, href: string): boolean {
-  // Explore points at home, but search results live on /browse — one tab, both.
-  if (href === "/") return pathname === "/" || pathname.startsWith("/browse");
+  // The first tab always points away from the current page, so it never lights
+  // up; an exact match also keeps `startsWith` from matching every route.
+  if (href === "/" || href === "/browse") return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -39,7 +41,7 @@ export function MobileBottomNav() {
   const authed = useAuthStore((s) => s.status === "authed");
   const user = useAuthStore((s) => s.user);
   const mapOverlayOpen = useUiStore((s) => s.mapOverlayOpen);
-  const items = authed ? AUTHED : ANON;
+  const items = [pathname === "/" ? EXPLORE : HOME, ...(authed ? AUTHED : ANON)];
 
   // Hidden while the fullscreen mobile map is up.
   if (mapOverlayOpen) return null;
