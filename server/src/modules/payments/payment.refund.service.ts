@@ -86,7 +86,6 @@ export class PaymentRefundService {
     // Safe snapshot: following update only mutates status.
     const existingMetadata = getMetadataObject(payment.metadata);
     const existingAudit = getAuditObject(existingMetadata);
-    const existingStripePayload = getStripePayloadObject(existingMetadata);
     const refundAmount = (Number(payment.amount) * Number(policy.refundPercent)) / 100;
     const refundRequestedAt = new Date().toISOString();
 
@@ -368,7 +367,6 @@ export class PaymentRefundService {
 
     const existingMetadata = getMetadataObject(payment.metadata);
     const existingAudit = getAuditObject(existingMetadata);
-    const existingStripePayload = getStripePayloadObject(existingMetadata);
     const refundRequestRaw = existingAudit.refundRequest;
     const refundRequest =
       refundRequestRaw && typeof refundRequestRaw === "object" && !Array.isArray(refundRequestRaw)

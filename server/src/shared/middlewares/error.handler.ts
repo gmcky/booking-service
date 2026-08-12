@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from "express";
-import type { Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { MulterError } from "multer";
 import { ZodError } from "zod";

@@ -33,7 +33,6 @@ import { prisma } from "../../shared/lib/prisma.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
 import { sendOpsAlert } from "../../shared/lib/ops-alert.js";
-import { AppError } from "../../shared/middlewares/error.handler.js";
 import { PaymentRefundService } from "../../modules/payments/payment.refund.service.js";
 
 // TODO: add unit coverage for PaymentRefundService.approveRefund/rejectRefund.

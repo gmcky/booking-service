@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { authenticate, authorize, requireVerifiedEmail } from "../../shared/middlewares/auth.js";
+import { authenticate, requireVerifiedEmail } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { asyncHandler } from "../../shared/utils/async.handler.js";
 import * as reviewController from "./review.controller.js";

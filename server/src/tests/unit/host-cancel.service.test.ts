@@ -25,7 +25,6 @@ vi.mock("timers/promises", () => ({
 import { prisma } from "../../shared/lib/prisma.js";
 import { stripe } from "../../shared/lib/stripe.js";
 import { emailQueue } from "../../shared/queues/email.queue.js";
-import { AppError } from "../../shared/middlewares/error.handler.js";
 import { HostCancellationService } from "../../modules/bookings/host-cancel.service.js";
 
 const mockPrisma = prisma as unknown as DeepMockProxy<PrismaClient>;
