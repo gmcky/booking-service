@@ -5,7 +5,6 @@ import { FavoriteService } from "./favorite.service.js";
 import type { FavoriteQueryInput } from "./favorite.types.js";
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/favorites/:propertyId
  * @access Private
  * @security Bearer token required.
@@ -19,7 +18,6 @@ export async function addFavorite(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route DELETE /api/v1/favorites/:propertyId
  * @access Private
  * @security Bearer token required.
@@ -33,7 +31,6 @@ export async function removeFavorite(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/favorites
  * @access Private
  * @security Bearer token required.
@@ -47,7 +44,6 @@ export async function getFavorites(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/favorites/ids
  * @access Private
  * @security Bearer token required.

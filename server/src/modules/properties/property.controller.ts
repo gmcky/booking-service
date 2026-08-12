@@ -10,7 +10,6 @@ import type {
 } from "./property.types.js";
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/properties
  * @access Public
  */
@@ -66,7 +65,6 @@ export async function getProperties(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/properties/map-markers
  * @access Public
  */
@@ -115,7 +113,6 @@ export async function getPropertyMapMarkers(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/properties/locations
  * @access Public
  */
@@ -124,7 +121,6 @@ export async function getPropertyLocations(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/properties/address-suggest
  * @access Private
  * @security Bearer token required — host-form helper, not a public geocoder.
@@ -135,7 +131,6 @@ export async function getAddressSuggestions(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/properties/my
  * @access Private
  * @security Bearer token required.
@@ -149,7 +144,6 @@ export async function getMyProperties(req: AuthenticatedRequest, res: Response) 
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/properties/:id
  * @access Public
  */
@@ -168,7 +162,6 @@ export async function getPropertyById(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/properties/images
  * @access Private
  * @security Bearer token required. Files are written to disk; caller passes returned paths as rawImagePaths on create/update.
@@ -187,7 +180,6 @@ export async function uploadPropertyImages(req: AuthenticatedRequest, res: Respo
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/properties
  * @access Private
  * @security Bearer token required. Any authenticated user can create a property; ownerId is set from req.user.id.
@@ -201,7 +193,6 @@ export async function createProperty(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/properties/:id
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
@@ -214,7 +205,6 @@ export async function updateProperty(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route DELETE /api/v1/properties/:id
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
@@ -227,7 +217,6 @@ export async function deleteProperty(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/properties/:id/activate
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.
@@ -240,7 +229,6 @@ export async function activateProperty(req: AuthenticatedRequest, res: Response)
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/properties/:id/deactivate
  * @access Private
  * @security Bearer token required. Ownership is verified per-resource.

@@ -24,7 +24,6 @@ const REFRESH_TOKEN_CLEAR_OPTIONS: CookieOptions = {
 };
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/users/me
  * @access Private
  * @security Bearer token required.
@@ -36,7 +35,6 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/users/me/stats
  * @access Private
  * @security Bearer token required.
@@ -48,7 +46,6 @@ export async function getCurrentUserStats(req: AuthenticatedRequest, res: Respon
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/users/me
  * @access Private
  * @security Bearer token required.
@@ -71,7 +68,6 @@ export async function updateCurrentUser(req: AuthenticatedRequest, res: Response
 
 // TODO:   Enforce step-up confirmation token for account deletion.
 /**
- * @server\src\api.routes.ts
  * @route DELETE /api/v1/users/me
  * @access Private
  * @security Bearer token required.
@@ -86,7 +82,6 @@ export async function deleteCurrentUser(req: AuthenticatedRequest, res: Response
 }
 
 /**
- * @server\src\api.routes.ts
  * @route DELETE /api/v1/users/me/avatar
  * @access Private
  * @security Bearer token required.
@@ -98,7 +93,6 @@ export async function deleteAvatar(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/users/me/email/request-change
  * @access Private
  * @security Bearer token required.
@@ -117,7 +111,6 @@ export async function requestEmailChange(req: AuthenticatedRequest, res: Respons
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/users/me/email/confirm-change
  * @access Private
  * @security Bearer token required.
@@ -133,7 +126,6 @@ export async function confirmEmailChange(req: AuthenticatedRequest, res: Respons
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/users/me/change-password
  * @access Private
  * @security Bearer token required.
@@ -155,7 +147,6 @@ export async function changePassword(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/users?page=1&limit=10
  * @access Private (Admin)
  * @security Bearer token required + ADMIN role.
@@ -176,7 +167,6 @@ export async function getAllUsers(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/users/:id
  * @access Public
  */
@@ -188,7 +178,6 @@ export async function getUserById(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/users/:id/reviews
  * @access Public
  */
@@ -201,7 +190,6 @@ export async function getHostReviews(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/users/:id/suspend
  * @access Private (Admin)
  * @security Bearer token required + ADMIN role.
@@ -213,7 +201,6 @@ export async function suspendUser(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/users/:id/restore
  * @access Private (Admin)
  * @security Bearer token required + ADMIN role.

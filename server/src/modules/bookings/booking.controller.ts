@@ -7,7 +7,6 @@ import { logger } from "../../shared/lib/logger.js";
 import type { HostBookingsQueryInput } from "./booking.types.js";
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/bookings
  * @access Private
  * @security Bearer token required.
@@ -22,7 +21,6 @@ export async function getUserBookings(req: AuthenticatedRequest, res: Response) 
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/bookings/host
  * @access Private
  * @security Bearer token required.
@@ -40,7 +38,6 @@ export async function getHostBookings(req: AuthenticatedRequest, res: Response) 
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/bookings/:id
  * @access Private
  * @security Bearer token required.
@@ -54,7 +51,6 @@ export async function getBookingById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/bookings/:id/host-view
  * @access Private
  * @security Bearer token required. Property owner only.
@@ -67,7 +63,6 @@ export async function getHostBookingById(req: AuthenticatedRequest, res: Respons
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/bookings/:id/host-cancel-request
  * @access Private
  * @security Bearer token required. Property owner only.
@@ -81,7 +76,6 @@ export async function requestHostCancellation(req: AuthenticatedRequest, res: Re
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/bookings/:id/host-decline
  * @access Private
  * @security Bearer token required. Property owner only.
@@ -94,7 +88,6 @@ export async function declineHostBooking(req: AuthenticatedRequest, res: Respons
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/bookings
  * @access Private
  * @security Bearer token required.
@@ -129,7 +122,6 @@ export async function createBooking(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/bookings/:id/status
  * @access Private
  * @security Bearer token required.
@@ -144,7 +136,6 @@ export async function updateBookingStatus(req: AuthenticatedRequest, res: Respon
 }
 
 /**
- * @server\src\api.routes.ts
  * @route DELETE /api/v1/bookings/:id
  * @access Private
  * @security Bearer token required.
@@ -158,7 +149,6 @@ export async function cancelBooking(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/bookings/:id/early-checkout
  * @access Private
  * @security Bearer token required. Guest or admin only.
@@ -172,7 +162,6 @@ export async function earlyCheckout(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/bookings/:id/dates
  * @access Private
  * @security Bearer token required.
@@ -186,7 +175,6 @@ export async function updateBookingDates(req: AuthenticatedRequest, res: Respons
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/bookings/check-availability
  * @access Public
  */
@@ -199,7 +187,6 @@ export async function checkAvailability(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/bookings/:propertyId/blocked-dates
  * @access Public
  */

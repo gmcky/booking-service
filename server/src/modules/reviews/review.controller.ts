@@ -5,7 +5,6 @@ import { ReviewService } from "./review.service.js";
 import type { ReviewQueryInput } from "./review.types.js";
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/reviews/property/:propertyId
  * @access Public
  */
@@ -30,7 +29,6 @@ export async function getPropertyReviews(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/reviews
  * @access Private (completed booking required)
  * @security Bearer token required.
@@ -43,7 +41,6 @@ export async function createReview(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/reviews/:id
  * @access Private
  * @security Bearer token required.
@@ -56,7 +53,6 @@ export async function updateReview(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route DELETE /api/v1/reviews/:id
  * @access Private (author or admin)
  * @security Bearer token required.
@@ -70,7 +66,6 @@ export async function deleteReview(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route PATCH /api/v1/reviews/:id/reply
  * @access Private
  * @security Bearer token required + OWNER role.
@@ -87,7 +82,6 @@ export async function replyToReview(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/reviews/:id/report
  * @access Private
  * @security Bearer token required.
@@ -105,7 +99,6 @@ export async function reportReview(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route GET /api/v1/reviews/property/:propertyId/stats
  * @access Public
  */

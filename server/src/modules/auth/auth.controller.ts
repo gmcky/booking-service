@@ -25,7 +25,6 @@ const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
 };
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/register
  * @access Public
  * @security Rate-limited at HTTP layer.
@@ -44,7 +43,6 @@ export async function register(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/login
  * @access Public
  * @security Rate-limited + lockout-backed.
@@ -62,7 +60,6 @@ export async function login(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/google
  * @access Public
  * @security Rate-limited (shares the login limiter).
@@ -80,7 +77,6 @@ export async function googleAuth(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/logout
  * @access Private
  * @security Requires refresh token cookie.
@@ -99,7 +95,6 @@ export async function logout(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/refresh
  * @access Public
  * @security Rotation + reuse-detection path.
@@ -119,7 +114,6 @@ export async function refreshToken(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/verify-email
  * @access Public
  * @body { token: string }
@@ -133,7 +127,6 @@ export async function verifyEmail(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/resend-verification
  * @access Private
  * @security Bearer token required. Rate-limited to 3/hour.
@@ -147,7 +140,6 @@ export async function resendVerification(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/forgot-password
  * @access Public
  * @body { email: string }
@@ -163,7 +155,6 @@ export async function forgotPassword(req: Request, res: Response) {
 }
 
 /**
- * @server\src\api.routes.ts
  * @route POST /api/v1/auth/reset-password
  * @access Public
  * @body { token: string, newPassword: string }
