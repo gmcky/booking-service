@@ -805,9 +805,6 @@ export class AuthService {
   }
 
   // Fail-open on Redis outage; auth should degrade, not hard-stop.
-  // Trade-off: We prioritize user availability over strict security during a cache outage.
-  // In a high-security environment, we might consider a fail-closed approach or a
-  // secondary in-memory fallback (e.g., a LRU cache) to maintain partial protection.
   private static async checkLockout(
     email: string,
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
