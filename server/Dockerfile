@@ -4,7 +4,7 @@
 FROM node:22-alpine AS builder
 
 # Install pnpm
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@10.30.3
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ RUN pnpm build
 FROM node:22-alpine
 
 # Install pnpm
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@10.30.3
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
