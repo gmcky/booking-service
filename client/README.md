@@ -28,7 +28,7 @@ pnpm test:e2e
 
 Test fixtures default to the local dev seed (`demo@booking.dev`,
 `owner@demo.com`, a seeded property id). To run the suite against another
-environment, override them (in `.env.local` or the shell — the Playwright
+environment, override them (in `.env.local` or the shell; the Playwright
 config loads `.env.local` itself):
 
 ```bash
@@ -40,7 +40,7 @@ E2E_PROPERTY_ID=...     # checkout spec target property
 ```
 
 Note: the register and checkout specs hard-navigate mid-session, which
-requires the refresh cookie to survive a reload — that only works when the
+requires the refresh cookie to survive a reload, which only works when the
 client and API are same-site (localhost↔localhost in dev, or production
 subdomains of one domain). Pointing a localhost client at a deployed API is
 cross-site: those specs will fail on session loss, by design.
