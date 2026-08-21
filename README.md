@@ -247,7 +247,7 @@ On merge to `main`: the Docker image is built and pushed to GHCR, then the VPS p
 push → Tests & Checks → Build & Push (GHCR) → Deploy (VPS)
 ```
 
-Workers and the API server run as separate containers from the same image. SSH keys, GHCR credentials, and the VPS address are stored as GitHub Actions secrets. VPS runs on DigitalOcean.
+Workers and the API server run as separate containers from the same image. SSH keys, GHCR credentials, and the VPS address are stored as GitHub Actions secrets. VPS runs on Hetzner.
 
 ## Environment
 
