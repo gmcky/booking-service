@@ -115,6 +115,10 @@ async function sendPropertyCreatedHost(data: PropertyCreatedHostJob): Promise<vo
   });
 }
 
+// Currently unreachable: BookingService.create no longer enqueues
+// "booking-created-guest" (a PENDING booking holds no inventory, so a
+// payment nudge would half-promise a reservation we don't hold). Kept wired
+// so re-enabling the enqueue is a one-line change.
 async function sendBookingCreatedGuest(data: BookingCreatedGuestJob): Promise<void> {
   await sendMail("booking-created-guest", {
     from: env.EMAIL_FROM,

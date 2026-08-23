@@ -208,10 +208,7 @@ describe("ABAC booking flow integration", () => {
     const bookingId = createBookingResponse.body.id as string;
 
     await waitForAsyncSideEffects(() => {
-      expect(emailQueue.add).toHaveBeenCalledWith(
-        "booking-created-guest",
-        expect.objectContaining({ bookingId }),
-      );
+      // Guest gets no booking-created mail (only "Payment successful" after pay).
       expect(emailQueue.add).toHaveBeenCalledWith(
         "booking-created-host",
         expect.objectContaining({ bookingId }),

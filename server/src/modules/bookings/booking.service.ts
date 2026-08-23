@@ -1180,18 +1180,25 @@ export class BookingService {
 
     const nights = calculateNights(booking.checkIn, booking.checkOut);
 
-    await emailQueue.add("booking-created-guest", {
-      bookingId: booking.id,
-      guestEmail: guest.email,
-      guestFirstName: guest.firstName,
-      propertyTitle: booking.property.title,
-      propertyCity: booking.property.city,
-      checkIn: formatDate(booking.checkIn),
-      checkOut: formatDate(booking.checkOut),
-      nights,
-      guests: booking.guests,
-      totalPrice: Number(booking.totalPrice),
-    });
+    // Disabled: a PENDING booking holds no inventory (only CONFIRMED does — see
+    // checkAvailability), so a "complete your payment" nudge would half-promise
+    // a reservation we don't actually hold. Instant-pay is the common path and
+    // already gets "Payment successful"; sending a booking-received mail too
+    // just spammed the guest with two mails at once. Unpaid bookings expire
+    // silently via the 24h sweep. Host still gets its booking-created mail below.
+    // Kept for reference in case a real hold + delayed-payment flow is added.
+    // await emailQueue.add("booking-created-guest", {
+    //   bookingId: booking.id,
+    //   guestEmail: guest.email,
+    //   guestFirstName: guest.firstName,
+    //   propertyTitle: booking.property.title,
+    //   propertyCity: booking.property.city,
+    //   checkIn: formatDate(booking.checkIn),
+    //   checkOut: formatDate(booking.checkOut),
+    //   nights,
+    //   guests: booking.guests,
+    //   totalPrice: Number(booking.totalPrice),
+    // });
 
     if (!host) {
       logger.warn(
