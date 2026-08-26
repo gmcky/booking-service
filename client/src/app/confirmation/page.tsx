@@ -45,7 +45,11 @@ function ConfirmationInner() {
     queryFn: () => bookingApi.byId(bookingId),
     enabled: Boolean(bookingId),
     refetchInterval: (query) =>
-      query.state.data?.status === "PENDING" && !timedOut ? 2000 : false,
+      query.state.data?.status === "PENDING" &&
+      query.state.data?.payment?.status !== "FAILED" &&
+      !timedOut
+        ? 2000
+        : false,
   });
 
   const status = booking?.status;
@@ -76,9 +80,13 @@ function ConfirmationInner() {
     );
   }
 
+  const paymentFailed = booking.payment?.status === "FAILED";
   const confirmed = booking.status === "CONFIRMED" || booking.status === "COMPLETED";
-  const processing = booking.status === "PENDING";
   const cancelled = booking.status === "CANCELLED";
+  // A failed attempt leaves the booking PENDING and resumable; the cron sweep
+  // releases it later. Only a CANCELLED booking is truly dead.
+  const processing = booking.status === "PENDING" && !paymentFailed;
+  const retryable = booking.status === "PENDING" && paymentFailed;
 
   const stalled = processing && timedOut;
 
@@ -95,7 +103,9 @@ function ConfirmationInner() {
       ? "This is taking longer than usual. Your payment is safe. We'll email you once the booking confirms, or you can check again now."
       : processing
         ? "Your payment is being confirmed. This can take a moment. It's safe to leave this page, we'll email you as soon as it's done."
-        : "Your payment couldn't be completed and this booking was cancelled. You can try booking again.";
+        : retryable
+          ? "Your payment didn't go through. You can try again."
+          : "Your payment couldn't be completed and this booking was cancelled. You can try booking again.";
 
   return (
     <Centered>
@@ -112,10 +122,10 @@ function ConfirmationInner() {
           <div className="mx-auto mb-5 flex size-13 items-center justify-center rounded-full border border-border bg-muted">
             {processing ? (
               <Loader2 className="size-6 animate-spin" strokeWidth={1.75} />
-            ) : cancelled ? (
-              <X className="size-6" strokeWidth={1.75} />
-            ) : (
+            ) : confirmed ? (
               <Check className="size-6" strokeWidth={1.75} />
+            ) : (
+              <X className="size-6" strokeWidth={1.75} />
             )}
           </div>
           <h1 className="mb-1.5 text-[23px] font-semibold tracking-tight">{heading}</h1>
@@ -193,6 +203,15 @@ function ConfirmationInner() {
                 }}
               >
                 Check again
+              </Button>
+            ) : retryable ? (
+              <Button
+                nativeButton={false}
+                size="lg"
+                className="w-full"
+                render={<Link href={`/checkout?bookingId=${booking.id}`} />}
+              >
+                Try again
               </Button>
             ) : cancelled ? (
               <Button
