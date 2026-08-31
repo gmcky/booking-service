@@ -163,6 +163,7 @@ API types are committed, so the client builds without a live backend. After chan
 booking-service/
 ├── server/
 │   ├── src/
+│   │   ├── config/            # env validation (Zod), Swagger spec
 │   │   ├── modules/           # feature modules, each with controller/service/routes/validators
 │   │   │   ├── auth/          # register, login, refresh, Google sign-in, email verification, password reset
 │   │   │   ├── users/         # profiles, avatars, password change, soft delete
@@ -177,6 +178,7 @@ booking-service/
 │   │   │   ├── middlewares/   # auth, validation, error handling
 │   │   │   ├── queues/        # BullMQ queue definitions
 │   │   │   └── utils/         # date helpers, pagination
+│   │   ├── tests/             # unit + integration (Testcontainers)
 │   │   └── workers/           # BullMQ workers (email, image, cleanup, payout, geocode)
 │   ├── prisma/
 │   │   ├── schema.prisma      # 12 models
